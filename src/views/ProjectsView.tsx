@@ -83,6 +83,25 @@ export function ProjectsView() {
       return next;
     });
 
+  const revealPlanLocation = (projectId: string | null, taskId: string | null) => {
+    if (projectId) {
+      setExpandedProjects((prev) => {
+        if (prev.has(projectId)) return prev;
+        const next = new Set(prev);
+        next.add(projectId);
+        return next;
+      });
+    }
+    if (taskId) {
+      setExpandedTasks((prev) => {
+        if (prev.has(taskId)) return prev;
+        const next = new Set(prev);
+        next.add(taskId);
+        return next;
+      });
+    }
+  };
+
   const tasksOfProject = useMemo(() => {
     const map = new Map<string, Task[]>();
     for (const t of state.tasks) {
@@ -440,6 +459,8 @@ export function ProjectsView() {
       <Dialog open={planForm.open} onClose={() => setPlanForm((s) => ({ ...s, open: false }))} title={planForm.editing ? "编辑计划" : "新建每日计划"}>
         <DailyPlanForm
           initial={planForm.editing}
+          defaultProjectId={planForm.projectId}
+          defaultTaskId={planForm.taskId}
           lockProject={planForm.lockProject}
           lockTask={planForm.lockTask}
           defaultDate={planForm.defaultDate}
@@ -452,6 +473,7 @@ export function ProjectsView() {
               store.addDailyPlan(input);
               show("计划已添加");
             }
+            revealPlanLocation(input.projectId, input.taskId);
             setPlanForm((s) => ({ ...s, open: false }));
           }}
         />

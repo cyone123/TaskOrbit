@@ -25,6 +25,8 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, actions, wide }: DialogProps) {
+  if (!open) return null;
+
   return createPortal(
     <MaterialDialog
       open={open}

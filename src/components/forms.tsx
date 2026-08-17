@@ -249,6 +249,8 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
 
 export interface DailyPlanFormProps {
   initial?: DailyPlan | null;
+  defaultProjectId?: string | null;
+  defaultTaskId?: string | null;
   lockProject?: boolean;
   lockTask?: boolean;
   defaultDate?: string;
@@ -267,6 +269,8 @@ export interface DailyPlanFormProps {
 
 export function DailyPlanForm({
   initial,
+  defaultProjectId,
+  defaultTaskId,
   lockProject = false,
   lockTask = false,
   defaultDate,
@@ -276,8 +280,8 @@ export function DailyPlanForm({
   const { state } = useStore();
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [projectId, setProjectId] = useState<string>(initial?.projectId ?? "");
-  const [taskId, setTaskId] = useState<string>(initial?.taskId ?? "");
+  const [projectId, setProjectId] = useState<string>(initial?.projectId ?? defaultProjectId ?? "");
+  const [taskId, setTaskId] = useState<string>(initial?.taskId ?? defaultTaskId ?? "");
   const [date, setDate] = useState(initial?.date ?? defaultDate ?? todayISO());
   const [startTime, setStartTime] = useState(initial?.startTime ?? "09:00");
   const [endTime, setEndTime] = useState(initial?.endTime ?? "10:00");
