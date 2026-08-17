@@ -72,6 +72,17 @@ export function StatsView() {
     return map;
   }, [focusSessions, state]);
 
+  const projectLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const session of focusSessions) {
+      const projectId = resolveProjectId(session, state);
+      if (!projectId || map.has(projectId)) continue;
+      const project = state.projects.find((item) => item.id === projectId);
+      map.set(projectId, project?.name ?? session.projectNameSnapshot ?? "已删除项目");
+    }
+    return map;
+  }, [focusSessions, state]);
+
   const maxProject = Math.max(1, ...[...projectMinutes.values()]);
 
   const taskTotal = state.tasks.length;
@@ -144,7 +155,7 @@ export function StatsView() {
                     <div className="spread mb-8">
                       <div className="row gap-8">
                         <span className="dot" style={{ background: color }} />
-                        <span className="body-md">{proj?.name ?? "已删除项目"}</span>
+                        <span className="body-md">{proj?.name ?? projectLabels.get(pid) ?? "已删除项目"}</span>
                       </div>
                       <span className="body-md muted">{formatDurationMinutes(mins)}</span>
                     </div>

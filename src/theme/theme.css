@@ -252,6 +252,43 @@ h4 {
   background: var(--md-surface);
 }
 
+.bootstrap-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+
+.bootstrap-card {
+  width: min(100%, 520px);
+  text-align: center;
+}
+
+.app-notice {
+  position: fixed;
+  z-index: 20;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: var(--shape-sm);
+  box-shadow: var(--elev-2);
+  font-size: 13px;
+}
+
+.app-notice--warning {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.app-notice--error {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
 .main-area {
   flex: 1;
   min-width: 0;

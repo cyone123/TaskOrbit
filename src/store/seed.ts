@@ -1,6 +1,8 @@
 import type { AppState, DailyPlan, PomodoroSession, Priority, Project, Task } from "../types";
 import { addDays, toISODate, todayISO } from "../utils/date";
 import { uid } from "../utils/id";
+import { createEmptyState } from "./schema";
+import { STATE_VERSION } from "./version";
 
 function d(offset: number): string {
   return toISODate(addDays(new Date(), offset));
@@ -22,6 +24,7 @@ function mkProject(
     startDate: d(startOffset),
     endDate: d(endOffset),
     archived: false,
+    archivedAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -66,7 +69,17 @@ function mkPlan(
   };
 }
 
+/**
+ * A new installation intentionally starts empty. Demo data is kept in a
+ * separate factory so development fixtures remain available without leaking
+ * into the user's first-run experience.
+ */
 export function createDefaultState(): AppState {
+  return createEmptyState();
+}
+
+/** Development fixture. This is never loaded automatically. */
+export function createDemoState(): AppState {
   const release = mkProject("产品发布", "violet", -14, 20, "App 2.0 版本发布计划");
   const learn = mkProject("个人学习", "blue", -7, 30, "持续学习与自我提升");
   const fitness = mkProject("健身计划", "green", -10, 40, "减脂与增肌");
@@ -168,11 +181,16 @@ export function createDefaultState(): AppState {
     const end = new Date();
     end.setDate(end.getDate() + dayOffset);
     end.setHours(10 + Math.floor(minutes / 60), end.getMinutes() + (minutes % 60), 0, 0);
+    const project = projectId ? [release, learn, fitness].find((p) => p.id === projectId) : null;
+    const task = taskId ? tasks.find((t) => t.id === taskId) : null;
     sessions.push({
       id: uid("s_"),
       projectId,
       taskId,
       dailyPlanId: null,
+      projectNameSnapshot: project?.name ?? null,
+      taskNameSnapshot: task?.name ?? null,
+      dailyPlanNameSnapshot: null,
       kind: "focus",
       startedAt: end.getTime() - minutes * 60_000,
       endedAt: end.getTime(),
@@ -190,7 +208,7 @@ export function createDefaultState(): AppState {
   pushSession(-6, 50, fitness.id, null);
 
   return {
-    version: 1,
+    version: STATE_VERSION,
     projects: [release, learn, fitness],
     tasks,
     dailyPlans: plans,

@@ -353,7 +353,7 @@ export function DailyPlanForm({
               onChange={(e) => changeProject(e.target.value)}
             >
               <option value="">无项目（独立）</option>
-              {state.projects.map((p) => (
+              {state.projects.filter((p) => !p.archived).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

@@ -1,7 +1,127 @@
-.pnpm-store
-node_modules
-dist
-src-tauri/target
-src-tauri/gen
+# ==========================================
+# Rust / Cargo
+# ==========================================
+# Rust 编译输出目录（包含所有的 .exe, .dll, .so, .dylib 等）
+/src-tauri/target/
+
+# Cargo 产生的临时文件
+**/*.rs.bk
+*.rmeta
+
+# Cargo.lock 推荐提交到 Git（保障依赖版本一致性）。
+# 如果你开发的是纯库（Library）项目才建议取消注释下一行：
+# /src-tauri/Cargo.lock
+
+
+# ==========================================
+# Node.js / 前端包管理器
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 前端框架构建产物目录 (例如 Vite/React/Vue 默认打包目录)
+dist/
+dist-ssr/
+build/
+.output/
+.next/
+.nuxt/
+
+
+# ==========================================
+# Tauri 2.0 专用与本地缓存
+# ==========================================
+# Tauri 在构建或开发时产生的临时/生成文件
+/src-tauri/gen/
+/src-tauri/.tauri/
+**/src-tauri/gen/
+**/src-tauri/.tauri/
+
+
+# ==========================================
+# 环境与敏感凭证 (Environment & Credentials)
+# ==========================================
+# 环境变量文件 (包含 API Key、密钥等)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Tauri 打包签名密钥文件 (防止私钥泄漏)
+*.key
+*.pem
+*.pfx
+*.asc
+/src-tauri/tauri.key
+
+
+# ==========================================
+# IDE & 编辑器配置文件
+# ==========================================
+# Visual Studio Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.history/
+
+# JetBrains IDE (CLion, RustRover, WebStorm 等)
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text / Eclipse / Visual Studio
+*.sublime-workspace
+*.sublime-project
+.vs/
+
+
+# ==========================================
+# 操作系统原生临时文件
+# ==========================================
+# macOS
 .DS_Store
-*.local
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthru.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+# Production workspaces
+node_modules/
+target/
+.cargo-tools-target/
+.tmp-cargo-tools/
+dist/
+dist-types/
+.turbo/
+.vite/
+.storybook-out/
+test-results/
+playwright-report/
+*.log
+*.db
+*.db-shm
+*.db-wal
+apps/desktop/public/licenses/
+planning/evidence/m01-*.tmp.json
+.pnpm-store/

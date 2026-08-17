@@ -1,0 +1,100 @@
+import { DEFAULT_SETTINGS } from "./schemaDefaults";
+import { STATE_VERSION } from "./version";
+
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : {};
+}
+
+function asArray(value: unknown): JsonRecord[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * v1 did not have archive timestamps or snapshots for historical sessions.
+ * Add those fields while the related entities are still available so old
+ * history keeps its human-readable labels after a later permanent delete.
+ */
+function migrateV1ToV2(input: JsonRecord): JsonRecord {
+  const projects = asArray(input.projects);
+  const tasks = asArray(input.tasks);
+  const plans = asArray(input.dailyPlans);
+  const sessions = asArray(input.pomodoroSessions);
+
+  const projectNames = new Map<string, string>();
+  const taskNames = new Map<string, string>();
+  const planNames = new Map<string, string>();
+  const taskProjects = new Map<string, string>();
+
+  for (const project of projects) {
+    const id = asString(project.id);
+    const name = asString(project.name);
+    if (id && name) projectNames.set(id, name);
+  }
+  for (const task of tasks) {
+    const id = asString(task.id);
+    const name = asString(task.name);
+    const projectId = asString(task.projectId);
+    if (id && name) taskNames.set(id, name);
+    if (id && projectId) taskProjects.set(id, projectId);
+  }
+  for (const plan of plans) {
+    const id = asString(plan.id);
+    const name = asString(plan.name);
+    if (id && name) planNames.set(id, name);
+  }
+
+  return {
+    ...input,
+    version: STATE_VERSION,
+    projects: projects.map((project) => ({
+      ...project,
+      archivedAt: project.archivedAt ?? null,
+    })),
+    tasks,
+    dailyPlans: plans,
+    pomodoroSessions: sessions.map((session) => {
+      const projectId = asString(session.projectId);
+      const taskId = asString(session.taskId);
+      const dailyPlanId = asString(session.dailyPlanId);
+      const resolvedProjectId = projectId ?? (taskId ? taskProjects.get(taskId) : null);
+      return {
+        ...session,
+        projectNameSnapshot:
+          session.projectNameSnapshot ??
+          (resolvedProjectId ? projectNames.get(resolvedProjectId) ?? null : null),
+        taskNameSnapshot:
+          session.taskNameSnapshot ?? (taskId ? taskNames.get(taskId) ?? null : null),
+        dailyPlanNameSnapshot:
+          session.dailyPlanNameSnapshot ??
+          (dailyPlanId ? planNames.get(dailyPlanId) ?? null : null),
+      };
+    }),
+    settings: { ...DEFAULT_SETTINGS, ...asRecord(input.settings) },
+  };
+}
+
+/** Apply every migration from the stored version to the current version. */
+export function migratePersistedState(raw: unknown): unknown {
+  const input = asRecord(raw);
+  const rawVersion = input.version;
+  const version = typeof rawVersion === "number" && Number.isInteger(rawVersion) ? rawVersion : 1;
+
+  if (version > STATE_VERSION) {
+    throw new Error(
+      `数据版本 ${version} 高于当前版本 ${STATE_VERSION}，请升级应用后再打开。`,
+    );
+  }
+
+  let migrated = input;
+  if (version <= 1) migrated = migrateV1ToV2(migrated);
+
+  return migrated;
+}

@@ -162,14 +162,17 @@ export function PomodoroView() {
     const opts: { value: string; label: string; projectId: string | null; taskId: string | null; dailyPlanId: string | null }[] = [
       { value: "", label: "无（自由专注）", projectId: null, taskId: null, dailyPlanId: null },
     ];
-    for (const p of state.projects) {
+    const activeProjectIds = new Set(
+      state.projects.filter((project) => !project.archived).map((project) => project.id),
+    );
+    for (const p of state.projects.filter((project) => !project.archived)) {
       opts.push({ value: `p_${p.id}`, label: `项目 · ${p.name}`, projectId: p.id, taskId: null, dailyPlanId: null });
     }
-    for (const t of state.tasks) {
+    for (const t of state.tasks.filter((task) => activeProjectIds.has(task.projectId))) {
       const p = state.projects.find((x) => x.id === t.projectId);
       opts.push({ value: `t_${t.id}`, label: `任务 · ${p?.name ?? ""} · ${t.name}`, projectId: t.projectId, taskId: t.id, dailyPlanId: null });
     }
-    for (const pl of state.dailyPlans) {
+    for (const pl of state.dailyPlans.filter((plan) => !plan.projectId || activeProjectIds.has(plan.projectId))) {
       opts.push({ value: `pl_${pl.id}`, label: `计划 · ${pl.name}`, projectId: pl.projectId, taskId: pl.taskId, dailyPlanId: pl.id });
     }
     return opts;

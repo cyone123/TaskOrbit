@@ -29,6 +29,8 @@ export function ProjectsView() {
   const store = useStore();
   const { state } = store;
   const { show } = useSnackbar();
+  const activeProjects = state.projects.filter((project) => !project.archived);
+  const archivedProjects = state.projects.filter((project) => project.archived);
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -62,6 +64,8 @@ export function ProjectsView() {
     open: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
+    danger?: boolean;
     onConfirm: () => void;
   }>({ open: false, title: "", message: "", onConfirm: () => {} });
 
@@ -116,15 +120,32 @@ export function ProjectsView() {
     return map;
   }, [state.dailyPlans]);
 
-  const askDeleteProject = (p: Project) => {
+  const askArchiveProject = (p: Project) => {
     setConfirm({
       open: true,
-      title: "删除项目",
-      message: `确定删除项目「${p.name}」吗？其下的所有任务与计划也会一并删除。`,
+      title: "归档项目",
+      message: `确定归档项目「${p.name}」吗？归档后项目不会出现在活跃项目列表中，但其任务、计划和历史记录会保留。`,
+      confirmLabel: "归档",
+      danger: false,
+      onConfirm: () => {
+        store.archiveProject(p.id);
+        setConfirm((c) => ({ ...c, open: false }));
+        show("项目已归档");
+      },
+    });
+  };
+
+  const askPermanentDeleteProject = (p: Project) => {
+    setConfirm({
+      open: true,
+      title: "永久删除项目",
+      message: `确定永久删除项目「${p.name}」吗？其下的任务与计划也会被删除，此操作不可恢复。历史番茄钟记录会保留，但不再属于活跃项目。`,
+      confirmLabel: "永久删除",
+      danger: true,
       onConfirm: () => {
         store.deleteProject(p.id);
         setConfirm((c) => ({ ...c, open: false }));
-        show("项目已删除");
+        show("项目已永久删除");
       },
     });
   };
@@ -193,7 +214,7 @@ export function ProjectsView() {
         <div>
           <div className="title-lg">我的项目</div>
           <div className="body-sm muted mt-8">
-            {state.projects.length} 个项目 · {state.tasks.length} 个任务 · {state.dailyPlans.length} 个计划
+            {activeProjects.length} 个活跃项目 · {state.tasks.length} 个任务 · {state.dailyPlans.length} 个计划
           </div>
         </div>
         <button className="btn btn--tonal" onClick={() => setProjForm({ open: true, editing: null })}>
@@ -201,11 +222,11 @@ export function ProjectsView() {
         </button>
       </div>
 
-      {state.projects.length === 0 ? (
+      {activeProjects.length === 0 ? (
         <EmptyState icon="space_dashboard" title="还没有项目" hint="点击「新建项目」开始规划你的工作" />
       ) : (
         <div className="col gap-12">
-          {state.projects.map((p) => {
+          {activeProjects.map((p) => {
             const tasks = tasksOfProject.get(p.id) ?? [];
             const done = tasks.filter((t) => t.done).length;
             const status = statusLabel(p.startDate, p.endDate);
@@ -247,8 +268,8 @@ export function ProjectsView() {
                   >
                     <Icon name="edit" size={18} />
                   </button>
-                  <button className="icon-btn" title="删除项目" onClick={(e) => { e.stopPropagation(); askDeleteProject(p); }}>
-                    <Icon name="delete" size={18} />
+                  <button className="icon-btn" title="归档项目" onClick={(e) => { e.stopPropagation(); askArchiveProject(p); }}>
+                    <Icon name="archive" size={18} />
                   </button>
                   <Icon name={expanded ? "expand_less" : "expand_more"} size={22} className="muted" />
                 </div>
@@ -356,6 +377,29 @@ export function ProjectsView() {
         </div>
       )}
 
+      {archivedProjects.length > 0 && (
+        <div className="card card--filled mt-24">
+          <div className="spread mb-8">
+            <span className="label-lg muted">已归档项目（{archivedProjects.length}）</span>
+          </div>
+          <div className="col gap-8">
+            {archivedProjects.map((p) => (
+              <div className="row gap-12" key={p.id}>
+                <span className="dot" style={{ background: colorByKey(p.color) }} />
+                <span className="body-md grow ellipsis">{p.name}</span>
+                <span className="body-sm muted">{relativeRangeLabel(p.startDate, p.endDate)}</span>
+                <button className="btn btn--text btn--small" onClick={() => { store.restoreProject(p.id); show("项目已恢复"); }}>
+                  <Icon name="unarchive" size={16} /> 恢复
+                </button>
+                <button className="icon-btn" title="永久删除项目" onClick={() => askPermanentDeleteProject(p)}>
+                  <Icon name="delete_forever" size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* FAB */}
       <button className="fab" style={{ right: 24, bottom: 24 }} onClick={() => setProjForm({ open: true, editing: null })} title="新建项目">
         <Icon name="add" />
@@ -421,6 +465,8 @@ export function ProjectsView() {
         open={confirm.open}
         title={confirm.title}
         message={confirm.message}
+        confirmLabel={confirm.confirmLabel}
+        danger={confirm.danger}
         onCancel={() => setConfirm((c) => ({ ...c, open: false }))}
         onConfirm={confirm.onConfirm}
       />

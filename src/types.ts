@@ -10,6 +10,7 @@ export interface Project {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   archived: boolean;
+  archivedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -49,6 +50,10 @@ export interface PomodoroSession {
   projectId: string | null;
   taskId: string | null;
   dailyPlanId: string | null;
+  // Snapshots keep historical statistics readable after permanent deletion.
+  projectNameSnapshot: string | null;
+  taskNameSnapshot: string | null;
+  dailyPlanNameSnapshot: string | null;
   kind: PomodoroKind;
   startedAt: number;
   endedAt: number;
