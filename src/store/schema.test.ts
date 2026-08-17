@@ -5,11 +5,12 @@ describe("persisted state schema", () => {
   it("starts with an empty state", () => {
     const state = createEmptyState();
 
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
     expect(state.projects).toHaveLength(0);
     expect(state.tasks).toHaveLength(0);
     expect(state.dailyPlans).toHaveLength(0);
     expect(state.pomodoroSessions).toHaveLength(0);
+    expect(state.activeTimer).toBeNull();
   });
 
   it("migrates v1 project and session data", () => {
@@ -51,7 +52,7 @@ describe("persisted state schema", () => {
       },
     });
 
-    expect(state.version).toBe(2);
+    expect(state.version).toBe(3);
     expect(state.projects[0].archivedAt).toBeNull();
     expect(state.pomodoroSessions[0].projectNameSnapshot).toBe("项目一");
   });
@@ -80,5 +81,44 @@ describe("persisted state schema", () => {
         settings: {},
       }),
     ).toThrow("引用了不存在的项目");
+  });
+
+  it("migrates v2 data without an active timer", () => {
+    const state = parsePersistedState({
+      version: 2,
+      projects: [],
+      tasks: [],
+      dailyPlans: [],
+      pomodoroSessions: [],
+      settings: {},
+    });
+
+    expect(state.version).toBe(3);
+    expect(state.activeTimer).toBeNull();
+  });
+
+  it("rejects an active timer with an invalid relation", () => {
+    expect(() =>
+      parsePersistedState({
+        version: 3,
+        projects: [],
+        tasks: [],
+        dailyPlans: [],
+        pomodoroSessions: [],
+        settings: {},
+        activeTimer: {
+          projectId: "missing",
+          taskId: null,
+          dailyPlanId: null,
+          phase: "focus",
+          status: "paused",
+          focusCount: 0,
+          durationMs: 25 * 60_000,
+          remainingMs: 25 * 60_000,
+          phaseStartedAt: null,
+          endAt: null,
+        },
+      }),
+    ).toThrow("计时器引用了不存在的项目");
   });
 });

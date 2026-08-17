@@ -129,6 +129,43 @@ const pomodoroSessionSchema = z
     }
   });
 
+const activeTimerSchema = z
+  .object({
+    projectId: z.string().min(1).nullable(),
+    taskId: z.string().min(1).nullable(),
+    dailyPlanId: z.string().min(1).nullable(),
+    phase: z.enum(["focus", "shortBreak", "longBreak"]),
+    status: z.enum(["running", "paused"]),
+    focusCount: z.number().int().min(0),
+    durationMs: z.number().int().min(1),
+    remainingMs: z.number().int().min(0),
+    phaseStartedAt: timestamp.nullable(),
+    endAt: timestamp.nullable(),
+  })
+  .superRefine((timer, ctx) => {
+    if (timer.remainingMs > timer.durationMs) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["remainingMs"],
+        message: "剩余时间不能大于阶段总时长",
+      });
+    }
+    if (timer.status === "running" && (timer.phaseStartedAt === null || timer.endAt === null)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "运行中的计时器必须包含开始时间和结束时间",
+      });
+    }
+    if (timer.status === "paused" && timer.endAt !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endAt"],
+        message: "暂停中的计时器不能包含结束时间",
+      });
+    }
+  });
+
 export const settingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).default(DEFAULT_SETTINGS.theme),
   focusMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.focusMinutes),
@@ -144,6 +181,7 @@ export const appStateSchema = z.object({
   dailyPlans: z.array(dailyPlanSchema),
   pomodoroSessions: z.array(pomodoroSessionSchema),
   settings: settingsSchema,
+  activeTimer: activeTimerSchema.nullable(),
 });
 
 const persistedEnvelopeSchema = z
@@ -154,6 +192,7 @@ const persistedEnvelopeSchema = z
     dailyPlans: z.array(z.unknown()).optional(),
     pomodoroSessions: z.array(z.unknown()).optional(),
     settings: z.unknown().optional(),
+    activeTimer: z.unknown().optional(),
   })
   .passthrough();
 
@@ -165,6 +204,7 @@ export function createEmptyState(): AppState {
     dailyPlans: [],
     pomodoroSessions: [],
     settings: { ...DEFAULT_SETTINGS },
+    activeTimer: null,
   };
 }
 
@@ -191,6 +231,7 @@ export function parsePersistedState(raw: unknown): AppState {
     dailyPlans: envelope.data.dailyPlans ?? [],
     pomodoroSessions: envelope.data.pomodoroSessions ?? [],
     settings: envelope.data.settings ?? {},
+    activeTimer: envelope.data.activeTimer ?? null,
   });
   const parsed = appStateSchema.safeParse(migrated);
   if (!parsed.success) {
@@ -220,6 +261,27 @@ export function validateAppState(state: AppState): AppState {
       if (!task) throw new Error(`计划「${plan.name}」引用了不存在的任务。`);
       if (plan.projectId !== task.projectId) {
         throw new Error(`计划「${plan.name}」的项目与任务不一致。`);
+      }
+    }
+  }
+
+  const timer = parsed.activeTimer;
+  if (timer) {
+    if (timer.projectId && !projectIds.has(timer.projectId)) {
+      throw new Error("计时器引用了不存在的项目。");
+    }
+    if (timer.taskId) {
+      const task = taskById.get(timer.taskId);
+      if (!task) throw new Error("计时器引用了不存在的任务。");
+      if (timer.projectId !== task.projectId) {
+        throw new Error("计时器的项目与任务不一致。");
+      }
+    }
+    if (timer.dailyPlanId) {
+      const plan = parsed.dailyPlans.find((item) => item.id === timer.dailyPlanId);
+      if (!plan) throw new Error("计时器引用了不存在的计划。");
+      if (plan.projectId !== timer.projectId || plan.taskId !== timer.taskId) {
+        throw new Error("计时器的项目、任务与计划不一致。");
       }
     }
   }

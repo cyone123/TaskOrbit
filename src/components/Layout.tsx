@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useStore } from "../store/store";
 import type { ViewKey } from "../types";
+import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
 
 const NAV: { key: ViewKey; label: string; icon: string }[] = [
@@ -20,6 +22,7 @@ interface LayoutProps {
 
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
   const { state, updateSettings } = useStore();
+  const [dataDialogOpen, setDataDialogOpen] = useState(false);
   const theme = state.settings.theme;
   const isDark =
     theme === "dark" ||
@@ -54,6 +57,13 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           {actions}
           <button
             className="icon-btn"
+            onClick={() => setDataDialogOpen(true)}
+            title="数据管理"
+          >
+            <Icon name="import_export" />
+          </button>
+          <button
+            className="icon-btn"
             onClick={toggleTheme}
             title={isDark ? "切换到浅色模式" : "切换到深色模式"}
           >
@@ -62,6 +72,10 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
         </header>
         <div className="content">{children}</div>
       </div>
+      <DataManagementDialog
+        open={dataDialogOpen}
+        onClose={() => setDataDialogOpen(false)}
+      />
     </div>
   );
 }

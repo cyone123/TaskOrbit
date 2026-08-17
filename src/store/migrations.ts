@@ -53,7 +53,7 @@ function migrateV1ToV2(input: JsonRecord): JsonRecord {
 
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 2,
     projects: projects.map((project) => ({
       ...project,
       archivedAt: project.archivedAt ?? null,
@@ -81,6 +81,15 @@ function migrateV1ToV2(input: JsonRecord): JsonRecord {
   };
 }
 
+/** v3 adds the persisted active timer. Existing data has no running timer. */
+function migrateV2ToV3(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    activeTimer: input.activeTimer ?? null,
+  };
+}
+
 /** Apply every migration from the stored version to the current version. */
 export function migratePersistedState(raw: unknown): unknown {
   const input = asRecord(raw);
@@ -95,6 +104,7 @@ export function migratePersistedState(raw: unknown): unknown {
 
   let migrated = input;
   if (version <= 1) migrated = migrateV1ToV2(migrated);
+  if (version <= 2) migrated = migrateV2ToV3(migrated);
 
   return migrated;
 }

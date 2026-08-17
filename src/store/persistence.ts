@@ -77,8 +77,31 @@ export async function persistState(state: AppState): Promise<void> {
 
   const serialized = JSON.stringify(state);
   const previous = localStorage.getItem(LS_KEY);
-  if (previous) localStorage.setItem(LS_BACKUP_KEY, previous);
-  localStorage.setItem(LS_KEY, serialized);
+  const previousBackup = localStorage.getItem(LS_BACKUP_KEY);
+
+  try {
+    if (previous) {
+      try {
+        JSON.parse(previous);
+        localStorage.setItem(LS_BACKUP_KEY, previous);
+      } catch {
+        // Keep the last known-good backup when the primary file is corrupted.
+      }
+    }
+    localStorage.setItem(LS_KEY, serialized);
+  } catch (error) {
+    // localStorage has no transaction primitive. Restore both keys when a
+    // quota or browser storage error interrupts the two-key update.
+    try {
+      if (previous === null) localStorage.removeItem(LS_KEY);
+      else localStorage.setItem(LS_KEY, previous);
+      if (previousBackup === null) localStorage.removeItem(LS_BACKUP_KEY);
+      else localStorage.setItem(LS_BACKUP_KEY, previousBackup);
+    } catch {
+      // Preserve the original storage error for the caller.
+    }
+    throw error;
+  }
 }
 
 export async function clearPersistedState(): Promise<void> {

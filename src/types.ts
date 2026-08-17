@@ -45,11 +45,26 @@ export interface DailyPlan {
 
 export type PomodoroKind = "focus" | "shortBreak" | "longBreak";
 
-export interface PomodoroSession {
-  id: string;
+export type TimerStatus = "running" | "paused";
+
+export interface PomodoroLink {
   projectId: string | null;
   taskId: string | null;
   dailyPlanId: string | null;
+}
+
+export interface ActiveTimer extends PomodoroLink {
+  phase: PomodoroKind;
+  status: TimerStatus;
+  focusCount: number;
+  durationMs: number;
+  remainingMs: number;
+  phaseStartedAt: number | null;
+  endAt: number | null;
+}
+
+export interface PomodoroSession extends PomodoroLink {
+  id: string;
   // Snapshots keep historical statistics readable after permanent deletion.
   projectNameSnapshot: string | null;
   taskNameSnapshot: string | null;
@@ -75,6 +90,7 @@ export interface AppState {
   dailyPlans: DailyPlan[];
   pomodoroSessions: PomodoroSession[];
   settings: Settings;
+  activeTimer: ActiveTimer | null;
 }
 
 // ---- Small helper types -----------------------------------------------------

@@ -213,6 +213,7 @@ export function createDemoState(): AppState {
     tasks,
     dailyPlans: plans,
     pomodoroSessions: sessions,
+    activeTimer: null,
     settings: {
       theme: "system",
       focusMinutes: 25,

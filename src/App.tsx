@@ -36,6 +36,7 @@ function BootstrapGate() {
     loadError,
     loadWarning,
     persistenceError,
+    timerRecoveryWarning,
     retryLoad,
     resetAll,
   } = useStore();
@@ -86,6 +87,11 @@ function BootstrapGate() {
       {persistenceError && (
         <div className="app-notice app-notice--error">
           本地保存失败：{persistenceError}
+        </div>
+      )}
+      {timerRecoveryWarning && (
+        <div className="app-notice app-notice--warning" style={{ top: 60 }}>
+          {timerRecoveryWarning}
         </div>
       )}
       <ThemeManager />

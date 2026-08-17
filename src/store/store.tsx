@@ -10,13 +10,39 @@ import {
 import type {
   AppState,
   DailyPlan,
+  PomodoroKind,
+  PomodoroLink,
   PomodoroSession,
-  Priority,
   Project,
   Settings,
   Task,
 } from "../types";
 import { uid } from "../utils/id";
+import {
+  appendDailyPlan,
+  appendPomodoroSession,
+  appendProject,
+  appendTask,
+  archiveProjectState,
+  createDailyPlan,
+  createProject,
+  createTask,
+  deleteDailyPlanState,
+  deleteProjectState,
+  deleteTaskState,
+  updateDailyPlanState,
+  updateProjectState,
+  updateSettingsState,
+  updateTaskState,
+  restoreProjectState,
+  type DailyPlanInput,
+  type DailyPlanPatch,
+  type PomodoroInput,
+  type ProjectInput,
+  type ProjectPatch,
+  type TaskInput,
+  type TaskPatch,
+} from "./domain";
 import {
   clearPersistedState,
   loadPersistedState,
@@ -24,78 +50,40 @@ import {
   type PersistedLoadResult,
 } from "./persistence";
 import { createDefaultState } from "./seed";
+import { parseImportSnapshot, serializeExportSnapshot } from "./transfer";
+import {
+  pauseTimer as pauseTimerState,
+  reconcileTimer,
+  resetTimer as resetTimerState,
+  resumeTimer as resumeTimerState,
+  selectTimerPhase as selectTimerPhaseState,
+  skipTimer as skipTimerState,
+  startTimer as startTimerState,
+  updateTimerLink,
+} from "./timer";
 import { parsePersistedState, validateAppState } from "./schema";
 
 export { STATE_VERSION } from "./version";
+export type {
+  DailyPlanInput,
+  DailyPlanPatch,
+  PomodoroInput,
+  ProjectInput,
+  ProjectPatch,
+  TaskInput,
+  TaskPatch,
+} from "./domain";
 
-export interface ProjectInput {
-  name: string;
-  description: string;
-  color: string;
-  startDate: string;
-  endDate: string;
-}
+export type StoreStatus = "loading" | "ready" | "error";
 
-export type ProjectPatch = Partial<ProjectInput>;
-
-export interface TaskInput {
-  projectId: string;
-  name: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  priority: Priority;
-}
-
-export type TaskPatch = Partial<
-  Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "priority">
->;
-
-export interface DailyPlanInput {
-  projectId: string | null;
-  taskId: string | null;
-  name: string;
-  description: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  estimatedMinutes: number;
-}
-
-export type DailyPlanPatch = Partial<
-  Pick<
-    DailyPlan,
-    | "projectId"
-    | "taskId"
-    | "name"
-    | "description"
-    | "date"
-    | "startTime"
-    | "endTime"
-    | "done"
-    | "estimatedMinutes"
-  >
->;
-
-export interface PomodoroInput {
-  projectId: string | null;
-  taskId: string | null;
-  dailyPlanId: string | null;
-  kind: PomodoroSession["kind"];
-  startedAt: number;
-  endedAt: number;
-  minutes: number;
-}
-
-type StoreStatus = "loading" | "ready" | "error";
-
-interface StoreApi {
+export interface StoreApi {
   state: AppState;
   status: StoreStatus;
   ready: boolean;
   loadWarning: string | null;
   loadError: string | null;
   persistenceError: string | null;
+  timerRecoveryWarning: string | null;
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
@@ -110,6 +98,15 @@ interface StoreApi {
   deleteDailyPlan: (id: string) => void;
   addPomodoroSession: (input: PomodoroInput) => PomodoroSession;
   updateSettings: (patch: Partial<Settings>) => void;
+  startTimer: (link: PomodoroLink) => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
+  selectTimerPhase: (phase: PomodoroKind) => void;
+  skipTimer: () => void;
+  resetTimer: () => void;
+  updateTimerLink: (link: PomodoroLink) => void;
+  exportSnapshot: () => string;
+  importSnapshot: (raw: unknown) => Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -119,72 +116,22 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function requireProject(state: AppState, projectId: string): Project {
-  const project = state.projects.find((item) => item.id === projectId);
-  if (!project) throw new Error("请选择一个有效的项目。");
-  return project;
-}
-
-function assertPlanRelation(
+function reconcileAppState(
   state: AppState,
-  projectId: string | null,
-  taskId: string | null,
-  allowArchivedProject = true,
-): void {
-  if (projectId) {
-    const project = requireProject(state, projectId);
-    if (!allowArchivedProject && project.archived) {
-      throw new Error("归档项目不能添加新计划。");
-    }
+  now = Date.now(),
+): { state: AppState; warning: string | null; changed: boolean } {
+  const result = reconcileTimer(state.activeTimer, state.settings, now);
+  if (!result.changed) return { state, warning: null, changed: false };
+
+  let nextState: AppState = { ...state, activeTimer: result.timer };
+  for (const completion of result.completed) {
+    nextState = appendPomodoroSession(nextState, completion).state;
   }
-  if (!taskId) return;
-
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) throw new Error("请选择一个有效的任务。");
-  if (!projectId || task.projectId !== projectId) {
-    throw new Error("计划的项目必须与任务所属项目一致。");
-  }
-}
-
-function snapshotForSession(state: AppState, input: PomodoroInput) {
-  const project = input.projectId
-    ? state.projects.find((item) => item.id === input.projectId)
-    : undefined;
-  const task = input.taskId
-    ? state.tasks.find((item) => item.id === input.taskId)
-    : undefined;
-  const plan = input.dailyPlanId
-    ? state.dailyPlans.find((item) => item.id === input.dailyPlanId)
-    : undefined;
-
   return {
-    projectNameSnapshot: project?.name ?? null,
-    taskNameSnapshot: task?.name ?? null,
-    dailyPlanNameSnapshot: plan?.name ?? null,
+    state: validateAppState(nextState),
+    warning: result.warning,
+    changed: true,
   };
-}
-
-function assertPomodoroRelation(state: AppState, input: PomodoroInput): void {
-  const project = input.projectId
-    ? state.projects.find((item) => item.id === input.projectId)
-    : undefined;
-  if (input.projectId && !project) throw new Error("专注对象引用了不存在的项目。");
-
-  const task = input.taskId
-    ? state.tasks.find((item) => item.id === input.taskId)
-    : undefined;
-  if (input.taskId && !task) throw new Error("专注对象引用了不存在的任务。");
-  if (task && input.projectId !== task.projectId) {
-    throw new Error("专注对象的项目与任务不一致。");
-  }
-
-  const plan = input.dailyPlanId
-    ? state.dailyPlans.find((item) => item.id === input.dailyPlanId)
-    : undefined;
-  if (input.dailyPlanId && !plan) throw new Error("专注对象引用了不存在的计划。");
-  if (plan && (plan.projectId !== input.projectId || plan.taskId !== input.taskId)) {
-    throw new Error("专注对象的项目、任务与计划不一致。");
-  }
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -193,12 +140,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const [timerRecoveryWarning, setTimerRecoveryWarning] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
   const readyRef = useRef(false);
+  const stateRef = useRef(state);
   const loadRequestRef = useRef(0);
   const saveGenerationRef = useRef(0);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveTimerRef = useRef<number | undefined>(undefined);
+  const skipNextStatePersistRef = useRef(false);
+  stateRef.current = state;
+
+  const enqueuePersist = useCallback((snapshot: AppState): Promise<void> => {
+    const generation = saveGenerationRef.current;
+    const queued = saveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (generation !== saveGenerationRef.current) return;
+        await persistState(snapshot);
+      });
+    saveQueueRef.current = queued;
+    queued.then(
+      () => {
+        if (mountedRef.current) setPersistenceError(null);
+      },
+      (error) => {
+        if (mountedRef.current) setPersistenceError(errorMessage(error));
+      },
+    );
+    return queued;
+  }, []);
+
+  const flushPendingSave = useCallback(
+    async (snapshot: AppState) => {
+      if (saveTimerRef.current !== undefined) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = undefined;
+      }
+      await enqueuePersist(snapshot);
+      await saveQueueRef.current.catch(() => undefined);
+    },
+    [enqueuePersist],
+  );
 
   const loadState = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
@@ -206,12 +190,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setStatus("loading");
     setLoadError(null);
     setLoadWarning(null);
+    setTimerRecoveryWarning(null);
 
     try {
       const result: PersistedLoadResult = await loadPersistedState();
       if (!mountedRef.current || requestId !== loadRequestRef.current) return;
 
-      let nextState;
+      let nextState: AppState;
       let warning = result.warning ?? null;
       try {
         nextState = parsePersistedState(result.state);
@@ -221,8 +206,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         warning = "主数据格式无效，已从备份恢复。";
       }
 
-      setState(nextState);
+      const reconciled = reconcileAppState(nextState);
+      if (reconciled.changed) {
+        skipNextStatePersistRef.current = true;
+        void enqueuePersist(reconciled.state);
+      }
+      stateRef.current = reconciled.state;
+      setState(reconciled.state);
       setLoadWarning(warning);
+      setTimerRecoveryWarning(reconciled.warning);
       readyRef.current = true;
       setStatus("ready");
     } catch (error) {
@@ -231,7 +223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setLoadError(errorMessage(error));
       setStatus("error");
     }
-  }, []);
+  }, [enqueuePersist]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -241,36 +233,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [loadState]);
 
-  // Debounced, serialized persistence. A later save waits for an earlier one
-  // so a slow disk write cannot be overwritten by an older snapshot.
+  // Persist only durable state transitions. The PomodoroView's display tick
+  // never updates AppState, so it cannot cause a disk write every 250ms.
   useEffect(() => {
     if (!readyRef.current) return;
-    const timer = window.setTimeout(() => {
-      const snapshot = state;
-      const generation = saveGenerationRef.current;
-      const queued = saveQueueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (generation !== saveGenerationRef.current) return;
-          await persistState(snapshot);
-        });
-      saveQueueRef.current = queued;
-      queued.then(
-        () => {
-          if (mountedRef.current) setPersistenceError(null);
-        },
-        (error) => {
-          if (mountedRef.current) setPersistenceError(errorMessage(error));
-        },
-      );
+    if (skipNextStatePersistRef.current) {
+      skipNextStatePersistRef.current = false;
+      return;
+    }
+    if (saveTimerRef.current !== undefined) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = undefined;
+      void enqueuePersist(state);
     }, 400);
-    return () => window.clearTimeout(timer);
-  }, [state]);
+    return () => {
+      if (saveTimerRef.current !== undefined) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = undefined;
+      }
+    };
+  }, [state, enqueuePersist]);
 
-  const mutate = useCallback((fn: (s: AppState) => AppState) => {
+  const reconcileTimerState = useCallback(() => {
+    const result = reconcileAppState(stateRef.current, Date.now());
+    if (!result.changed) return;
+    stateRef.current = result.state;
+    setState(result.state);
+    setTimerRecoveryWarning(result.warning);
+  }, []);
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    const interval = window.setInterval(reconcileTimerState, 1000);
+    const onFocus = () => reconcileTimerState();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") reconcileTimerState();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [status, reconcileTimerState]);
+
+  const mutate = useCallback((fn: (state: AppState) => AppState) => {
     setState((previous) => {
       try {
-        return validateAppState(fn(previous));
+        const next = validateAppState(fn(previous));
+        stateRef.current = next;
+        return next;
       } catch (error) {
         console.error("rejected invalid state mutation", error);
         return previous;
@@ -278,212 +293,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const now = () => Date.now();
-
   const addProject = useCallback<StoreApi["addProject"]>((input) => {
-    const createdAt = now();
-    const project: Project = {
-      id: uid("p_"),
-      ...input,
-      archived: false,
-      archivedAt: null,
-      createdAt,
-      updatedAt: createdAt,
-    };
-    mutate((s) => ({ ...s, projects: [project, ...s.projects] }));
+    const project = createProject(input);
+    mutate((state) => appendProject(state, project));
     return project;
   }, [mutate]);
 
   const updateProject = useCallback<StoreApi["updateProject"]>((id, patch) => {
-    mutate((s) => ({
-      ...s,
-      projects: s.projects.map((project) =>
-        project.id === id ? { ...project, ...patch, updatedAt: now() } : project,
-      ),
-    }));
+    mutate((state) => updateProjectState(state, id, patch));
   }, [mutate]);
 
   const archiveProject = useCallback<StoreApi["archiveProject"]>((id) => {
-    mutate((s) => ({
-      ...s,
-      projects: s.projects.map((project) =>
-        project.id === id
-          ? { ...project, archived: true, archivedAt: now(), updatedAt: now() }
-          : project,
-      ),
-    }));
+    mutate((state) => archiveProjectState(state, id));
   }, [mutate]);
 
   const restoreProject = useCallback<StoreApi["restoreProject"]>((id) => {
-    mutate((s) => ({
-      ...s,
-      projects: s.projects.map((project) =>
-        project.id === id
-          ? { ...project, archived: false, archivedAt: null, updatedAt: now() }
-          : project,
-      ),
-    }));
+    mutate((state) => restoreProjectState(state, id));
   }, [mutate]);
 
-  /** Permanently delete an archived project and its active descendants. */
   const deleteProject = useCallback<StoreApi["deleteProject"]>((id) => {
-    mutate((s) => {
-      const project = s.projects.find((item) => item.id === id);
-      if (!project || !project.archived) return s;
-
-      const taskIds = new Set(
-        s.tasks.filter((task) => task.projectId === id).map((task) => task.id),
-      );
-      const planIds = new Set(
-        s.dailyPlans
-          .filter((plan) => plan.projectId === id || (plan.taskId && taskIds.has(plan.taskId)))
-          .map((plan) => plan.id),
-      );
-      const taskNames = new Map(
-        s.tasks.filter((task) => taskIds.has(task.id)).map((task) => [task.id, task.name]),
-      );
-      const planNames = new Map(
-        s.dailyPlans.filter((plan) => planIds.has(plan.id)).map((plan) => [plan.id, plan.name]),
-      );
-
-      return {
-        ...s,
-        projects: s.projects.filter((item) => item.id !== id),
-        tasks: s.tasks.filter((task) => task.projectId !== id),
-        dailyPlans: s.dailyPlans.filter((plan) => !planIds.has(plan.id)),
-        pomodoroSessions: s.pomodoroSessions.map((session) => {
-          const belongsToProject = session.projectId === id;
-          const belongsToTask = session.taskId ? taskIds.has(session.taskId) : false;
-          const belongsToPlan = session.dailyPlanId ? planIds.has(session.dailyPlanId) : false;
-          if (!belongsToProject && !belongsToTask && !belongsToPlan) return session;
-          return {
-            ...session,
-            // Keep the historical project ID as a stable grouping key even
-            // though the live project entity has been permanently deleted.
-            projectId:
-              belongsToProject || belongsToTask || belongsToPlan ? id : session.projectId,
-            taskId: null,
-            dailyPlanId: null,
-            projectNameSnapshot: session.projectNameSnapshot ?? project.name,
-            taskNameSnapshot:
-              session.taskNameSnapshot ??
-              (session.taskId ? taskNames.get(session.taskId) ?? null : null),
-            dailyPlanNameSnapshot:
-              session.dailyPlanNameSnapshot ??
-              (session.dailyPlanId ? planNames.get(session.dailyPlanId) ?? null : null),
-          };
-        }),
-      };
-    });
+    mutate((state) => deleteProjectState(state, id));
   }, [mutate]);
 
   const addTask = useCallback<StoreApi["addTask"]>((input) => {
-    const createdAt = now();
-    const task: Task = {
-      id: uid("t_"),
-      ...input,
-      done: false,
-      createdAt,
-      updatedAt: createdAt,
-    };
-    mutate((s) => {
-      const project = requireProject(s, input.projectId);
-      if (project.archived) throw new Error("归档项目不能添加新任务。");
-      return { ...s, tasks: [task, ...s.tasks] };
-    });
+    const task = createTask(input);
+    mutate((state) => appendTask(state, task));
     return task;
   }, [mutate]);
 
   const updateTask = useCallback<StoreApi["updateTask"]>((id, patch) => {
-    mutate((s) => ({
-      ...s,
-      tasks: s.tasks.map((task) =>
-        task.id === id ? { ...task, ...patch, updatedAt: now() } : task,
-      ),
-    }));
+    mutate((state) => updateTaskState(state, id, patch));
   }, [mutate]);
 
   const deleteTask = useCallback<StoreApi["deleteTask"]>((id) => {
-    mutate((s) => {
-      const task = s.tasks.find((item) => item.id === id);
-      if (!task) return s;
-      const planIds = new Set(
-        s.dailyPlans.filter((plan) => plan.taskId === id).map((plan) => plan.id),
-      );
-      const planNames = new Map(
-        s.dailyPlans.filter((plan) => planIds.has(plan.id)).map((plan) => [plan.id, plan.name]),
-      );
-      return {
-        ...s,
-        tasks: s.tasks.filter((item) => item.id !== id),
-        dailyPlans: s.dailyPlans.filter((plan) => plan.taskId !== id),
-        pomodoroSessions: s.pomodoroSessions.map((session) =>
-          session.taskId === id || (session.dailyPlanId ? planIds.has(session.dailyPlanId) : false)
-            ? {
-                ...session,
-                taskId: null,
-                dailyPlanId: null,
-                taskNameSnapshot: session.taskNameSnapshot ?? task.name,
-                dailyPlanNameSnapshot:
-                  session.dailyPlanNameSnapshot ??
-                  (session.dailyPlanId ? planNames.get(session.dailyPlanId) ?? null : null),
-              }
-            : session,
-        ),
-      };
-    });
+    mutate((state) => deleteTaskState(state, id));
   }, [mutate]);
 
   const addDailyPlan = useCallback<StoreApi["addDailyPlan"]>((input) => {
-    const createdAt = now();
-    const plan: DailyPlan = {
-      id: uid("pl_"),
-      ...input,
-      done: false,
-      createdAt,
-      updatedAt: createdAt,
-    };
-    mutate((s) => {
-      assertPlanRelation(s, input.projectId, input.taskId, false);
-      return { ...s, dailyPlans: [plan, ...s.dailyPlans] };
-    });
+    const plan = createDailyPlan(input);
+    mutate((state) => appendDailyPlan(state, plan));
     return plan;
   }, [mutate]);
 
   const updateDailyPlan = useCallback<StoreApi["updateDailyPlan"]>((id, patch) => {
-    mutate((s) => {
-      const current = s.dailyPlans.find((plan) => plan.id === id);
-      if (!current) return s;
-      const projectId = patch.projectId !== undefined ? patch.projectId : current.projectId;
-      const taskId = patch.taskId !== undefined ? patch.taskId : current.taskId;
-      assertPlanRelation(s, projectId, taskId);
-      return {
-        ...s,
-        dailyPlans: s.dailyPlans.map((plan) =>
-          plan.id === id ? { ...plan, ...patch, updatedAt: now() } : plan,
-        ),
-      };
-    });
+    mutate((state) => updateDailyPlanState(state, id, patch));
   }, [mutate]);
 
   const deleteDailyPlan = useCallback<StoreApi["deleteDailyPlan"]>((id) => {
-    mutate((s) => {
-      const plan = s.dailyPlans.find((item) => item.id === id);
-      if (!plan) return s;
-      return {
-        ...s,
-        dailyPlans: s.dailyPlans.filter((item) => item.id !== id),
-        pomodoroSessions: s.pomodoroSessions.map((session) =>
-          session.dailyPlanId === id
-            ? {
-                ...session,
-                dailyPlanId: null,
-                dailyPlanNameSnapshot: session.dailyPlanNameSnapshot ?? plan.name,
-              }
-            : session,
-        ),
-      };
-    });
+    mutate((state) => deleteDailyPlanState(state, id));
   }, [mutate]);
 
   const addPomodoroSession = useCallback<StoreApi["addPomodoroSession"]>((input) => {
@@ -494,33 +351,106 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       taskNameSnapshot: null,
       dailyPlanNameSnapshot: null,
     };
-    mutate((s) => {
-      assertPomodoroRelation(s, input);
-      return {
-        ...s,
-        pomodoroSessions: [
-          { ...session, ...snapshotForSession(s, input) },
-          ...s.pomodoroSessions,
-        ],
-      };
-    });
+    mutate((state) => appendPomodoroSession(state, input, session.id).state);
     return session;
   }, [mutate]);
 
   const updateSettings = useCallback<StoreApi["updateSettings"]>((patch) => {
-    mutate((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+    mutate((state) => updateSettingsState(state, patch));
   }, [mutate]);
+
+  const startTimer = useCallback<StoreApi["startTimer"]>((link) => {
+    setTimerRecoveryWarning(null);
+    mutate((state) => ({
+      ...state,
+      activeTimer: startTimerState(state.activeTimer, state.settings, link),
+    }));
+  }, [mutate]);
+
+  const pauseTimer = useCallback<StoreApi["pauseTimer"]>(() => {
+    mutate((state) => ({
+      ...state,
+      activeTimer: pauseTimerState(state.activeTimer),
+    }));
+  }, [mutate]);
+
+  const resumeTimer = useCallback<StoreApi["resumeTimer"]>(() => {
+    setTimerRecoveryWarning(null);
+    mutate((state) => ({
+      ...state,
+      activeTimer: resumeTimerState(state.activeTimer, state.settings),
+    }));
+  }, [mutate]);
+
+  const selectTimerPhase = useCallback<StoreApi["selectTimerPhase"]>((phase) => {
+    mutate((state) => ({
+      ...state,
+      activeTimer: selectTimerPhaseState(state.activeTimer, state.settings, phase),
+    }));
+  }, [mutate]);
+
+  const skipTimer = useCallback<StoreApi["skipTimer"]>(() => {
+    mutate((state) => ({
+      ...state,
+      activeTimer: skipTimerState(state.activeTimer, state.settings),
+    }));
+  }, [mutate]);
+
+  const resetTimer = useCallback<StoreApi["resetTimer"]>(() => {
+    mutate((state) => ({ ...state, activeTimer: resetTimerState() }));
+  }, [mutate]);
+
+  const updateTimerLinkValue = useCallback<StoreApi["updateTimerLink"]>((link) => {
+    mutate((state) => ({
+      ...state,
+      activeTimer: updateTimerLink(state.activeTimer, state.settings, link),
+    }));
+  }, [mutate]);
+
+  const exportSnapshot = useCallback(() => {
+    return serializeExportSnapshot(stateRef.current);
+  }, []);
+
+  const importSnapshot = useCallback(async (raw: unknown) => {
+    const imported = parseImportSnapshot(raw);
+    const nextState = validateAppState({ ...imported, activeTimer: null });
+    const currentState = stateRef.current;
+
+    try {
+      await flushPendingSave(currentState);
+      saveGenerationRef.current += 1;
+      await persistState(nextState);
+      if (!mountedRef.current) return;
+      skipNextStatePersistRef.current = true;
+      stateRef.current = nextState;
+      setState(nextState);
+      setLoadWarning(null);
+      setLoadError(null);
+      setTimerRecoveryWarning(null);
+      setPersistenceError(null);
+    } catch (error) {
+      if (mountedRef.current) setPersistenceError(errorMessage(error));
+      throw error;
+    }
+  }, [flushPendingSave]);
 
   const resetAll = useCallback(async () => {
     saveGenerationRef.current += 1;
+    if (saveTimerRef.current !== undefined) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = undefined;
+    }
     await saveQueueRef.current.catch(() => undefined);
     try {
       await clearPersistedState();
       if (!mountedRef.current) return;
-      setState(createDefaultState());
+      const nextState = createDefaultState();
+      stateRef.current = nextState;
+      setState(nextState);
       setLoadError(null);
       setLoadWarning(null);
       setPersistenceError(null);
+      setTimerRecoveryWarning(null);
       readyRef.current = true;
       setStatus("ready");
     } catch (error) {
@@ -542,6 +472,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         loadWarning,
         loadError,
         persistenceError,
+        timerRecoveryWarning,
         retryLoad,
         addProject,
         updateProject,
@@ -556,6 +487,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         deleteDailyPlan,
         addPomodoroSession,
         updateSettings,
+        startTimer,
+        pauseTimer,
+        resumeTimer,
+        selectTimerPhase,
+        skipTimer,
+        resetTimer,
+        updateTimerLink: updateTimerLinkValue,
+        exportSnapshot,
+        importSnapshot,
         resetAll,
       }}
     >

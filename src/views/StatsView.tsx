@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Icon } from "../components/Icon";
 import { colorByKey } from "../store/colors";
+import { resolveSessionProjectId, selectFocusSessions } from "../store/selectors";
 import { useStore } from "../store/store";
-import type { PomodoroSession } from "../types";
 import {
   addDays,
   formatDurationMinutes,
@@ -16,23 +16,11 @@ function isoOfTimestamp(ts: number): string {
   return toISODate(d);
 }
 
-function resolveProjectId(session: PomodoroSession, state: ReturnType<typeof useStore>["state"]): string | null {
-  if (session.projectId) return session.projectId;
-  if (session.taskId) {
-    return state.tasks.find((t) => t.id === session.taskId)?.projectId ?? null;
-  }
-  if (session.dailyPlanId) {
-    const pl = state.dailyPlans.find((p) => p.id === session.dailyPlanId);
-    return pl?.projectId ?? null;
-  }
-  return null;
-}
-
 export function StatsView() {
   const { state } = useStore();
   const sessions = state.pomodoroSessions;
 
-  const focusSessions = useMemo(() => sessions.filter((s) => s.kind === "focus"), [sessions]);
+  const focusSessions = useMemo(() => selectFocusSessions(state), [sessions, state]);
 
   const now = new Date();
   const today = toISODate(now);
@@ -66,7 +54,7 @@ export function StatsView() {
   const projectMinutes = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of focusSessions) {
-      const pid = resolveProjectId(s, state);
+      const pid = resolveSessionProjectId(s, state);
       if (pid) map.set(pid, (map.get(pid) ?? 0) + s.minutes);
     }
     return map;
@@ -75,7 +63,7 @@ export function StatsView() {
   const projectLabels = useMemo(() => {
     const map = new Map<string, string>();
     for (const session of focusSessions) {
-      const projectId = resolveProjectId(session, state);
+      const projectId = resolveSessionProjectId(session, state);
       if (!projectId || map.has(projectId)) continue;
       const project = state.projects.find((item) => item.id === projectId);
       map.set(projectId, project?.name ?? session.projectNameSnapshot ?? "已删除项目");
