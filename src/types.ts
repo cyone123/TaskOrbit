@@ -28,6 +28,18 @@ export interface Task {
   updatedAt: number;
 }
 
+export type DailyPlanRepeat = "none" | "daily" | "weekly" | "monthly";
+
+export interface DailyPlanRecurrence {
+  frequency: DailyPlanRepeat;
+  /** Total number of occurrences, including the first one. */
+  count: number;
+  /** Shared identifier for occurrences created from the same repeat rule. */
+  seriesId: string | null;
+  /** One-based occurrence number within the series. */
+  occurrence: number;
+}
+
 export interface DailyPlan {
   id: string;
   projectId: string | null; // null -> fully independent plan
@@ -39,6 +51,7 @@ export interface DailyPlan {
   endTime: string; // HH:mm
   done: boolean;
   estimatedMinutes: number;
+  recurrence: DailyPlanRecurrence;
   createdAt: number;
   updatedAt: number;
 }

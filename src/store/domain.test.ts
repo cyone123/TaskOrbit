@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   appendDailyPlan,
+  appendDailyPlans,
   appendPomodoroSession,
   appendProject,
   appendTask,
   archiveProjectState,
   createDailyPlan,
+  createDailyPlans,
   createProject,
   createTask,
   deleteProjectState,
@@ -97,5 +99,33 @@ describe("domain commands", () => {
         }, 6),
       ),
     ).toThrow("项目必须与任务所属项目一致");
+  });
+
+  it("expands repeated plans into linked concrete occurrences", () => {
+    const { project, task, state } = fixtureState();
+    const plans = createDailyPlans({
+      projectId: project.id,
+      taskId: task.id,
+      name: "重复计划",
+      description: "",
+      date: "2026-08-17",
+      startTime: "09:00",
+      endTime: "10:00",
+      estimatedMinutes: 60,
+      repeat: "weekly",
+      repeatCount: 3,
+    }, 10);
+    const next = appendDailyPlans(state, plans);
+
+    expect(plans).toHaveLength(3);
+    expect(plans.map((plan) => plan.date)).toEqual([
+      "2026-08-17",
+      "2026-08-24",
+      "2026-08-31",
+    ]);
+    expect(new Set(plans.map((plan) => plan.id)).size).toBe(3);
+    expect(new Set(plans.map((plan) => plan.recurrence.seriesId)).size).toBe(1);
+    expect(plans.map((plan) => plan.recurrence.occurrence)).toEqual([1, 2, 3]);
+    expect(next.dailyPlans).toHaveLength(4);
   });
 });

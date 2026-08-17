@@ -55,7 +55,8 @@ function mkTask(
 }
 
 function mkPlan(
-  input: Omit<DailyPlan, "id" | "done" | "createdAt" | "updatedAt" | "estimatedMinutes"> &
+  input: Omit<DailyPlan, "id" | "done" | "createdAt" | "updatedAt" | "estimatedMinutes" | "recurrence"> &
+    Partial<Pick<DailyPlan, "recurrence">> &
     Partial<Pick<DailyPlan, "done" | "estimatedMinutes">>,
 ): DailyPlan {
   const now = Date.now();
@@ -63,6 +64,12 @@ function mkPlan(
     id: uid("pl_"),
     done: input.done ?? false,
     estimatedMinutes: input.estimatedMinutes ?? 60,
+    recurrence: input.recurrence ?? {
+      frequency: "none",
+      count: 1,
+      seriesId: null,
+      occurrence: 1,
+    },
     createdAt: now,
     updatedAt: now,
     ...input,

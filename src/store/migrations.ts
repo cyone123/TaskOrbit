@@ -90,6 +90,23 @@ function migrateV2ToV3(input: JsonRecord): JsonRecord {
   };
 }
 
+/** v4 adds repeat metadata to every persisted daily-plan occurrence. */
+function migrateV3ToV4(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    dailyPlans: asArray(input.dailyPlans).map((plan) => ({
+      ...plan,
+      recurrence: plan.recurrence ?? {
+        frequency: "none",
+        count: 1,
+        seriesId: null,
+        occurrence: 1,
+      },
+    })),
+  };
+}
+
 /** Apply every migration from the stored version to the current version. */
 export function migratePersistedState(raw: unknown): unknown {
   const input = asRecord(raw);
@@ -105,6 +122,7 @@ export function migratePersistedState(raw: unknown): unknown {
   let migrated = input;
   if (version <= 1) migrated = migrateV1ToV2(migrated);
   if (version <= 2) migrated = migrateV2ToV3(migrated);
+  if (version <= 3) migrated = migrateV3ToV4(migrated);
 
   return migrated;
 }

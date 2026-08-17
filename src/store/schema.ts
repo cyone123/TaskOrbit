@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AppState } from "../types";
 import { migratePersistedState } from "./migrations";
+import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
 import { DEFAULT_SETTINGS } from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
@@ -23,6 +24,47 @@ function isValidISODate(value: string): boolean {
 const isoDate = z.string().refine(isValidISODate, "必须是有效的 YYYY-MM-DD 日期");
 const time = z.string().regex(HHMM_RE, "必须是有效的 HH:mm 时间");
 const timestamp = z.number().int().nonnegative();
+
+const dailyPlanRecurrenceSchema = z
+  .object({
+    frequency: z.enum(["none", "daily", "weekly", "monthly"]),
+    count: z.number().int().min(1).max(MAX_DAILY_PLAN_REPEAT_COUNT),
+    seriesId: z.string().min(1).nullable(),
+    occurrence: z.number().int().min(1).max(MAX_DAILY_PLAN_REPEAT_COUNT),
+  })
+  .superRefine((recurrence, ctx) => {
+    if (recurrence.frequency === "none") {
+      if (recurrence.count !== 1 || recurrence.seriesId !== null || recurrence.occurrence !== 1) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["frequency"],
+          message: "不重复计划的重复信息必须是单次执行",
+        });
+      }
+      return;
+    }
+    if (recurrence.count < 2) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["count"],
+        message: "重复计划至少需要执行 2 次",
+      });
+    }
+    if (!recurrence.seriesId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["seriesId"],
+        message: "重复计划必须包含系列 ID",
+      });
+    }
+    if (recurrence.occurrence > recurrence.count) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["occurrence"],
+        message: "重复计划序号不能大于总次数",
+      });
+    }
+  });
 
 const projectSchema = z
   .object({
@@ -84,6 +126,7 @@ const dailyPlanSchema = z
     endTime: time,
     done: z.boolean(),
     estimatedMinutes: z.number().int().min(1).default(60),
+    recurrence: dailyPlanRecurrenceSchema,
     createdAt: timestamp,
     updatedAt: timestamp,
   })

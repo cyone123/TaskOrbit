@@ -4,6 +4,7 @@ import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
 import { Checkbox, Fab, FilledCard, IconButton, TextButton, TonalButton } from "../components/material";
 import { ConfirmDialog, Dialog, EmptyState, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
+import { dailyPlanRepeatLabel } from "../store/recurrence";
 import { useStore } from "../store/store";
 import type { DailyPlan, Priority, Project, Task } from "../types";
 import {
@@ -215,6 +216,11 @@ export function ProjectsView() {
           {pl.name}
         </span>
         <span className="body-sm muted">{formatDate(pl.date)}</span>
+        {pl.recurrence.frequency !== "none" && (
+          <span className="chip chip--small">
+            {dailyPlanRepeatLabel(pl.recurrence.frequency)} {pl.recurrence.occurrence}/{pl.recurrence.count}
+          </span>
+        )}
         <span className="chip chip--small">{formatTime(pl.startTime).replace("上午 ", "").replace("下午 ", "")} - {formatTime(pl.endTime).replace("上午 ", "").replace("下午 ", "")}</span>
         <IconButton onClick={() => setPlanForm({ open: true, projectId: pl.projectId, taskId: pl.taskId, lockProject: true, lockTask: true, editing: pl })} aria-label="编辑">
           <Icon name="edit" size={18} />
@@ -466,12 +472,13 @@ export function ProjectsView() {
           defaultDate={planForm.defaultDate}
           onCancel={() => setPlanForm((s) => ({ ...s, open: false }))}
           onSubmit={(input) => {
+            const { repeat: _repeat, repeatCount: _repeatCount, ...planPatch } = input;
             if (planForm.editing) {
-              store.updateDailyPlan(planForm.editing.id, input);
+              store.updateDailyPlan(planForm.editing.id, planPatch);
               show("计划已更新");
             } else {
               store.addDailyPlan(input);
-              show("计划已添加");
+              show(input.repeat === "none" ? "计划已添加" : `已添加 ${input.repeatCount} 个计划`);
             }
             revealPlanLocation(input.projectId, input.taskId);
             setPlanForm((s) => ({ ...s, open: false }));

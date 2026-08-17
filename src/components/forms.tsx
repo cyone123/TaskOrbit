@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { PROJECT_COLORS, colorByKey } from "../store/colors";
+import { MAX_DAILY_PLAN_REPEAT_COUNT, dailyPlanRepeatLabel } from "../store/recurrence";
 import { useStore } from "../store/store";
-import type { DailyPlan, Priority, Project, Task } from "../types";
+import type { DailyPlan, DailyPlanRepeat, Priority, Project, Task } from "../types";
 import { addDays, toISODate, todayISO } from "../utils/date";
 import {
   FilledButton,
@@ -263,6 +264,8 @@ export interface DailyPlanFormProps {
     startTime: string;
     endTime: string;
     estimatedMinutes: number;
+    repeat: DailyPlanRepeat;
+    repeatCount: number;
   }) => void;
   onCancel: () => void;
 }
@@ -285,6 +288,8 @@ export function DailyPlanForm({
   const [date, setDate] = useState(initial?.date ?? defaultDate ?? todayISO());
   const [startTime, setStartTime] = useState(initial?.startTime ?? "09:00");
   const [endTime, setEndTime] = useState(initial?.endTime ?? "10:00");
+  const [repeat, setRepeat] = useState<DailyPlanRepeat>("none");
+  const [repeatCount, setRepeatCount] = useState("2");
   const [error, setError] = useState("");
 
   const tasksOfProject = useMemo(
@@ -301,6 +306,15 @@ export function DailyPlanForm({
     if (!name.trim()) return setError("请输入计划名称");
     if (!date) return setError("请选择日期");
     if (endTime <= startTime) return setError("结束时间必须晚于开始时间");
+    const parsedRepeatCount = repeat === "none" ? 1 : Number(repeatCount);
+    if (
+      repeat !== "none" &&
+      (!Number.isInteger(parsedRepeatCount) ||
+        parsedRepeatCount < 2 ||
+        parsedRepeatCount > MAX_DAILY_PLAN_REPEAT_COUNT)
+    ) {
+      return setError(`重复次数必须是 2-${MAX_DAILY_PLAN_REPEAT_COUNT} 之间的整数`);
+    }
     onSubmit({
       projectId: projectId || null,
       taskId: taskId || null,
@@ -310,6 +324,8 @@ export function DailyPlanForm({
       startTime,
       endTime,
       estimatedMinutes: 60,
+      repeat,
+      repeatCount: parsedRepeatCount,
     });
   };
 
@@ -339,6 +355,42 @@ export function DailyPlanForm({
           placeholder="计划说明（可选）"
         />
       </div>
+
+      {!initial && (
+        <>
+          <div className="field__row">
+            <div className="field">
+              <OutlinedSelect
+                label="重复"
+                value={repeat}
+                onChange={(event) => setRepeat(eventValue(event) as DailyPlanRepeat)}
+                menuPositioning="fixed"
+              >
+                {(["none", "daily", "weekly", "monthly"] as DailyPlanRepeat[]).map((value) => (
+                  <SelectOption key={value} value={value} selected={repeat === value}>
+                    <span slot="headline">{dailyPlanRepeatLabel(value)}</span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+            {repeat !== "none" && (
+              <div className="field">
+                <OutlinedTextField
+                  label="重复次数（含首次）"
+                  type="number"
+                  value={repeatCount}
+                  onInput={(event) => setRepeatCount(eventValue(event))}
+                />
+              </div>
+            )}
+          </div>
+          {repeat !== "none" && (
+            <p className="body-sm muted mt-8">
+              将从 {date} 开始创建 {repeatCount || "0"} 个{dailyPlanRepeatLabel(repeat)}计划实例。
+            </p>
+          )}
+        </>
+      )}
 
       <div className="field__row">
         <div className="field">

@@ -12,6 +12,7 @@ import {
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { colorByKey, contrastText } from "../store/colors";
+import { dailyPlanRepeatLabel } from "../store/recurrence";
 import { useStore } from "../store/store";
 import type { DailyPlan, Task } from "../types";
 import {
@@ -328,6 +329,11 @@ export function CalendarView() {
                       />
                       <span className="dot" style={{ background: color }} />
                       <span className="body-md grow ellipsis" style={{ textDecoration: pl.done ? "line-through" : "none" }}>{pl.name}</span>
+                      {pl.recurrence.frequency !== "none" && (
+                        <span className="chip chip--small">
+                          {dailyPlanRepeatLabel(pl.recurrence.frequency)} {pl.recurrence.occurrence}/{pl.recurrence.count}
+                        </span>
+                      )}
                       <span className="chip chip--small">{pl.startTime} - {pl.endTime}</span>
                       <IconButton onClick={(e) => { e.stopPropagation(); askDeletePlan(pl); }} aria-label="删除" title="删除">
                         <Icon name="delete" size={18} />
@@ -368,12 +374,13 @@ export function CalendarView() {
           defaultDate={planForm.defaultDate}
           onCancel={() => setPlanForm((s) => ({ ...s, open: false }))}
           onSubmit={(input) => {
+            const { repeat: _repeat, repeatCount: _repeatCount, ...planPatch } = input;
             if (planForm.editing) {
-              store.updateDailyPlan(planForm.editing.id, input);
+              store.updateDailyPlan(planForm.editing.id, planPatch);
               show("计划已更新");
             } else {
               store.addDailyPlan(input);
-              show("计划已添加");
+              show(input.repeat === "none" ? "计划已添加" : `已添加 ${input.repeatCount} 个计划`);
             }
             setPlanForm((s) => ({ ...s, open: false }));
           }}

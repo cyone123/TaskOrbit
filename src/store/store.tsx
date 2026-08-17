@@ -19,12 +19,12 @@ import type {
 } from "../types";
 import { uid } from "../utils/id";
 import {
-  appendDailyPlan,
+  appendDailyPlans,
   appendPomodoroSession,
   appendProject,
   appendTask,
   archiveProjectState,
-  createDailyPlan,
+  createDailyPlans,
   createProject,
   createTask,
   deleteDailyPlanState,
@@ -330,9 +330,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [mutate]);
 
   const addDailyPlan = useCallback<StoreApi["addDailyPlan"]>((input) => {
-    const plan = createDailyPlan(input);
-    mutate((state) => appendDailyPlan(state, plan));
-    return plan;
+    const plans = createDailyPlans(input);
+    mutate((state) => appendDailyPlans(state, plans));
+    return plans[0];
   }, [mutate]);
 
   const updateDailyPlan = useCallback<StoreApi["updateDailyPlan"]>((id, patch) => {

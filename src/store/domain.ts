@@ -1,6 +1,8 @@
 import type {
   AppState,
   DailyPlan,
+  DailyPlanRecurrence,
+  DailyPlanRepeat,
   PomodoroLink,
   PomodoroSession,
   Priority,
@@ -9,6 +11,7 @@ import type {
   Settings,
 } from "../types";
 import { uid } from "../utils/id";
+import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
 
 export interface ProjectInput {
   name: string;
@@ -42,6 +45,10 @@ export interface DailyPlanInput {
   startTime: string;
   endTime: string;
   estimatedMinutes: number;
+  /** Optional creation-time rule; persisted plans contain concrete recurrence metadata. */
+  repeat?: DailyPlanRepeat;
+  /** Total occurrences, including the initial date. */
+  repeatCount?: number;
 }
 
 export type DailyPlanPatch = Partial<
@@ -308,19 +315,56 @@ export function deleteTaskState(state: AppState, id: string): AppState {
   };
 }
 
-export function createDailyPlan(input: DailyPlanInput, createdAt = Date.now()): DailyPlan {
+function createDailyPlanOccurrence(
+  input: DailyPlanInput,
+  recurrence: DailyPlanRecurrence,
+  createdAt: number,
+): DailyPlan {
+  const { repeat: _repeat, repeatCount: _repeatCount, ...planInput } = input;
   return {
     id: uid("pl_"),
-    ...input,
+    ...planInput,
+    recurrence,
     done: false,
     createdAt,
     updatedAt: createdAt,
   };
 }
 
+/** Create the first occurrence for compatibility with the existing CRUD API. */
+export function createDailyPlan(input: DailyPlanInput, createdAt = Date.now()): DailyPlan {
+  return createDailyPlans(input, createdAt)[0];
+}
+
+/** Expand a creation-time repeat rule into concrete persisted plan instances. */
+export function createDailyPlans(input: DailyPlanInput, createdAt = Date.now()): DailyPlan[] {
+  const repeat = normalizeDailyPlanRepeat(input.repeat, input.repeatCount);
+  const dates = expandDailyPlanDates(input.date, repeat.frequency, repeat.count);
+  const seriesId = repeat.frequency === "none" ? null : uid("prs_");
+
+  return dates.map((date, index) =>
+    createDailyPlanOccurrence(
+      { ...input, date },
+      {
+        frequency: repeat.frequency,
+        count: repeat.count,
+        seriesId,
+        occurrence: index + 1,
+      },
+      createdAt,
+    ),
+  );
+}
+
+export function appendDailyPlans(state: AppState, plans: DailyPlan[]): AppState {
+  for (const plan of plans) {
+    assertPlanRelation(state, plan.projectId, plan.taskId, false);
+  }
+  return { ...state, dailyPlans: [...plans, ...state.dailyPlans] };
+}
+
 export function appendDailyPlan(state: AppState, plan: DailyPlan): AppState {
-  assertPlanRelation(state, plan.projectId, plan.taskId, false);
-  return { ...state, dailyPlans: [plan, ...state.dailyPlans] };
+  return appendDailyPlans(state, [plan]);
 }
 
 export function updateDailyPlanState(

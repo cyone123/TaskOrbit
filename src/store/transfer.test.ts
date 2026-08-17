@@ -28,7 +28,7 @@ describe("snapshot transfer", () => {
     expect(exported.exportedAt).toBe(123);
     expect(exported.state.activeTimer).toBeNull();
     expect(parseImportSnapshot(exported)).toMatchObject({
-      version: 3,
+      version: 4,
       activeTimer: null,
     });
   });
@@ -43,7 +43,7 @@ describe("snapshot transfer", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(3);
+    expect(state.version).toBe(4);
     expect(state.activeTimer).toBeNull();
   });
 
