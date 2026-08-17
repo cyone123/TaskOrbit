@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
+import { Checkbox, Fab, FilledCard, IconButton, TextButton, TonalButton } from "../components/material";
 import { ConfirmDialog, Dialog, EmptyState, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
@@ -182,13 +183,11 @@ export function ProjectsView() {
       : "var(--md-outline)";
     return (
       <div className="row gap-12" key={pl.id} style={{ padding: "6px 8px" }}>
-        <label className="checkbox" style={{ margin: 0 }}>
-          <input
-            type="checkbox"
-            checked={pl.done}
-            onChange={() => store.updateDailyPlan(pl.id, { done: !pl.done })}
-          />
-        </label>
+        <Checkbox
+          checked={pl.done}
+          aria-label={`标记计划「${pl.name}」${pl.done ? "未完成" : "已完成"}`}
+          onChange={() => store.updateDailyPlan(pl.id, { done: !pl.done })}
+        />
         <span className="dot" style={{ background: projectColor }} />
         <span
           className="body-md grow ellipsis"
@@ -198,12 +197,12 @@ export function ProjectsView() {
         </span>
         <span className="body-sm muted">{formatDate(pl.date)}</span>
         <span className="chip chip--small">{formatTime(pl.startTime).replace("上午 ", "").replace("下午 ", "")} - {formatTime(pl.endTime).replace("上午 ", "").replace("下午 ", "")}</span>
-        <button className="icon-btn" onClick={() => setPlanForm({ open: true, projectId: pl.projectId, taskId: pl.taskId, lockProject: true, lockTask: true, editing: pl })} title="编辑">
+        <IconButton onClick={() => setPlanForm({ open: true, projectId: pl.projectId, taskId: pl.taskId, lockProject: true, lockTask: true, editing: pl })} aria-label="编辑">
           <Icon name="edit" size={18} />
-        </button>
-        <button className="icon-btn" onClick={() => askDeletePlan(pl)} title="删除">
+        </IconButton>
+        <IconButton onClick={() => askDeletePlan(pl)} aria-label="删除">
           <Icon name="delete" size={18} />
-        </button>
+        </IconButton>
       </div>
     );
   };
@@ -217,9 +216,9 @@ export function ProjectsView() {
             {activeProjects.length} 个活跃项目 · {state.tasks.length} 个任务 · {state.dailyPlans.length} 个计划
           </div>
         </div>
-        <button className="btn btn--tonal" onClick={() => setProjForm({ open: true, editing: null })}>
-          <Icon name="add" size={18} /> 新建项目
-        </button>
+        <TonalButton onClick={() => setProjForm({ open: true, editing: null })}>
+          <Icon name="add" size={18} slot="icon" /> 新建项目
+        </TonalButton>
       </div>
 
       {activeProjects.length === 0 ? (
@@ -233,7 +232,7 @@ export function ProjectsView() {
             const expanded = expandedProjects.has(p.id);
             const indep = independentPlans.get(p.id) ?? [];
             return (
-              <div className="card" key={p.id}>
+              <FilledCard className="material-card project-card" key={p.id}>
                 <div
                   className="row gap-12"
                   style={{ cursor: "pointer" }}
@@ -248,44 +247,43 @@ export function ProjectsView() {
                       {done}/{tasks.length}
                     </span>
                   )}
-                  <button
-                    className="icon-btn"
+                  <IconButton
                     title="添加任务"
+                    aria-label="添加任务"
                     onClick={(e) => {
                       e.stopPropagation();
                       setTaskForm({ open: true, projectId: p.id, editing: null });
                     }}
                   >
                     <Icon name="playlist_add" size={20} />
-                  </button>
-                  <button
-                    className="icon-btn"
+                  </IconButton>
+                  <IconButton
                     title="编辑项目"
+                    aria-label="编辑项目"
                     onClick={(e) => {
                       e.stopPropagation();
                       setProjForm({ open: true, editing: p });
                     }}
                   >
                     <Icon name="edit" size={18} />
-                  </button>
-                  <button className="icon-btn" title="归档项目" onClick={(e) => { e.stopPropagation(); askArchiveProject(p); }}>
+                  </IconButton>
+                  <IconButton aria-label="归档项目" title="归档项目" onClick={(e) => { e.stopPropagation(); askArchiveProject(p); }}>
                     <Icon name="archive" size={18} />
-                  </button>
+                  </IconButton>
                   <Icon name={expanded ? "expand_less" : "expand_more"} size={22} className="muted" />
                 </div>
 
                 {expanded && (
-                  <div className="mt-16 col gap-8">
+                  <div className="project-details mt-16 col gap-8">
                     {p.description && <p className="body-sm muted">{p.description}</p>}
 
                     <div className="spread mt-8">
                       <span className="label-lg muted">任务</span>
-                      <button
-                        className="btn btn--text btn--small"
+                      <TextButton
                         onClick={() => setTaskForm({ open: true, projectId: p.id, editing: null })}
                       >
-                        <Icon name="add" size={16} /> 添加任务
-                      </button>
+                        <Icon name="add" size={16} slot="icon" /> 添加任务
+                      </TextButton>
                     </div>
 
                     {tasks.length === 0 ? (
@@ -305,13 +303,12 @@ export function ProjectsView() {
                             }}
                           >
                             <div className="row gap-12" style={{ cursor: "pointer" }} onClick={() => toggleTask(t.id)}>
-                              <label className="checkbox" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="checkbox"
-                                  checked={t.done}
-                                  onChange={() => store.updateTask(t.id, { done: !t.done })}
-                                />
-                              </label>
+                              <Checkbox
+                                checked={t.done}
+                                aria-label={`标记任务「${t.name}」${t.done ? "未完成" : "已完成"}`}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => store.updateTask(t.id, { done: !t.done })}
+                              />
                               <span className="dot" style={{ background: PRIORITY_COLOR[t.priority] }} title={`优先级：${t.priority}`} />
                               <span
                                 className="body-md grow ellipsis"
@@ -321,27 +318,27 @@ export function ProjectsView() {
                               </span>
                               <span className="body-sm muted">{tStatus.text}</span>
                               <span className="body-sm muted">{relativeRangeLabel(t.startDate, t.endDate)}</span>
-                              <button
-                                className="icon-btn"
+                              <IconButton
                                 title="添加计划"
+                                aria-label="添加计划"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setPlanForm({ open: true, projectId: p.id, taskId: t.id, lockProject: true, lockTask: true, editing: null });
                                 }}
                               >
                                 <Icon name="add" size={20} />
-                              </button>
-                              <button className="icon-btn" title="编辑" onClick={(e) => { e.stopPropagation(); setTaskForm({ open: true, projectId: p.id, editing: t }); }}>
+                              </IconButton>
+                              <IconButton aria-label="编辑" title="编辑" onClick={(e) => { e.stopPropagation(); setTaskForm({ open: true, projectId: p.id, editing: t }); }}>
                                 <Icon name="edit" size={18} />
-                              </button>
-                              <button className="icon-btn" title="删除" onClick={(e) => { e.stopPropagation(); askDeleteTask(t); }}>
+                              </IconButton>
+                              <IconButton aria-label="删除" title="删除" onClick={(e) => { e.stopPropagation(); askDeleteTask(t); }}>
                                 <Icon name="delete" size={18} />
-                              </button>
+                              </IconButton>
                               {plans.length > 0 && <Icon name={tExpanded ? "expand_less" : "expand_more"} size={20} className="muted" />}
                             </div>
 
                             {tExpanded && (
-                              <div className="col gap-4" style={{ paddingLeft: 40, marginTop: 4 }}>
+                              <div className="task-details col gap-4" style={{ paddingLeft: 40, marginTop: 4 }}>
                                 {t.description && <p className="body-sm muted">{t.description}</p>}
                                 {plans.length === 0 ? (
                                   <div className="body-sm muted">暂无计划</div>
@@ -357,12 +354,11 @@ export function ProjectsView() {
 
                     <div className="spread mt-8">
                       <span className="label-lg muted">独立计划（不挂在任务下）</span>
-                      <button
-                        className="btn btn--text btn--small"
+                      <TextButton
                         onClick={() => setPlanForm({ open: true, projectId: p.id, taskId: null, lockProject: true, lockTask: true, editing: null })}
                       >
-                        <Icon name="add" size={16} /> 添加计划
-                      </button>
+                        <Icon name="add" size={16} slot="icon" /> 添加计划
+                      </TextButton>
                     </div>
                     {indep.length === 0 ? (
                       <div className="body-sm muted" style={{ padding: "8px 12px" }}>暂无独立计划</div>
@@ -371,14 +367,14 @@ export function ProjectsView() {
                     )}
                   </div>
                 )}
-              </div>
+              </FilledCard>
             );
           })}
         </div>
       )}
 
       {archivedProjects.length > 0 && (
-        <div className="card card--filled mt-24">
+        <FilledCard className="material-card archived-card mt-24">
           <div className="spread mb-8">
             <span className="label-lg muted">已归档项目（{archivedProjects.length}）</span>
           </div>
@@ -388,22 +384,22 @@ export function ProjectsView() {
                 <span className="dot" style={{ background: colorByKey(p.color) }} />
                 <span className="body-md grow ellipsis">{p.name}</span>
                 <span className="body-sm muted">{relativeRangeLabel(p.startDate, p.endDate)}</span>
-                <button className="btn btn--text btn--small" onClick={() => { store.restoreProject(p.id); show("项目已恢复"); }}>
-                  <Icon name="unarchive" size={16} /> 恢复
-                </button>
-                <button className="icon-btn" title="永久删除项目" onClick={() => askPermanentDeleteProject(p)}>
+                <TextButton onClick={() => { store.restoreProject(p.id); show("项目已恢复"); }}>
+                  <Icon name="unarchive" size={16} slot="icon" /> 恢复
+                </TextButton>
+                <IconButton aria-label="永久删除项目" title="永久删除项目" onClick={() => askPermanentDeleteProject(p)}>
                   <Icon name="delete_forever" size={18} />
-                </button>
+                </IconButton>
               </div>
             ))}
           </div>
-        </div>
+        </FilledCard>
       )}
 
       {/* FAB */}
-      <button className="fab" style={{ right: 24, bottom: 24 }} onClick={() => setProjForm({ open: true, editing: null })} title="新建项目">
-        <Icon name="add" />
-      </button>
+      <Fab className="project-fab" style={{ right: 24, bottom: 24 }} onClick={() => setProjForm({ open: true, editing: null })} aria-label="新建项目">
+        <Icon name="add" slot="icon" />
+      </Fab>
 
       {/* Dialogs */}
       <Dialog open={projForm.open} onClose={() => setProjForm((s) => ({ ...s, open: false }))} title={projForm.editing ? "编辑项目" : "新建项目"}>

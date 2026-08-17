@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Icon } from "./components/Icon";
 import { Layout } from "./components/Layout";
+import { FilledButton, FilledCard, OutlinedButton } from "./components/material";
 import { SnackbarProvider } from "./components/ui";
 import { StoreProvider, useStore } from "./store/store";
 import { ThemeManager } from "./theme/theme";
@@ -22,10 +23,12 @@ function Shell() {
 
   return (
     <Layout view={view} title={TITLES[view]} onNavigate={setView}>
-      {view === "projects" && <ProjectsView />}
-      {view === "calendar" && <CalendarView />}
-      {view === "pomodoro" && <PomodoroView />}
-      {view === "stats" && <StatsView />}
+      <div className="view-stage" key={view}>
+        {view === "projects" && <ProjectsView />}
+        {view === "calendar" && <CalendarView />}
+        {view === "pomodoro" && <PomodoroView />}
+        {view === "stats" && <StatsView />}
+      </div>
     </Layout>
   );
 }
@@ -44,11 +47,11 @@ function BootstrapGate() {
   if (status === "loading") {
     return (
       <div className="bootstrap-screen">
-        <div className="card bootstrap-card">
+        <FilledCard className="material-card bootstrap-card">
           <Icon name="sync" size={40} />
           <div className="title-md mt-16">正在加载本地数据</div>
           <div className="body-md muted mt-8">请稍候，Task Orbit 正在准备工作区。</div>
-        </div>
+        </FilledCard>
       </div>
     );
   }
@@ -56,7 +59,7 @@ function BootstrapGate() {
   if (status === "error") {
     return (
       <div className="bootstrap-screen">
-        <div className="card bootstrap-card">
+        <FilledCard className="material-card bootstrap-card">
           <Icon name="error_outline" size={40} style={{ color: "var(--md-error)" }} />
           <div className="title-md mt-16">本地数据无法加载</div>
           <div className="body-md mt-8">{loadError ?? "发生了未知错误。"}</div>
@@ -64,19 +67,19 @@ function BootstrapGate() {
             可以重试读取，或清空本地数据后从空工作区开始。清空操作不可恢复，请先确认已有备份。
           </div>
           <div className="row gap-8 mt-16">
-            <button className="btn btn--outlined" onClick={retryLoad}>
-              <Icon name="refresh" size={18} /> 重试
-            </button>
-            <button
-              className="btn btn--filled-danger"
+            <OutlinedButton onClick={retryLoad}>
+              <Icon name="refresh" size={18} slot="icon" /> 重试
+            </OutlinedButton>
+            <FilledButton
+              className="material-button--danger"
               onClick={() => {
                 void resetAll().catch(() => undefined);
               }}
             >
               清空并重新开始
-            </button>
+            </FilledButton>
           </div>
-        </div>
+        </FilledCard>
       </div>
     );
   }

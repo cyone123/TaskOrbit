@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useStore } from "../store/store";
 import { todayISO } from "../utils/date";
+import { OutlinedButton, TextButton, TonalButton } from "./material";
 import { ConfirmDialog, Dialog, useSnackbar } from "./ui";
 import { Icon } from "./Icon";
 
@@ -69,7 +70,7 @@ export function DataManagementDialog({
         onClose={closeDialog}
         title="数据管理"
         actions={
-          <button className="btn btn--text" onClick={onClose}>关闭</button>
+          <TextButton onClick={onClose}>关闭</TextButton>
         }
       >
         <div className="col gap-12">
@@ -77,12 +78,12 @@ export function DataManagementDialog({
             导出完整工作区快照，用于备份或迁移到另一台设备。导出文件不包含正在运行的番茄钟。
           </div>
           <div className="row gap-8">
-            <button className="btn btn--tonal" onClick={exportData}>
-              <Icon name="download" size={18} /> 导出 JSON
-            </button>
-            <button className="btn btn--outlined" onClick={() => fileInputRef.current?.click()}>
-              <Icon name="upload" size={18} /> 导入 JSON
-            </button>
+            <TonalButton onClick={exportData}>
+              <Icon name="download" size={18} slot="icon" /> 导出 JSON
+            </TonalButton>
+            <OutlinedButton onClick={() => fileInputRef.current?.click()}>
+              <Icon name="upload" size={18} slot="icon" /> 导入 JSON
+            </OutlinedButton>
           </div>
           <input
             ref={fileInputRef}

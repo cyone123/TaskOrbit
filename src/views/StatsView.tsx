@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Icon } from "../components/Icon";
+import { FilledCard, LinearProgress } from "../components/material";
 import { colorByKey } from "../store/colors";
 import { resolveSessionProjectId, selectFocusSessions } from "../store/selectors";
 import { useStore } from "../store/store";
@@ -91,18 +92,18 @@ export function StatsView() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         {summary.map((c) => (
-          <div className="card" key={c.label}>
+          <FilledCard className="material-card" key={c.label}>
             <div className="row gap-8 muted">
               <Icon name={c.icon} size={18} />
               <span className="label-md">{c.label}</span>
             </div>
             <div className="title-lg" style={{ fontSize: 24, marginTop: 8 }}>{c.value}</div>
             <div className="body-sm muted mt-8">{c.sub}</div>
-          </div>
+          </FilledCard>
         ))}
       </div>
 
-      <div className="card mt-16">
+      <FilledCard className="material-card mt-16">
         <div className="title-md mb-16">近 7 天专注时长</div>
         <div className="bar-chart">
           {last7.map((iso) => {
@@ -125,9 +126,9 @@ export function StatsView() {
             );
           })}
         </div>
-      </div>
+      </FilledCard>
 
-      <div className="card mt-16">
+      <FilledCard className="material-card mt-16">
         <div className="title-md mb-16">各项目专注时长</div>
         {projectMinutes.size === 0 ? (
           <div className="body-sm muted">暂无专注记录，开始一个番茄钟试试吧。</div>
@@ -147,17 +148,21 @@ export function StatsView() {
                       </div>
                       <span className="body-md muted">{formatDurationMinutes(mins)}</span>
                     </div>
-                    <div className="progress-track">
-                      <div className="progress-fill" style={{ width: `${(mins / maxProject) * 100}%`, background: color }} />
-                    </div>
+                    <LinearProgress
+                      className="progress--project"
+                      value={mins}
+                      max={maxProject}
+                      style={{ "--md-linear-progress-active-indicator-color": color } as React.CSSProperties}
+                      aria-label={`${proj?.name ?? projectLabels.get(pid) ?? "项目"}专注进度`}
+                    />
                   </div>
                 );
               })}
           </div>
         )}
-      </div>
+      </FilledCard>
 
-      <div className="card mt-16">
+      <FilledCard className="material-card mt-16">
         <div className="title-md mb-16">任务与计划完成率</div>
         <div className="col gap-12">
           <div>
@@ -165,21 +170,26 @@ export function StatsView() {
               <span className="body-md">任务</span>
               <span className="body-sm muted">{taskDone} / {taskTotal}</span>
             </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${taskTotal ? (taskDone / taskTotal) * 100 : 0}%` }} />
-            </div>
+            <LinearProgress
+              value={taskTotal ? (taskDone / taskTotal) * 100 : 0}
+              max={100}
+              aria-label="任务完成率"
+            />
           </div>
           <div>
             <div className="spread mb-8">
               <span className="body-md">每日计划</span>
               <span className="body-sm muted">{planDone} / {planTotal}</span>
             </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${planTotal ? (planDone / planTotal) * 100 : 0}%`, background: "#43A047" }} />
-            </div>
+            <LinearProgress
+              className="progress--success"
+              value={planTotal ? (planDone / planTotal) * 100 : 0}
+              max={100}
+              aria-label="每日计划完成率"
+            />
           </div>
         </div>
-      </div>
+      </FilledCard>
     </div>
   );
 }

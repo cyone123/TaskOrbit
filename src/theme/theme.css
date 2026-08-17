@@ -49,6 +49,55 @@
   --md-primary-rgb: 103, 80, 164;
   --md-on-surface-rgb: 29, 27, 32;
 
+  /* Official material-web token bridge. Components consume these MD3 system
+     tokens while the app keeps the shorter aliases used by its data views. */
+  --md-sys-color-background: var(--md-background);
+  --md-sys-color-on-background: var(--md-on-background);
+  --md-sys-color-error: var(--md-error);
+  --md-sys-color-on-error: var(--md-on-error);
+  --md-sys-color-error-container: var(--md-error-container);
+  --md-sys-color-on-error-container: var(--md-on-error-container);
+  --md-sys-color-inverse-on-surface: var(--md-inverse-on-surface);
+  --md-sys-color-inverse-primary: var(--md-inverse-primary);
+  --md-sys-color-inverse-surface: var(--md-inverse-surface);
+  --md-sys-color-on-primary: var(--md-on-primary);
+  --md-sys-color-on-primary-container: var(--md-on-primary-container);
+  --md-sys-color-on-secondary: var(--md-on-secondary);
+  --md-sys-color-on-secondary-container: var(--md-on-secondary-container);
+  --md-sys-color-on-surface: var(--md-on-surface);
+  --md-sys-color-on-surface-variant: var(--md-on-surface-variant);
+  --md-sys-color-on-tertiary: var(--md-on-tertiary);
+  --md-sys-color-on-tertiary-container: var(--md-on-tertiary-container);
+  --md-sys-color-outline: var(--md-outline);
+  --md-sys-color-outline-variant: var(--md-outline-variant);
+  --md-sys-color-primary: var(--md-primary);
+  --md-sys-color-primary-container: var(--md-primary-container);
+  --md-sys-color-scrim: var(--md-scrim);
+  --md-sys-color-secondary: var(--md-secondary);
+  --md-sys-color-secondary-container: var(--md-secondary-container);
+  --md-sys-color-shadow: var(--md-shadow);
+  --md-sys-color-surface: var(--md-surface);
+  --md-sys-color-surface-container-lowest: var(--md-surface-container-lowest);
+  --md-sys-color-surface-container-low: var(--md-surface-container-low);
+  --md-sys-color-surface-container: var(--md-surface-container);
+  --md-sys-color-surface-container-high: var(--md-surface-container-high);
+  --md-sys-color-surface-container-highest: var(--md-surface-container-highest);
+  --md-sys-color-surface-variant: var(--md-surface-variant);
+  --md-sys-color-tertiary: var(--md-tertiary);
+  --md-sys-color-tertiary-container: var(--md-tertiary-container);
+
+  --md-ref-typeface-plain: var(--font);
+  --md-ref-typeface-brand: var(--font);
+  --md-ref-typeface-weight-regular: 400;
+  --md-ref-typeface-weight-medium: 500;
+  --md-ref-typeface-weight-bold: 700;
+  --md-sys-shape-corner-extra-small: var(--shape-xs);
+  --md-sys-shape-corner-small: var(--shape-sm);
+  --md-sys-shape-corner-medium: var(--shape-md);
+  --md-sys-shape-corner-large: var(--shape-lg);
+  --md-sys-shape-corner-extra-large: var(--shape-xl);
+  --md-sys-shape-corner-full: var(--shape-full);
+
   /* Elevation shadows */
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
@@ -296,6 +345,11 @@ h4 {
   flex-direction: column;
 }
 
+.view-stage {
+  min-height: 100%;
+  animation: viewEnter 260ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
 .top-bar {
   height: 64px;
   flex: 0 0 auto;
@@ -319,6 +373,7 @@ h4 {
   overflow-x: hidden;
   padding: 24px;
   background: var(--md-surface);
+  scroll-behavior: smooth;
 }
 
 .content--no-pad {
@@ -364,7 +419,8 @@ h4 {
   border-radius: var(--shape-lg);
   color: var(--md-on-surface-variant);
   position: relative;
-  transition: background 120ms ease;
+  transition: background 180ms cubic-bezier(0.2, 0, 0, 1), color 180ms ease,
+    transform 180ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .nav-item svg {
@@ -386,6 +442,18 @@ h4 {
   background: var(--md-secondary-container);
 }
 
+.nav-item__control {
+  --md-icon-button-container-width: 48px;
+  --md-icon-button-container-height: 40px;
+  --md-icon-button-icon-size: 24px;
+  --md-icon-button-icon-color: var(--md-on-surface-variant);
+  color: inherit;
+}
+
+.nav-item.active .nav-item__control {
+  --md-icon-button-icon-color: var(--md-on-secondary-container);
+}
+
 .nav-item.active::before {
   content: "";
   position: absolute;
@@ -399,173 +467,6 @@ h4 {
 
 .nav-rail__spacer {
   flex: 1;
-}
-
-/* ============================================================================
-   Buttons
-   ========================================================================== */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 24px;
-  border-radius: var(--shape-full);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.1px;
-  position: relative;
-  overflow: hidden;
-  transition: box-shadow 120ms ease, background 120ms ease;
-  white-space: nowrap;
-}
-
-.btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.btn:disabled {
-  opacity: 0.38;
-  cursor: default;
-}
-
-.btn--filled {
-  background: var(--md-primary);
-  color: var(--md-on-primary);
-}
-.btn--filled:hover {
-  box-shadow: var(--elev-1);
-}
-.btn--filled:active {
-  background: var(--md-on-primary-container);
-  color: var(--md-on-primary-container);
-}
-
-.btn--tonal {
-  background: var(--md-secondary-container);
-  color: var(--md-on-secondary-container);
-}
-.btn--tonal:hover {
-  box-shadow: var(--elev-1);
-}
-
-.btn--elevated {
-  background: var(--md-surface-container-low);
-  color: var(--md-primary);
-  box-shadow: var(--elev-1);
-}
-.btn--elevated:hover {
-  box-shadow: var(--elev-2);
-}
-
-.btn--outlined {
-  border: 1px solid var(--md-outline);
-  color: var(--md-primary);
-  background: transparent;
-}
-.btn--outlined:hover {
-  background: rgba(var(--md-primary-rgb), 0.08);
-}
-
-.btn--text {
-  color: var(--md-primary);
-  padding: 0 12px;
-  background: transparent;
-}
-.btn--text:hover {
-  background: rgba(var(--md-primary-rgb), 0.08);
-}
-
-.btn--danger {
-  color: var(--md-error);
-}
-.btn--danger:hover {
-  background: rgba(179, 38, 30, 0.08);
-}
-
-.btn--filled-danger {
-  background: var(--md-error);
-  color: var(--md-on-error);
-}
-.btn--filled-danger:hover {
-  box-shadow: var(--elev-1);
-}
-
-.btn--small {
-  height: 32px;
-  padding: 0 16px;
-  font-size: 13px;
-}
-
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--shape-full);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--md-on-surface-variant);
-  position: relative;
-  flex: 0 0 auto;
-  transition: background 120ms ease;
-}
-.icon-btn:hover {
-  background: rgba(var(--md-on-surface-rgb), 0.08);
-}
-.icon-btn:disabled {
-  opacity: 0.38;
-}
-.icon-btn svg {
-  width: 22px;
-  height: 22px;
-}
-.icon-btn--primary {
-  color: var(--md-primary);
-}
-
-.fab {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--shape-lg);
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--elev-3);
-  position: fixed;
-  transition: box-shadow 120ms ease;
-}
-.fab:hover {
-  box-shadow: var(--elev-4);
-}
-.fab svg {
-  width: 24px;
-  height: 24px;
-}
-
-/* ============================================================================
-   Cards / surfaces
-   ========================================================================== */
-
-.card {
-  background: var(--md-surface-container-low);
-  border-radius: var(--shape-md);
-  padding: 16px;
-  border: 1px solid var(--md-outline-variant);
-}
-
-.card--filled {
-  background: var(--md-surface-container-high);
-  border: none;
-}
-
-.card--outlined {
-  background: transparent;
-  border: 1px solid var(--md-outline-variant);
 }
 
 /* ============================================================================
@@ -597,43 +498,6 @@ h4 {
 }
 
 /* ============================================================================
-   Segmented buttons
-   ========================================================================== */
-
-.segmented {
-  display: inline-flex;
-  border: 1px solid var(--md-outline);
-  border-radius: var(--shape-full);
-  overflow: hidden;
-  background: var(--md-surface);
-}
-
-.segment {
-  height: 40px;
-  padding: 0 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--md-on-surface-variant);
-}
-.segment:not(:last-child) {
-  border-right: 1px solid var(--md-outline);
-}
-.segment:hover {
-  background: rgba(var(--md-on-surface-rgb), 0.06);
-}
-.segment.active {
-  background: var(--md-secondary-container);
-  color: var(--md-on-secondary-container);
-}
-.segment svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* ============================================================================
    Text fields
    ========================================================================== */
 
@@ -650,45 +514,6 @@ h4 {
   color: var(--md-on-surface-variant);
 }
 
-.field__input,
-.field__textarea,
-.field__select {
-  width: 100%;
-  min-height: 48px;
-  padding: 12px 14px;
-  border-radius: var(--shape-xs);
-  border: 1px solid var(--md-outline);
-  background: transparent;
-  color: var(--md-on-surface);
-  font-size: 15px;
-  outline: none;
-  transition: border-color 120ms ease;
-}
-
-.field__textarea {
-  min-height: 80px;
-  resize: vertical;
-  line-height: 1.4;
-}
-
-.field__input:focus,
-.field__textarea:focus,
-.field__select:focus {
-  border-color: var(--md-primary);
-  border-width: 2px;
-  padding: 11px 13px;
-}
-
-.field__select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--md-on-surface-variant) 50%),
-    linear-gradient(135deg, var(--md-on-surface-variant) 50%, transparent 50%);
-  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-  padding-right: 32px;
-}
-
 .field__row {
   display: flex;
   gap: 12px;
@@ -697,107 +522,134 @@ h4 {
   flex: 1;
 }
 
-/* ============================================================================
-   Checkbox
-   ========================================================================== */
+/* material-web controls --------------------------------------------------- */
 
-.checkbox {
+md-filled-button,
+md-filled-tonal-button,
+md-outlined-button,
+md-text-button,
+md-icon-button,
+md-fab,
+md-outlined-text-field,
+md-outlined-select,
+md-checkbox,
+md-switch,
+md-linear-progress,
+md-filled-card,
+md-outlined-card {
+  font-family: var(--font);
+}
+
+md-outlined-text-field,
+md-outlined-select {
+  display: block;
+  width: 100%;
+  --md-outlined-text-field-container-shape: var(--shape-md);
+  --md-outlined-select-text-field-container-shape: var(--shape-md);
+}
+
+md-outlined-text-field {
+  --md-outlined-text-field-input-text-font: var(--font);
+  --md-outlined-text-field-label-text-font: var(--font);
+  --md-outlined-text-field-supporting-text-font: var(--font);
+}
+
+md-icon-button {
+  flex: 0 0 auto;
+  --md-icon-button-icon-size: 22px;
+}
+
+.material-button--danger {
+  --md-filled-button-container-color: var(--md-error);
+  --md-filled-button-label-text-color: var(--md-on-error);
+  --md-filled-button-icon-color: var(--md-on-error);
+  --md-filled-button-hover-label-text-color: var(--md-on-error);
+  --md-filled-button-hover-icon-color: var(--md-on-error);
+}
+
+.material-dialog--wide {
+  max-width: min(760px, calc(100% - 48px));
+}
+
+.material-dialog__content {
+  min-width: 0;
+}
+
+md-filled-card.material-card,
+md-outlined-card.material-card {
+  min-width: 0;
+  padding: 16px;
+  --md-filled-card-container-color: var(--md-surface-container-low);
+  --md-outlined-card-container-color: var(--md-surface-container-low);
+}
+
+md-filled-card.pomodoro-card {
+  --md-filled-card-container-color: var(--md-surface-container);
+}
+
+md-filled-card.archived-card {
+  --md-filled-card-container-color: var(--md-surface-container-high);
+}
+
+md-outlined-card.calendar-timeline-card {
+  overflow: hidden;
+}
+
+md-outlined-card.calendar-plan-card {
+  flex-direction: row;
+  min-width: 0;
+}
+
+md-outlined-segmented-button-set.segmented-control {
   display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  color: var(--md-on-surface);
-}
-.checkbox input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--md-primary);
-  cursor: pointer;
+  max-width: 100%;
 }
 
-/* ============================================================================
-   Switch
-   ========================================================================== */
+md-outlined-segmented-button-set.segmented-control md-outlined-segmented-button {
+  min-width: 84px;
+}
 
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 52px;
-  height: 32px;
+.compact-action {
+  --md-filled-tonal-button-container-height: 32px;
+  --md-filled-tonal-button-label-text-size: 13px;
+  --md-filled-tonal-button-leading-space: 16px;
+  --md-filled-tonal-button-trailing-space: 16px;
 }
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+
+.timer-start-button {
+  --md-filled-button-container-height: 56px;
+  --md-filled-button-label-text-size: 16px;
+  --md-filled-button-leading-space: 40px;
+  --md-filled-button-trailing-space: 40px;
 }
-.switch__track {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--shape-full);
-  background: var(--md-surface-container-highest);
-  outline: 2px solid var(--md-outline);
-  transition: all 140ms ease;
-  cursor: pointer;
+
+.project-fab {
+  position: fixed;
+  z-index: 12;
 }
-.switch__thumb {
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--md-outline);
-  transition: all 140ms ease;
+
+.calendar-task-chip {
+  --md-filled-tonal-button-container-height: 32px;
+  --md-filled-tonal-button-label-text-size: 13px;
+  --md-filled-tonal-button-leading-space: 12px;
+  --md-filled-tonal-button-trailing-space: 16px;
 }
-.switch input:checked + .switch__track {
-  background: var(--md-primary);
-  outline-color: transparent;
+
+md-linear-progress {
+  display: block;
+  width: 100%;
+  --md-linear-progress-track-height: 8px;
+  --md-linear-progress-active-indicator-height: 8px;
+  --md-linear-progress-track-shape: var(--shape-full);
 }
-.switch input:checked + .switch__track .switch__thumb {
-  transform: translateX(20px);
-  width: 24px;
-  height: 24px;
-  top: 4px;
-  left: 4px;
-  background: var(--md-on-primary);
+
+md-linear-progress.progress--success {
+  --md-linear-progress-active-indicator-color: #43a047;
 }
 
 /* ============================================================================
    Dialog
    ========================================================================== */
-
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  animation: fadeIn 160ms ease;
-}
-
-.dialog {
-  width: 460px;
-  max-width: calc(100vw - 40px);
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  background: var(--md-surface-container-high);
-  border-radius: var(--shape-xl);
-  padding: 24px;
-  box-shadow: var(--elev-3);
-  animation: popIn 180ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-.dialog--wide {
-  width: 560px;
-}
-
-.dialog__title {
-  font-size: 24px;
-  font-weight: 400;
-  margin-bottom: 20px;
-}
 
 .dialog__actions {
   display: flex;
@@ -806,14 +658,6 @@ h4 {
   margin-top: 8px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 @keyframes popIn {
   from {
     opacity: 0;
@@ -822,6 +666,34 @@ h4 {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes viewEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.project-details,
+.task-details {
+  animation: expandIn 220ms cubic-bezier(0.2, 0, 0, 1) both;
+  transform-origin: top center;
+}
+
+@keyframes expandIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
   }
 }
 
@@ -895,23 +767,6 @@ h4 {
 }
 .list-item:hover {
   background: rgba(var(--md-on-surface-rgb), 0.06);
-}
-
-/* ============================================================================
-   Progress
-   ========================================================================== */
-
-.progress-track {
-  height: 8px;
-  border-radius: var(--shape-full);
-  background: var(--md-surface-container-highest);
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: var(--shape-full);
-  background: var(--md-primary);
-  transition: width 200ms ease;
 }
 
 /* ============================================================================
@@ -1143,6 +998,13 @@ h4 {
   border-radius: 6px 6px 2px 2px;
   background: var(--md-primary);
   min-height: 2px;
+  transform-origin: bottom;
+  animation: barGrow 520ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
 
 /* Gantt (week view) */
@@ -1232,6 +1094,17 @@ h4 {
 }
 .gantt-row__days > div:first-child {
   border-left: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Material Symbols icon font */

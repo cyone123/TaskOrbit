@@ -3,7 +3,16 @@ import { PROJECT_COLORS, colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 import type { DailyPlan, Priority, Project, Task } from "../types";
 import { addDays, toISODate, todayISO } from "../utils/date";
-import { Icon } from "./Icon";
+import {
+  FilledButton,
+  OutlinedSegmentedButton,
+  OutlinedSegmentedButtonSet,
+  OutlinedSelect,
+  OutlinedTextField,
+  SelectOption,
+  TextButton,
+  eventValue,
+} from "./material";
 
 interface FormActionProps {
   onCancel: () => void;
@@ -12,12 +21,12 @@ interface FormActionProps {
 function FormActions({ onCancel, submitLabel = "保存" }: FormActionProps) {
   return (
     <div className="dialog__actions">
-      <button className="btn btn--text" onClick={onCancel}>
+      <TextButton type="button" onClick={onCancel}>
         取消
-      </button>
-      <button className="btn btn--filled" type="submit">
+      </TextButton>
+      <FilledButton type="submit">
         {submitLabel}
-      </button>
+      </FilledButton>
     </div>
   );
 }
@@ -68,21 +77,21 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
       }}
     >
       <div className="field">
-        <label className="field__label">名称</label>
-        <input
-          className="field__input"
+        <OutlinedTextField
+          label="名称"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onInput={(event) => setName(eventValue(event))}
           placeholder="例如：产品发布"
           autoFocus
         />
       </div>
       <div className="field">
-        <label className="field__label">描述</label>
-        <textarea
-          className="field__textarea"
+        <OutlinedTextField
+          label="描述"
+          type="textarea"
+          rows={3}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onInput={(event) => setDescription(eventValue(event))}
           placeholder="项目说明（可选）"
         />
       </div>
@@ -103,21 +112,19 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
       </div>
       <div className="field__row">
         <div className="field">
-          <label className="field__label">开始日期</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="开始日期"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onInput={(event) => setStartDate(eventValue(event))}
           />
         </div>
         <div className="field">
-          <label className="field__label">结束日期</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="结束日期"
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onInput={(event) => setEndDate(eventValue(event))}
           />
         </div>
       </div>
@@ -180,57 +187,53 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
       }}
     >
       <div className="field">
-        <label className="field__label">名称</label>
-        <input
-          className="field__input"
+        <OutlinedTextField
+          label="名称"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onInput={(event) => setName(eventValue(event))}
           placeholder="例如：UI 设计"
           autoFocus
         />
       </div>
       <div className="field">
-        <label className="field__label">描述</label>
-        <textarea
-          className="field__textarea"
+        <OutlinedTextField
+          label="描述"
+          type="textarea"
+          rows={3}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onInput={(event) => setDescription(eventValue(event))}
           placeholder="任务说明（可选）"
         />
       </div>
       <div className="field">
-        <label className="field__label">优先级</label>
-        <div className="segmented">
+        <div className="field__label">优先级</div>
+        <OutlinedSegmentedButtonSet className="segmented-control">
           {PRIORITIES.map((p) => (
-            <button
+            <OutlinedSegmentedButton
               key={p.key}
-              type="button"
-              className={`segment ${priority === p.key ? "active" : ""}`}
+              label={p.label}
+              noCheckmark
+              selected={priority === p.key}
               onClick={() => setPriority(p.key)}
-            >
-              <span className="dot" style={{ background: p.color }} />
-              {p.label}
-            </button>
+            />
           ))}
-        </div>
+        </OutlinedSegmentedButtonSet>
       </div>
       <div className="field__row">
         <div className="field">
-          <label className="field__label">开始日期</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="开始日期"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onInput={(event) => setStartDate(eventValue(event))}
           />
         </div>
         <div className="field">
-          <label className="field__label">结束日期</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="结束日期"
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onInput={(event) => setEndDate(eventValue(event))}
           />
         </div>
       </div>
@@ -314,28 +317,27 @@ export function DailyPlanForm({
       }}
     >
       <div className="field">
-        <label className="field__label">名称</label>
-        <input
-          className="field__input"
+        <OutlinedTextField
+          label="名称"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onInput={(event) => setName(eventValue(event))}
           placeholder="例如：晨间阅读"
           autoFocus
         />
       </div>
       <div className="field">
-        <label className="field__label">描述</label>
-        <textarea
-          className="field__textarea"
+        <OutlinedTextField
+          label="描述"
+          type="textarea"
+          rows={3}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onInput={(event) => setDescription(eventValue(event))}
           placeholder="计划说明（可选）"
         />
       </div>
 
       <div className="field__row">
         <div className="field">
-          <label className="field__label">所属项目</label>
           {lockProject ? (
             <div className="chip chip--fill">
               <span
@@ -347,23 +349,25 @@ export function DailyPlanForm({
                 : "无项目（独立）"}
             </div>
           ) : (
-            <select
-              className="field__select"
+            <OutlinedSelect
+              label="所属项目"
               value={projectId}
-              onChange={(e) => changeProject(e.target.value)}
+              onChange={(event) => changeProject(eventValue(event))}
+              menuPositioning="fixed"
             >
-              <option value="">无项目（独立）</option>
+              <SelectOption value="" selected={projectId === ""}>
+                <span slot="headline">无项目（独立）</span>
+              </SelectOption>
               {state.projects.filter((p) => !p.archived).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <SelectOption key={p.id} value={p.id} selected={projectId === p.id}>
+                  <span slot="headline">{p.name}</span>
+                </SelectOption>
               ))}
-            </select>
+            </OutlinedSelect>
           )}
         </div>
 
         <div className="field">
-          <label className="field__label">所属任务</label>
           {lockTask ? (
             <div className="chip">
               {taskId
@@ -371,50 +375,50 @@ export function DailyPlanForm({
                 : "无任务（独立）"}
             </div>
           ) : (
-            <select
-              className="field__select"
+            <OutlinedSelect
+              label="所属任务"
               value={taskId}
-              onChange={(e) => setTaskId(e.target.value)}
+              onChange={(event) => setTaskId(eventValue(event))}
               disabled={!projectId}
+              menuPositioning="fixed"
             >
-              <option value="">无任务（独立）</option>
+              <SelectOption value="" selected={taskId === ""}>
+                <span slot="headline">无任务（独立）</span>
+              </SelectOption>
               {tasksOfProject.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
+                <SelectOption key={t.id} value={t.id} selected={taskId === t.id}>
+                  <span slot="headline">{t.name}</span>
+                </SelectOption>
               ))}
-            </select>
+            </OutlinedSelect>
           )}
         </div>
       </div>
 
       <div className="field">
-        <label className="field__label">执行日期</label>
-        <input
-          className="field__input"
+        <OutlinedTextField
+          label="执行日期"
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onInput={(event) => setDate(eventValue(event))}
         />
       </div>
 
       <div className="field__row">
         <div className="field">
-          <label className="field__label">开始时间</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="开始时间"
             type="time"
             value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            onInput={(event) => setStartTime(eventValue(event))}
           />
         </div>
         <div className="field">
-          <label className="field__label">结束时间</label>
-          <input
-            className="field__input"
+          <OutlinedTextField
+            label="结束时间"
             type="time"
             value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
+            onInput={(event) => setEndTime(eventValue(event))}
           />
         </div>
       </div>

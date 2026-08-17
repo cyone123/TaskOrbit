@@ -4,6 +4,7 @@ import { useStore } from "../store/store";
 import type { ViewKey } from "../types";
 import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
+import { IconButton } from "./material";
 
 const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: "projects", label: "项目", icon: "space_dashboard" },
@@ -37,15 +38,21 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
       <nav className="nav-rail">
         <div className="nav-rail__brand">T</div>
         {NAV.map((n) => (
-          <button
+          <div
             key={n.key}
             className={`nav-item ${view === n.key ? "active" : ""}`}
-            onClick={() => onNavigate(n.key)}
-            title={n.label}
           >
-            <Icon name={n.icon} size={24} fill={view === n.key} />
+            <IconButton
+              className="nav-item__control"
+              aria-label={n.label}
+              toggle
+              selected={view === n.key}
+              onClick={() => onNavigate(n.key)}
+            >
+              <Icon name={n.icon} size={24} fill={view === n.key} />
+            </IconButton>
             <span className="nav-item__label">{n.label}</span>
-          </button>
+          </div>
         ))}
         <div className="nav-rail__spacer" />
       </nav>
@@ -55,20 +62,18 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           <span className="top-bar__title">{title}</span>
           <div className="ml-auto" />
           {actions}
-          <button
-            className="icon-btn"
+          <IconButton
             onClick={() => setDataDialogOpen(true)}
-            title="数据管理"
+            aria-label="数据管理"
           >
             <Icon name="import_export" />
-          </button>
-          <button
-            className="icon-btn"
+          </IconButton>
+          <IconButton
             onClick={toggleTheme}
-            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
           >
             <Icon name={isDark ? "light_mode" : "dark_mode"} />
-          </button>
+          </IconButton>
         </header>
         <div className="content">{children}</div>
       </div>

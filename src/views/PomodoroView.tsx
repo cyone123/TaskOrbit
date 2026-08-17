@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
+import {
+  FilledCard,
+  FilledButton,
+  IconButton,
+  OutlinedSegmentedButton,
+  OutlinedSegmentedButtonSet,
+  OutlinedSelect,
+  OutlinedTextField,
+  SelectOption,
+  TextButton,
+  eventValue,
+} from "../components/material";
 import { Dialog, useSnackbar } from "../components/ui";
 import { selectTodayFocusSessions } from "../store/selectors";
 import { useStore } from "../store/store";
@@ -211,24 +223,23 @@ export function PomodoroView() {
             <Icon name="check_circle" size={16} style={{ color: "#43A047" }} />
             今日 {todaySessions.length} 个 · {formatDurationMinutes(todayMinutes)}
           </div>
-          <button className="icon-btn" onClick={() => setSettingsOpen(true)} title="设置">
+          <IconButton onClick={() => setSettingsOpen(true)} aria-label="设置" title="设置">
             <Icon name="settings" />
-          </button>
+          </IconButton>
         </div>
       </div>
 
-      <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 24px" }}>
-        <div className="segmented mb-16">
+      <FilledCard className="material-card pomodoro-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 24px" }}>
+        <OutlinedSegmentedButtonSet className="segmented-control mb-16">
           {PHASES.map((item) => (
-            <button
+            <OutlinedSegmentedButton
               key={item.key}
-              className={`segment ${phase === item.key ? "active" : ""}`}
+              label={item.label}
+              selected={phase === item.key}
               onClick={() => store.selectTimerPhase(item.key)}
-            >
-              {item.label}
-            </button>
+            />
           ))}
-        </div>
+        </OutlinedSegmentedButtonSet>
 
         <div style={{ position: "relative", width: 288, height: 288 }}>
           <svg width={288} height={288} className="pomo-ring">
@@ -253,35 +264,43 @@ export function PomodoroView() {
         </div>
 
         <div className="row gap-16" style={{ marginTop: 20 }}>
-          <button className="icon-btn" onClick={() => store.resetTimer()} title="重置" style={{ width: 48, height: 48 }}>
+          <IconButton onClick={() => store.resetTimer()} aria-label="重置" title="重置">
             <Icon name="replay" />
-          </button>
-          <button className="btn btn--filled" onClick={toggle} style={{ height: 56, padding: "0 40px", fontSize: 16 }}>
-            <Icon name={running ? "pause" : "play_arrow"} />
+          </IconButton>
+          <FilledButton className="timer-start-button" onClick={toggle}>
+            <Icon name={running ? "pause" : "play_arrow"} slot="icon" />
             {running ? "暂停" : timer && remaining < total ? "继续" : "开始"}
-          </button>
-          <button className="icon-btn" onClick={() => store.skipTimer()} title="跳过" style={{ width: 48, height: 48 }}>
+          </FilledButton>
+          <IconButton onClick={() => store.skipTimer()} aria-label="跳过" title="跳过">
             <Icon name="skip_next" />
-          </button>
+          </IconButton>
         </div>
 
         <div className="field" style={{ width: "100%", maxWidth: 420, marginTop: 24, marginBottom: 0 }}>
-          <label className="field__label">本次专注对象</label>
-          <select className="field__select" value={linkValue} onChange={(event) => onChangeLink(event.target.value)}>
+          <OutlinedSelect
+            label="本次专注对象"
+            value={linkValue}
+            onChange={(event) => onChangeLink(eventValue(event))}
+            menuPositioning="fixed"
+          >
             {linkOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
+              <SelectOption
+                key={option.value}
+                value={option.value}
+                selected={linkValue === option.value}
+              >
+                <span slot="headline">{option.label}</span>
+              </SelectOption>
             ))}
-          </select>
+          </OutlinedSelect>
         </div>
-      </div>
+      </FilledCard>
 
-      <div className="card mt-16" style={{ padding: "14px 18px" }}>
+      <FilledCard className="material-card mt-16" style={{ padding: "14px 18px" }}>
         <div className="body-sm muted">
           专注 {s.focusMinutes} 分钟 · 短休息 {s.shortBreakMinutes} 分钟 · 长休息 {s.longBreakMinutes} 分钟 · 每 {s.longBreakInterval} 个番茄进入长休息。完成专注后会自动记录到统计中。
         </div>
-      </div>
+      </FilledCard>
 
       <SettingsDialog
         open={settingsOpen}
@@ -337,29 +356,49 @@ function SettingsDialog({
       title="番茄钟设置"
       actions={
         <>
-          <button className="btn btn--text" onClick={onClose}>取消</button>
-          <button className="btn btn--filled" onClick={submit}>保存</button>
+          <TextButton onClick={onClose}>取消</TextButton>
+          <FilledButton onClick={submit}>保存</FilledButton>
         </>
       }
     >
       <div className="field__row">
         <div className="field">
-          <label className="field__label">专注时长（分钟）</label>
-          <input className="field__input" type="number" min={1} value={focus} onChange={(event) => setFocus(event.target.value)} />
+          <OutlinedTextField
+            label="专注时长（分钟）"
+            type="number"
+            min="1"
+            value={focus}
+            onInput={(event) => setFocus(eventValue(event))}
+          />
         </div>
         <div className="field">
-          <label className="field__label">短休息（分钟）</label>
-          <input className="field__input" type="number" min={1} value={short} onChange={(event) => setShort(event.target.value)} />
+          <OutlinedTextField
+            label="短休息（分钟）"
+            type="number"
+            min="1"
+            value={short}
+            onInput={(event) => setShort(eventValue(event))}
+          />
         </div>
       </div>
       <div className="field__row">
         <div className="field">
-          <label className="field__label">长休息（分钟）</label>
-          <input className="field__input" type="number" min={1} value={long} onChange={(event) => setLong(event.target.value)} />
+          <OutlinedTextField
+            label="长休息（分钟）"
+            type="number"
+            min="1"
+            value={long}
+            onInput={(event) => setLong(eventValue(event))}
+          />
         </div>
         <div className="field">
-          <label className="field__label">长休息间隔（个）</label>
-          <input className="field__input" type="number" min={1} value={interval} onChange={(event) => setIntervalVal(event.target.value)} />
+          <OutlinedTextField
+            label="长休息间隔（个）"
+            type="number"
+            min="1"
+            value={interval}
+            onInput={(event) => setIntervalVal(eventValue(event))}
+          />
         </div>
       </div>
       {error && <p className="error-text body-sm">{error}</p>}

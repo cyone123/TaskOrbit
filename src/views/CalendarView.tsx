@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, TaskForm } from "../components/forms";
+import {
+  Checkbox,
+  FilledCard,
+  IconButton,
+  OutlinedCard,
+  OutlinedSegmentedButton,
+  OutlinedSegmentedButtonSet,
+  TonalButton,
+} from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { colorByKey, contrastText } from "../store/colors";
 import { useStore } from "../store/store";
@@ -128,32 +137,40 @@ export function CalendarView() {
     <div ref={contentRef} style={{ maxWidth: 1100, margin: "0 auto", paddingBottom: 96 }}>
       <div className="spread mb-16">
         <div className="row gap-8">
-          <button className="icon-btn" onClick={() => navigate(-1)} title="上一页">
+          <IconButton onClick={() => navigate(-1)} aria-label="上一页" title="上一页">
             <Icon name="chevron_left" />
-          </button>
-          <button className="icon-btn" onClick={() => navigate(1)} title="下一页">
+          </IconButton>
+          <IconButton onClick={() => navigate(1)} aria-label="下一页" title="下一页">
             <Icon name="chevron_right" />
-          </button>
-          <button className="btn btn--tonal btn--small" onClick={goToday}>
+          </IconButton>
+          <TonalButton className="compact-action" onClick={goToday}>
             今天
-          </button>
+          </TonalButton>
           <span className="title-lg" style={{ marginLeft: 8 }}>{heading}</span>
         </div>
 
         <div className="row gap-12">
           {mode === "day" && (
-            <button className="btn btn--tonal" onClick={() => setPlanForm({ open: true, projectId: null, taskId: null, lockProject: false, lockTask: false, defaultDate: selectedISO, editing: null })}>
-              <Icon name="add" size={18} /> 添加计划
-            </button>
+            <TonalButton onClick={() => setPlanForm({ open: true, projectId: null, taskId: null, lockProject: false, lockTask: false, defaultDate: selectedISO, editing: null })}>
+              <Icon name="add" size={18} slot="icon" /> 添加计划
+            </TonalButton>
           )}
-          <div className="segmented">
-            <button className={`segment ${mode === "week" ? "active" : ""}`} onClick={() => setMode("week")}>
-              <Icon name="view_week" size={16} /> 周
-            </button>
-            <button className={`segment ${mode === "day" ? "active" : ""}`} onClick={() => setMode("day")}>
-              <Icon name="view_day" size={16} /> 日
-            </button>
-          </div>
+          <OutlinedSegmentedButtonSet className="segmented-control">
+            <OutlinedSegmentedButton
+              label="周"
+              selected={mode === "week"}
+              onClick={() => setMode("week")}
+            >
+              <Icon name="view_week" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+            <OutlinedSegmentedButton
+              label="日"
+              selected={mode === "day"}
+              onClick={() => setMode("day")}
+            >
+              <Icon name="view_day" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+          </OutlinedSegmentedButtonSet>
         </div>
       </div>
 
@@ -232,24 +249,24 @@ export function CalendarView() {
       ) : (
         <div className="col gap-16">
           {tasksOfDay.length > 0 && (
-            <div className="card" style={{ padding: "12px 16px" }}>
+            <FilledCard className="material-card calendar-task-card" style={{ padding: "12px 16px" }}>
               <div className="label-lg muted mb-8">今日进行中的任务</div>
               <div className="row row--wrap gap-8">
                 {tasksOfDay.map((t) => {
                   const proj = projectById.get(t.projectId);
                   const color = proj ? colorByKey(proj.color) : "#9e9e9e";
                   return (
-                    <button key={t.id} className="chip" style={{ borderColor: color }} onClick={() => openTaskEditor(t)}>
-                      <span className="dot" style={{ background: color }} />
+                    <TonalButton key={t.id} className="calendar-task-chip" onClick={() => openTaskEditor(t)}>
+                      <span slot="icon" className="dot" style={{ background: color }} />
                       {t.name}
-                    </button>
+                    </TonalButton>
                   );
                 })}
               </div>
-            </div>
+            </FilledCard>
           )}
 
-          <div className="card" style={{ padding: 0 }}>
+          <OutlinedCard className="calendar-timeline-card" style={{ padding: 0 }}>
             <div className="timeline" style={{ gridTemplateColumns: "56px 1fr" }}>
               <div className="col" style={{ position: "relative", height: DAY_MINUTES / 60 * HOUR_HEIGHT }}>
                 {Array.from({ length: 24 }, (_, h) => (
@@ -287,32 +304,35 @@ export function CalendarView() {
                 })}
               </div>
             </div>
-          </div>
+          </OutlinedCard>
 
           <div>
             <div className="label-lg muted mb-8">当日计划清单（{plansOfDay.length}）</div>
             {plansOfDay.length === 0 ? (
-              <div className="card empty" style={{ padding: 24 }}>
+              <FilledCard className="material-card empty" style={{ padding: 24 }}>
                 <Icon name="free_breakfast" size={40} />
                 <div>当天暂无计划，点击右上角「添加计划」安排一项</div>
-              </div>
+              </FilledCard>
             ) : (
               <div className="col gap-4">
                 {plansOfDay.map((pl) => {
                   const proj = pl.projectId ? projectById.get(pl.projectId) : null;
                   const color = proj ? colorByKey(proj.color) : "var(--md-outline)";
                   return (
-                    <div className="list-item card card--outlined" key={pl.id} onClick={() => openPlanEditor(pl)} style={{ padding: "10px 14px" }}>
-                      <label className="checkbox" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={pl.done} onChange={() => store.updateDailyPlan(pl.id, { done: !pl.done })} />
-                      </label>
+                    <OutlinedCard className="list-item calendar-plan-card" key={pl.id} onClick={() => openPlanEditor(pl)} style={{ padding: "10px 14px" }}>
+                      <Checkbox
+                        checked={pl.done}
+                        aria-label={`标记计划「${pl.name}」${pl.done ? "未完成" : "已完成"}`}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => store.updateDailyPlan(pl.id, { done: !pl.done })}
+                      />
                       <span className="dot" style={{ background: color }} />
                       <span className="body-md grow ellipsis" style={{ textDecoration: pl.done ? "line-through" : "none" }}>{pl.name}</span>
                       <span className="chip chip--small">{pl.startTime} - {pl.endTime}</span>
-                      <button className="icon-btn" onClick={(e) => { e.stopPropagation(); askDeletePlan(pl); }} title="删除">
+                      <IconButton onClick={(e) => { e.stopPropagation(); askDeletePlan(pl); }} aria-label="删除" title="删除">
                         <Icon name="delete" size={18} />
-                      </button>
-                    </div>
+                      </IconButton>
+                    </OutlinedCard>
                   );
                 })}
               </div>

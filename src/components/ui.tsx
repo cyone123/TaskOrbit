@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
+import { FilledButton, MaterialDialog, TextButton } from "./material";
 
 /* -------------------------------------------------------------------------- */
 /* Dialog                                                                     */
@@ -24,29 +25,18 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, actions, wide }: DialogProps) {
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  if (!open) return null;
   return createPortal(
-    <div
-      className="dialog-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <MaterialDialog
+      open={open}
+      className={`material-dialog ${wide ? "material-dialog--wide" : ""}`}
+      onCancel={onClose}
     >
-      <div className={`dialog ${wide ? "dialog--wide" : ""}`} role="dialog" aria-modal="true">
-        <div className="dialog__title">{title}</div>
+      <div slot="headline">{title}</div>
+      <div slot="content" className="material-dialog__content">
         {children}
-        {actions && <div className="dialog__actions">{actions}</div>}
       </div>
-    </div>,
+      {actions && <div slot="actions">{actions}</div>}
+    </MaterialDialog>,
     document.body,
   );
 }
@@ -81,15 +71,15 @@ export function ConfirmDialog({
       title={title}
       actions={
         <>
-          <button className="btn btn--text" onClick={onCancel}>
+          <TextButton onClick={onCancel}>
             取消
-          </button>
-          <button
-            className={`btn ${danger ? "btn--filled-danger" : "btn--filled"}`}
+          </TextButton>
+          <FilledButton
+            className={danger ? "material-button--danger" : undefined}
             onClick={onConfirm}
           >
             {confirmLabel}
-          </button>
+          </FilledButton>
         </>
       }
     >
