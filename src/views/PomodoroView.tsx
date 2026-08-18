@@ -203,7 +203,13 @@ export function PomodoroView() {
   const toggle = () => {
     if (running) {
       store.pauseTimer();
-    } else if (timer) {
+      return;
+    }
+
+    // The store starts from the wall clock, so refresh the display clock in
+    // the same user action instead of waiting for the first 250ms tick.
+    setNow(Date.now());
+    if (timer) {
       store.resumeTimer();
     } else {
       store.startTimer(linkRef.current);

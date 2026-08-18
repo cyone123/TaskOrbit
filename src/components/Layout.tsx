@@ -24,6 +24,7 @@ interface LayoutProps {
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
   const { state, updateSettings } = useStore();
   const [dataDialogOpen, setDataDialogOpen] = useState(false);
+  const isProjectWorkspace = view === "projects";
   const theme = state.settings.theme;
   const isDark =
     theme === "dark" ||
@@ -55,27 +56,43 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           </div>
         ))}
         <div className="nav-rail__spacer" />
+        {isProjectWorkspace && (
+          <div className="nav-rail__utilities">
+            <IconButton onClick={() => setDataDialogOpen(true)} aria-label="数据管理" title="数据管理">
+              <Icon name="import_export" size={21} />
+            </IconButton>
+            <IconButton
+              onClick={toggleTheme}
+              aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
+              title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            >
+              <Icon name={isDark ? "light_mode" : "dark_mode"} size={21} />
+            </IconButton>
+          </div>
+        )}
       </nav>
 
       <div className="main-area">
-        <header className="top-bar">
-          <span className="top-bar__title">{title}</span>
-          <div className="ml-auto" />
-          {actions}
-          <IconButton
-            onClick={() => setDataDialogOpen(true)}
-            aria-label="数据管理"
-          >
-            <Icon name="import_export" />
-          </IconButton>
-          <IconButton
-            onClick={toggleTheme}
-            aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
-          >
-            <Icon name={isDark ? "light_mode" : "dark_mode"} />
-          </IconButton>
-        </header>
-        <div className="content">{children}</div>
+        {!isProjectWorkspace && (
+          <header className="top-bar">
+            <span className="top-bar__title">{title}</span>
+            <div className="ml-auto" />
+            {actions}
+            <IconButton
+              onClick={() => setDataDialogOpen(true)}
+              aria-label="数据管理"
+            >
+              <Icon name="import_export" />
+            </IconButton>
+            <IconButton
+              onClick={toggleTheme}
+              aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            >
+              <Icon name={isDark ? "light_mode" : "dark_mode"} />
+            </IconButton>
+          </header>
+        )}
+        <div className={`content ${isProjectWorkspace ? "content--projects" : ""}`}>{children}</div>
       </div>
       <DataManagementDialog
         open={dataDialogOpen}
