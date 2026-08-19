@@ -67,6 +67,8 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
 
 - 独立 Expo 应用位于 `apps/mobile`，通过 `@task-orbit/core` 复用数据结构、校验、迁移、领域函数和计时器逻辑。
 - Expo Router 路由位于 `apps/mobile/src/app`；`(tabs)` 包含收件箱、项目、日历、番茄钟、统计五个底部 Tab。
+- `apps/mobile/src/store/app-store.tsx` 管理移动端 `AppState`；每次变更同样经过 core 的 Zod 校验。`persistence.ts` 使用 AsyncStorage 主 / 备份双 key，导入会立即替换数据并保留旧状态备份。
+- 番茄钟通过 `expo-notifications` 安排本地完成提醒；Web 环境仅运行计时逻辑，不调度系统通知。移动端 MVP 暂不接入 Obsidian Vault。
 - Metro 在 SDK 52+ 会自动识别 pnpm monorepo，不要添加手工 `watchFolders` 或 `nodeModulesPaths` 配置。
 - 根 `package.json` 临时将 `metro-config` 固定为 0.84.4，以避开 SDK 57 依赖树中已发布的 `metro-config@0.84.5` 对尚未发布的 `metro@0.84.5` 的引用。升级后应运行 Expo Doctor 和三平台导出再移除此 override。
 

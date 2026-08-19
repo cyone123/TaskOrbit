@@ -11,6 +11,9 @@ export const LIGHT_COLORS = {
   primarySoft: "#EADDFF",
   onPrimarySoft: "#21005D",
   tabInactive: "#79747E",
+  success: "#386A20",
+  danger: "#B3261E",
+  warning: "#A64500",
 } as const;
 
 export const DARK_COLORS = {
@@ -24,6 +27,9 @@ export const DARK_COLORS = {
   primarySoft: "#4F378B",
   onPrimarySoft: "#EADDFF",
   tabInactive: "#CAC4D0",
+  success: "#9CD67D",
+  danger: "#FFB4AB",
+  warning: "#FFB68A",
 } as const;
 
 export type AppColors = {
