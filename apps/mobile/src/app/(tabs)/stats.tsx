@@ -5,13 +5,14 @@ import * as Sharing from "expo-sharing";
 import { useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppScreen, Card, IconButton, PageScroll, PrimaryButton } from "@/components/ui";
-import { useAppColors } from "@/constants/theme";
+import { AppScreen, Card, ChoiceRow, IconButton, PageScroll, PrimaryButton } from "@/components/ui";
+import { useAppColors, useAppTheme } from "@/constants/theme";
 import { PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
 export default function StatsScreen() {
   const colors = useAppColors();
-  const { state, exportSnapshot, importSnapshot } = useAppStore();
+  const { preference } = useAppTheme();
+  const { state, exportSnapshot, importSnapshot, updateTheme } = useAppStore();
   const [busy, setBusy] = useState(false);
   const focusSessions = state.pomodoroSessions.filter((session) => session.kind === "focus");
   const totalMinutes = focusSessions.reduce((sum, session) => sum + session.minutes, 0);
@@ -90,6 +91,11 @@ export default function StatsScreen() {
         </Card>
 
         <Text style={[styles.sectionTitle, { color: colors.text }]}>数据管理</Text>
+        <Card style={styles.themeCard}>
+          <View style={[styles.dataIcon, { backgroundColor: colors.secondarySoft }]}><Ionicons name="color-palette-outline" size={24} color={colors.onSecondarySoft} /></View>
+          <View style={styles.dataCopy}><Text style={[styles.dataTitle, { color: colors.text }]}>外观</Text><Text style={[styles.dataDescription, { color: colors.textMuted }]}>主题偏好保存在本地，并应用到全部移动端页面。</Text></View>
+          <ChoiceRow label="颜色主题" value={preference} onChange={(value) => updateTheme(value as "system" | "light" | "dark")} options={[{ value: "system", label: "跟随系统" }, { value: "light", label: "浅色" }, { value: "dark", label: "深色" }]} />
+        </Card>
         <Card style={styles.dataCard}>
           <View style={[styles.dataIcon, { backgroundColor: colors.primarySoft }]}><Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} /></View>
           <View style={styles.dataCopy}><Text style={[styles.dataTitle, { color: colors.text }]}>本地优先</Text><Text style={[styles.dataDescription, { color: colors.textMuted }]}>数据仅保存在此设备；JSON 快照可与桌面端互相导入。运行中的计时器不会进入导出文件。</Text></View>
@@ -110,5 +116,5 @@ function decodeBase64(value: string): string {
 const styles = StyleSheet.create({
   metrics: { flexDirection: "row", gap: 9 }, metricCard: { flex: 1, minWidth: 0, padding: 13 }, metricValue: { fontSize: 25, fontWeight: "800", marginTop: 12 }, metricLabel: { fontSize: 10, marginTop: 2 }, sectionTitle: { fontSize: 17, fontWeight: "800", marginTop: 6, marginLeft: 4 },
   noData: { paddingVertical: 28, alignItems: "center", gap: 10 }, barRow: { marginBottom: 17 }, barHeading: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7 }, barName: { fontSize: 13, fontWeight: "700" }, barValue: { fontSize: 11 }, track: { height: 8, borderRadius: 4, overflow: "hidden" }, bar: { height: 8, borderRadius: 4 },
-  dataCard: { gap: 13 }, dataIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" }, dataCopy: { gap: 4 }, dataTitle: { fontSize: 16, fontWeight: "800" }, dataDescription: { fontSize: 12, lineHeight: 18 }, dataActions: { flexDirection: "row", gap: 10 }, flex: { flex: 1 }, vaultNote: { fontSize: 11, lineHeight: 17, textAlign: "center", paddingHorizontal: 16 },
+  themeCard: { gap: 13 }, dataCard: { gap: 13 }, dataIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" }, dataCopy: { gap: 4 }, dataTitle: { fontSize: 16, fontWeight: "800" }, dataDescription: { fontSize: 12, lineHeight: 18 }, dataActions: { flexDirection: "row", gap: 10 }, flex: { flex: 1 }, vaultNote: { fontSize: 11, lineHeight: 17, textAlign: "center", paddingHorizontal: 16 },
 });

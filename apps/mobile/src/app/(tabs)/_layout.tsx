@@ -19,8 +19,8 @@ export default function TabsLayout() {
           fontWeight: "600",
         },
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: colors.surfaceContainer,
+          borderTopColor: colors.surfaceContainer,
           paddingTop: 5,
           ...Platform.select({
             web: {

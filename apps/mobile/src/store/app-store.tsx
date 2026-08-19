@@ -25,14 +25,17 @@ import {
   updateDailyPlanState,
   updateInboxItemState,
   updateProjectState,
+  updateSettingsState,
   updateTaskState,
   validateAppState,
   type AppState,
   type DailyPlanInput,
+  type DailyPlanPatch,
   type InboxItemKind,
   type PomodoroLink,
   type Priority,
   type ProjectInput,
+  type Settings,
   type TaskInput,
 } from "@task-orbit/core";
 import {
@@ -72,7 +75,9 @@ interface AppStoreValue {
   removeTask(id: string): void;
   addPlans(input: DailyPlanInput): void;
   togglePlan(id: string, done: boolean): void;
+  updatePlan(id: string, patch: DailyPlanPatch): void;
   removePlan(id: string): void;
+  updateTheme(theme: Settings["theme"]): void;
   startPomodoro(link: PomodoroLink): Promise<boolean>;
   pausePomodoro(): void;
   skipPomodoro(): void;
@@ -180,7 +185,9 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     removeTask: (id) => mutate((current) => deleteTaskState(current, id)),
     addPlans: (input) => mutate((current) => appendDailyPlans(current, createDailyPlans(input))),
     togglePlan: (id, done) => mutate((current) => updateDailyPlanState(current, id, { done })),
+    updatePlan: (id, patch) => mutate((current) => updateDailyPlanState(current, id, patch)),
     removePlan: (id) => mutate((current) => deleteDailyPlanState(current, id)),
+    updateTheme: (theme) => mutate((current) => updateSettingsState(current, { theme })),
     startPomodoro: async (link) => {
       const nextTimer = startTimer(latestState.current.activeTimer, latestState.current.settings, link);
       mutate((current) => ({ ...current, activeTimer: nextTimer }));

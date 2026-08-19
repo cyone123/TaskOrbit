@@ -12,25 +12,34 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useAppColors } from "@/constants/theme";
+import { useAppColors, useAppTheme } from "@/constants/theme";
 import { useAppStore } from "@/store/app-store";
 
-export function AppScreen({ title, subtitle, action, children }: PropsWithChildren<{
+export function AppScreen({ title, subtitle, leading, action, children }: PropsWithChildren<{
   title: string;
   subtitle?: string;
+  leading?: ReactElement | null;
   action?: ReactElement | null;
 }>) {
   const colors = useAppColors();
-  const { ready, error, notice, clearNotice } = useAppStore();
+  const { preference } = useAppTheme();
+  const { ready, error, notice, clearNotice, updateTheme } = useAppStore();
+  const nextTheme = preference === "system" ? "light" : preference === "light" ? "dark" : "system";
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}>
         <View style={styles.header}>
+          {leading}
           <View style={styles.headerCopy}>
-            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
             {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
           </View>
           {action}
+          <IconButton
+            icon={preference === "dark" ? "moon" : preference === "light" ? "sunny" : "contrast"}
+            label={`切换主题，当前：${preference === "system" ? "跟随系统" : preference === "light" ? "浅色" : "深色"}`}
+            onPress={() => updateTheme(nextTheme)}
+          />
         </View>
         {error ? <Banner text={error} danger /> : null}
         {notice ? <Banner text={notice} onClose={clearNotice} /> : null}
@@ -65,7 +74,7 @@ export function Banner({ text, danger, onClose }: { text: string; danger?: boole
 
 export function Card({ children, style }: PropsWithChildren<{ style?: object }>) {
   const colors = useAppColors();
-  return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, style]}>{children}</View>;
+  return <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }, style]}>{children}</View>;
 }
 
 export function IconButton({ icon, label, onPress, danger }: {
@@ -76,8 +85,8 @@ export function IconButton({ icon, label, onPress, danger }: {
 }) {
   const colors = useAppColors();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.iconButton, { backgroundColor: colors.surfaceVariant }]}>
-      <Ionicons name={icon} size={21} color={danger ? "#B3261E" : colors.primary} />
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.iconButton, { backgroundColor: colors.surfaceContainerHigh }]}>
+      <Ionicons name={icon} size={21} color={danger ? colors.danger : colors.primary} />
     </Pressable>
   );
 }
@@ -97,11 +106,11 @@ export function PrimaryButton({ label, onPress, icon, secondary, disabled }: {
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: secondary ? colors.primarySoft : colors.primary, opacity: disabled ? 0.45 : pressed ? 0.82 : 1 },
+        { backgroundColor: secondary ? colors.secondarySoft : colors.primary, opacity: disabled ? 0.45 : pressed ? 0.82 : 1 },
       ]}
     >
-      {icon ? <Ionicons name={icon} size={18} color={secondary ? colors.onPrimarySoft : "#FFFFFF"} /> : null}
-      <Text style={[styles.buttonText, { color: secondary ? colors.onPrimarySoft : "#FFFFFF" }]}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={18} color={secondary ? colors.onSecondarySoft : colors.onPrimary} /> : null}
+      <Text style={[styles.buttonText, { color: secondary ? colors.onSecondarySoft : colors.onPrimary }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -194,6 +203,43 @@ export function ChoiceRow({ label, options, value, onChange }: {
   );
 }
 
+export function SegmentedControl({ options, value, onChange }: {
+  options: { value: string; label: string; icon?: keyof typeof Ionicons.glyphMap }[];
+  value: string;
+  onChange(value: string): void;
+}) {
+  const colors = useAppColors();
+  return (
+    <View style={[styles.segmented, { borderColor: colors.outline }]} accessibilityRole="tablist">
+      {options.map((option, index) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option.value)}
+            style={[
+              styles.segment,
+              index > 0 && { borderLeftColor: colors.outline, borderLeftWidth: 1 },
+              selected && { backgroundColor: colors.secondarySoft },
+            ]}
+          >
+            {selected ? <Ionicons name="checkmark" size={16} color={colors.onSecondarySoft} /> : option.icon ? <Ionicons name={option.icon} size={16} color={colors.textMuted} /> : null}
+            <Text style={{ color: selected ? colors.onSecondarySoft : colors.text, fontWeight: selected ? "700" : "500", fontSize: 12 }}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function ProgressBar({ value, color }: { value: number; color?: string }) {
+  const colors = useAppColors();
+  const normalized = Math.min(100, Math.max(0, value));
+  return <View style={[styles.progressTrack, { backgroundColor: colors.surfaceVariant }]}><View style={[styles.progressFill, { width: `${normalized}%`, backgroundColor: color ?? colors.primary }]} /></View>;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 }, safe: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 13, flexDirection: "row", alignItems: "center", gap: 12 },
@@ -209,4 +255,6 @@ const styles = StyleSheet.create({
   modalHeader: { padding: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, modalTitle: { fontSize: 22, fontWeight: "800" }, formScroll: { flex: 1 }, form: { paddingHorizontal: 20, paddingBottom: 16, gap: 15 }, modalFooter: { padding: 20, paddingTop: 10 },
   fieldWrap: { gap: 7 }, fieldLabel: { fontSize: 12, fontWeight: "700" }, field: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 15 }, multiline: { height: 88, paddingTop: 12, textAlignVertical: "top" },
   choiceRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, choice: { minHeight: 38, paddingHorizontal: 13, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 7 }, colorDot: { width: 10, height: 10, borderRadius: 5 },
+  segmented: { minHeight: 48, borderWidth: 1, borderRadius: 24, overflow: "hidden", flexDirection: "row" }, segment: { flex: 1, minHeight: 46, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, paddingHorizontal: 8 },
+  progressTrack: { height: 8, borderRadius: 4, overflow: "hidden" }, progressFill: { height: 8, borderRadius: 4 },
 });
