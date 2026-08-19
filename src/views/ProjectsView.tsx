@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
+import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
 import {
   Checkbox,
   FilledButton,
@@ -44,6 +45,7 @@ const PROJECT_TABS = [
   { key: "tasks", label: "任务" },
   { key: "plans", label: "计划" },
   { key: "stats", label: "统计" },
+  { key: "notes", label: "笔记" },
 ] as const;
 
 type ProjectTab = (typeof PROJECT_TABS)[number]["key"];
@@ -564,6 +566,7 @@ export function ProjectsView() {
     if (activeTab === "tasks") return renderTaskSection();
     if (activeTab === "plans") return renderPlanTab();
     if (activeTab === "stats") return renderStatsTab();
+    if (activeTab === "notes") return <ProjectNotesPanel project={selectedProject} state={state} />;
     return (
       <div className="project-overview-grid">
         <div className="project-overview-main">

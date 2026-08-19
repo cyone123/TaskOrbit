@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "./schemaDefaults";
+import { DEFAULT_SETTINGS, DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
 type JsonRecord = Record<string, unknown>;
@@ -85,7 +85,7 @@ function migrateV1ToV2(input: JsonRecord): JsonRecord {
 function migrateV2ToV3(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 3,
     activeTimer: input.activeTimer ?? null,
   };
 }
@@ -94,7 +94,7 @@ function migrateV2ToV3(input: JsonRecord): JsonRecord {
 function migrateV3ToV4(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 4,
     dailyPlans: asArray(input.dailyPlans).map((plan) => ({
       ...plan,
       recurrence: plan.recurrence ?? {
@@ -104,6 +104,15 @@ function migrateV3ToV4(input: JsonRecord): JsonRecord {
         occurrence: 1,
       },
     })),
+  };
+}
+
+/** v5 adds the local Obsidian-compatible Vault connection settings. */
+function migrateV4ToV5(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    vaultSettings: { ...DEFAULT_VAULT_SETTINGS, ...asRecord(input.vaultSettings) },
   };
 }
 
@@ -123,6 +132,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 1) migrated = migrateV1ToV2(migrated);
   if (version <= 2) migrated = migrateV2ToV3(migrated);
   if (version <= 3) migrated = migrateV3ToV4(migrated);
+  if (version <= 4) migrated = migrateV4ToV5(migrated);
 
   return migrated;
 }

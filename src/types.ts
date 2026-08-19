@@ -96,6 +96,15 @@ export interface Settings {
   longBreakInterval: number; // number of focus sessions before a long break
 }
 
+export interface VaultSettings {
+  enabled: boolean;
+  rootPath: string | null;
+  vaultName: string | null;
+  notesFolder: string;
+  autoReload: boolean;
+  openWithObsidian: boolean;
+}
+
 export interface AppState {
   version: number;
   projects: Project[];
@@ -103,6 +112,7 @@ export interface AppState {
   dailyPlans: DailyPlan[];
   pomodoroSessions: PomodoroSession[];
   settings: Settings;
+  vaultSettings: VaultSettings;
   activeTimer: ActiveTimer | null;
 }
 

@@ -9,6 +9,7 @@ import type {
   Project,
   Task,
   Settings,
+  VaultSettings,
 } from "../types";
 import { uid } from "../utils/id";
 import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
@@ -435,4 +436,11 @@ export function appendPomodoroSession(
 
 export function updateSettingsState(state: AppState, patch: Partial<Settings>): AppState {
   return { ...state, settings: { ...state.settings, ...patch } };
+}
+
+export function updateVaultSettingsState(
+  state: AppState,
+  patch: Partial<VaultSettings>,
+): AppState {
+  return { ...state, vaultSettings: { ...state.vaultSettings, ...patch } };
 }

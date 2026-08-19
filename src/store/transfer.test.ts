@@ -27,8 +27,9 @@ describe("snapshot transfer", () => {
     expect(exported.format).toBe("task-orbit-export");
     expect(exported.exportedAt).toBe(123);
     expect(exported.state.activeTimer).toBeNull();
+    expect(exported.state.vaultSettings.rootPath).toBeNull();
     expect(parseImportSnapshot(exported)).toMatchObject({
-      version: 4,
+      version: 5,
       activeTimer: null,
     });
   });
@@ -43,7 +44,7 @@ describe("snapshot transfer", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(4);
+    expect(state.version).toBe(5);
     expect(state.activeTimer).toBeNull();
   });
 

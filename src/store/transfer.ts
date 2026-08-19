@@ -29,11 +29,21 @@ function parseJsonString(raw: string): unknown {
 
 /** Serialize stable user data; an in-flight timer is intentionally excluded. */
 export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()): string {
+  const { rootPath: _rootPath, vaultName: _vaultName, ...portableVaultSettings } = state.vaultSettings;
   const envelope: TaskOrbitExportEnvelope = {
     format: EXPORT_FORMAT,
     formatVersion: EXPORT_FORMAT_VERSION,
     exportedAt,
-    state: { ...state, activeTimer: null },
+    state: {
+      ...state,
+      activeTimer: null,
+      vaultSettings: {
+        ...portableVaultSettings,
+        enabled: false,
+        rootPath: null,
+        vaultName: null,
+      },
+    },
   };
   return JSON.stringify(envelope, null, 2);
 }

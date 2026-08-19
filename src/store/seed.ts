@@ -2,6 +2,7 @@ import type { AppState, DailyPlan, PomodoroSession, Priority, Project, Task } fr
 import { addDays, toISODate, todayISO } from "../utils/date";
 import { uid } from "../utils/id";
 import { createEmptyState } from "./schema";
+import { DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
 function d(offset: number): string {
@@ -221,6 +222,7 @@ export function createDemoState(): AppState {
     dailyPlans: plans,
     pomodoroSessions: sessions,
     activeTimer: null,
+    vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     settings: {
       theme: "system",
       focusMinutes: 25,

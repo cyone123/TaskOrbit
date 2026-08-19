@@ -5,7 +5,7 @@ describe("persisted state schema", () => {
   it("starts with an empty state", () => {
     const state = createEmptyState();
 
-    expect(state.version).toBe(4);
+    expect(state.version).toBe(5);
     expect(state.projects).toHaveLength(0);
     expect(state.tasks).toHaveLength(0);
     expect(state.dailyPlans).toHaveLength(0);
@@ -52,7 +52,7 @@ describe("persisted state schema", () => {
       },
     });
 
-    expect(state.version).toBe(4);
+    expect(state.version).toBe(5);
     expect(state.projects[0].archivedAt).toBeNull();
     expect(state.pomodoroSessions[0].projectNameSnapshot).toBe("项目一");
   });
@@ -93,7 +93,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(4);
+    expect(state.version).toBe(5);
     expect(state.activeTimer).toBeNull();
   });
 
@@ -122,7 +122,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(4);
+    expect(state.version).toBe(5);
     expect(state.dailyPlans[0].recurrence).toEqual({
       frequency: "none",
       count: 1,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AppState } from "../types";
 import { migratePersistedState } from "./migrations";
 import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
-import { DEFAULT_SETTINGS } from "./schemaDefaults";
+import { DEFAULT_SETTINGS, DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
 export { STATE_VERSION } from "./version";
@@ -217,6 +217,15 @@ export const settingsSchema = z.object({
   longBreakInterval: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakInterval),
 });
 
+const vaultSettingsSchema = z.object({
+  enabled: z.boolean().default(DEFAULT_VAULT_SETTINGS.enabled),
+  rootPath: z.string().min(1).nullable().default(DEFAULT_VAULT_SETTINGS.rootPath),
+  vaultName: z.string().min(1).nullable().default(DEFAULT_VAULT_SETTINGS.vaultName),
+  notesFolder: z.string().trim().min(1).default(DEFAULT_VAULT_SETTINGS.notesFolder),
+  autoReload: z.boolean().default(DEFAULT_VAULT_SETTINGS.autoReload),
+  openWithObsidian: z.boolean().default(DEFAULT_VAULT_SETTINGS.openWithObsidian),
+});
+
 export const appStateSchema = z.object({
   version: z.literal(STATE_VERSION),
   projects: z.array(projectSchema),
@@ -224,6 +233,7 @@ export const appStateSchema = z.object({
   dailyPlans: z.array(dailyPlanSchema),
   pomodoroSessions: z.array(pomodoroSessionSchema),
   settings: settingsSchema,
+  vaultSettings: vaultSettingsSchema,
   activeTimer: activeTimerSchema.nullable(),
 });
 
@@ -235,6 +245,7 @@ const persistedEnvelopeSchema = z
     dailyPlans: z.array(z.unknown()).optional(),
     pomodoroSessions: z.array(z.unknown()).optional(),
     settings: z.unknown().optional(),
+    vaultSettings: z.unknown().optional(),
     activeTimer: z.unknown().optional(),
   })
   .passthrough();
@@ -247,6 +258,7 @@ export function createEmptyState(): AppState {
     dailyPlans: [],
     pomodoroSessions: [],
     settings: { ...DEFAULT_SETTINGS },
+    vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     activeTimer: null,
   };
 }
@@ -274,6 +286,7 @@ export function parsePersistedState(raw: unknown): AppState {
     dailyPlans: envelope.data.dailyPlans ?? [],
     pomodoroSessions: envelope.data.pomodoroSessions ?? [],
     settings: envelope.data.settings ?? {},
+    vaultSettings: envelope.data.vaultSettings ?? {},
     activeTimer: envelope.data.activeTimer ?? null,
   });
   const parsed = appStateSchema.safeParse(migrated);

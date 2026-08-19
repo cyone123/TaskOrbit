@@ -16,6 +16,7 @@ import type {
   Project,
   Settings,
   Task,
+  VaultSettings,
 } from "../types";
 import { uid } from "../utils/id";
 import {
@@ -34,6 +35,7 @@ import {
   updateProjectState,
   updateSettingsState,
   updateTaskState,
+  updateVaultSettingsState,
   restoreProjectState,
   type DailyPlanInput,
   type DailyPlanPatch,
@@ -98,6 +100,7 @@ export interface StoreApi {
   deleteDailyPlan: (id: string) => void;
   addPomodoroSession: (input: PomodoroInput) => PomodoroSession;
   updateSettings: (patch: Partial<Settings>) => void;
+  updateVaultSettings: (patch: Partial<VaultSettings>) => void;
   startTimer: (link: PomodoroLink) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
@@ -359,6 +362,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => updateSettingsState(state, patch));
   }, [mutate]);
 
+  const updateVaultSettings = useCallback<StoreApi["updateVaultSettings"]>((patch) => {
+    mutate((state) => updateVaultSettingsState(state, patch));
+  }, [mutate]);
+
   const startTimer = useCallback<StoreApi["startTimer"]>((link) => {
     setTimerRecoveryWarning(null);
     mutate((state) => ({
@@ -487,6 +494,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         deleteDailyPlan,
         addPomodoroSession,
         updateSettings,
+        updateVaultSettings,
         startTimer,
         pauseTimer,
         resumeTimer,

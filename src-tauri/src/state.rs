@@ -37,10 +37,9 @@ fn corrupt_path(path: &Path) -> PathBuf {
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
-    let raw = fs::read_to_string(path)
-        .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
-    serde_json::from_str(&raw)
-        .map_err(|e| format!("failed to parse {}: {e}", path.display()))
+    let raw =
+        fs::read_to_string(path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    serde_json::from_str(&raw).map_err(|e| format!("failed to parse {}: {e}", path.display()))
 }
 
 fn remove_if_exists(path: &Path) -> Result<(), String> {
@@ -54,10 +53,39 @@ fn remove_if_exists(path: &Path) -> Result<(), String> {
 fn sync_file(path: &Path) -> Result<(), String> {
     let file = OpenOptions::new()
         .read(true)
+        // Windows requires a write-capable handle for FlushFileBuffers,
+        // which is what File::sync_all uses under the hood.
+        .write(true)
         .open(path)
         .map_err(|e| format!("failed to reopen {}: {e}", path.display()))?;
     file.sync_all()
         .map_err(|e| format!("failed to flush {}: {e}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sync_file;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn sync_file_accepts_a_newly_written_file() {
+        let unique_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after the Unix epoch")
+            .as_nanos();
+        let path = PathBuf::from(std::env::temp_dir()).join(format!(
+            "task-orbit-sync-{}-{unique_id}.tmp",
+            std::process::id()
+        ));
+
+        fs::write(&path, "test data").expect("should create the temporary test file");
+        let result = sync_file(&path);
+        let _ = fs::remove_file(&path);
+
+        assert!(result.is_ok(), "sync_file failed: {:?}", result.err());
+    }
 }
 
 /// Load the persisted application state, falling back to the last valid backup.
