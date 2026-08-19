@@ -1,9 +1,18 @@
-import type { AppState, DailyPlan, PomodoroSession, Priority, Project, Task } from "../types";
-import { addDays, toISODate, todayISO } from "../utils/date";
-import { uid } from "../utils/id";
-import { createEmptyState } from "./schema";
-import { DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
-import { STATE_VERSION } from "./version";
+import {
+  DEFAULT_VAULT_SETTINGS,
+  STATE_VERSION,
+  addDays,
+  createEmptyState,
+  toISODate,
+  todayISO,
+  uid,
+  type AppState,
+  type DailyPlan,
+  type PomodoroSession,
+  type Priority,
+  type Project,
+  type Task,
+} from "@task-orbit/core";
 
 function d(offset: number): string {
   return toISODate(addDays(new Date(), offset));

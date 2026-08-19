@@ -1,4 +1,4 @@
-import type { ColorOption } from "../types";
+import type { ColorOption } from "@task-orbit/core";
 
 export const PROJECT_COLORS: ColorOption[] = [
   { key: "violet", name: "紫罗兰", hex: "#6750A4" },

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppState } from "../types";
+import type { AppState } from "@task-orbit/core";
 
 const LS_KEY = "task-orbit-state";
 const LS_BACKUP_KEY = "task-orbit-state-backup";

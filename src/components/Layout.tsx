@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
+import type { ViewKey } from "@task-orbit/core";
 import { useStore } from "../store/store";
-import type { ViewKey } from "../types";
 import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
 import { IconButton } from "./material";

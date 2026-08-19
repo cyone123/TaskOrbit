@@ -3,7 +3,7 @@ import type {
   PomodoroKind,
   PomodoroLink,
   Settings,
-} from "../types";
+} from "./types";
 
 export const MAX_TIMER_CATCH_UP_PHASES = 1000;
 

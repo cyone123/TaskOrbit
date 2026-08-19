@@ -1,11 +1,11 @@
 import { useState } from "react";
+import type { ViewKey } from "@task-orbit/core";
 import { Icon } from "./components/Icon";
 import { Layout } from "./components/Layout";
 import { FilledButton, FilledCard, OutlinedButton } from "./components/material";
 import { SnackbarProvider } from "./components/ui";
 import { StoreProvider, useStore } from "./store/store";
 import { ThemeManager } from "./theme/theme";
-import type { ViewKey } from "./types";
 import { CalendarView } from "./views/CalendarView";
 import { PomodoroView } from "./views/PomodoroView";
 import { ProjectsView } from "./views/ProjectsView";

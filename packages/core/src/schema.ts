@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AppState } from "../types";
+import type { AppState } from "./types";
 import { migratePersistedState } from "./migrations";
 import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
 import { DEFAULT_SETTINGS, DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";

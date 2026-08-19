@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import type { InboxItem, InboxItemKind } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import {
   FilledButton,
@@ -13,7 +14,6 @@ import {
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
-import type { InboxItem, InboxItemKind } from "../types";
 
 type InboxFilter = "all" | "todo" | "note";
 

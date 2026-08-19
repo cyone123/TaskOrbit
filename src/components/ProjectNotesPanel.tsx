@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  uid,
+  type AppState,
+  type DailyPlan,
+  type Project,
+  type Task,
+  type VaultSettings,
+} from "@task-orbit/core";
 import { Icon } from "./Icon";
 import {
   Checkbox,
@@ -23,9 +31,7 @@ import {
   type ProjectNoteSummary,
 } from "../store/vault";
 import { useStore } from "../store/store";
-import { uid } from "../utils/id";
 import { renderMarkdown } from "../utils/markdown";
-import type { AppState, Project, Task, DailyPlan, VaultSettings } from "../types";
 
 interface ProjectNotesPanelProps {
   project: Project;

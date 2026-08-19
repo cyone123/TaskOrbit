@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createEmptyState } from "./schema";
+import { createEmptyState } from "@task-orbit/core";
 import { loadPersistedState, persistState } from "./persistence";
 
 const values = new Map<string, string>();

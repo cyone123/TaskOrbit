@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PomodoroLink, Settings } from "../types";
+import type { PomodoroLink, Settings } from "./types";
 import {
   MAX_TIMER_CATCH_UP_PHASES,
   createPausedTimer,

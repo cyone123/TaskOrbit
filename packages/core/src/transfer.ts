@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AppState } from "../types";
+import type { AppState } from "./types";
 import { parsePersistedState } from "./schema";
 
 export const EXPORT_FORMAT = "task-orbit-export" as const;

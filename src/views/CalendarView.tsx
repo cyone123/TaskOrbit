@@ -1,4 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DAY_MS,
+  addDays,
+  dailyPlanRepeatLabel,
+  formatDate,
+  formatDateFull,
+  isToday,
+  isWeekend,
+  monthLabel,
+  parseISODate,
+  startOfWeek,
+  timeToMinutes,
+  toISODate,
+  weekDays,
+  weekdayCN,
+  type DailyPlan,
+  type Task,
+} from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, TaskForm } from "../components/forms";
 import {
@@ -12,24 +30,7 @@ import {
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { colorByKey, contrastText } from "../store/colors";
-import { dailyPlanRepeatLabel } from "../store/recurrence";
 import { useStore } from "../store/store";
-import type { DailyPlan, Task } from "../types";
-import {
-  DAY_MS,
-  addDays,
-  formatDate,
-  formatDateFull,
-  isToday,
-  isWeekend,
-  monthLabel,
-  parseISODate,
-  startOfWeek,
-  timeToMinutes,
-  toISODate,
-  weekDays,
-  weekdayCN,
-} from "../utils/date";
 
 const HOUR_HEIGHT = 44;
 const DAY_MINUTES = 24 * 60;

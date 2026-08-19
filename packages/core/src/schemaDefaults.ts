@@ -1,4 +1,4 @@
-import type { Settings, VaultSettings } from "../types";
+import type { Settings, VaultSettings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",

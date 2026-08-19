@@ -1,4 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  addDays,
+  dailyPlanRepeatLabel,
+  formatDate,
+  formatDateFull,
+  formatTime,
+  monthLabel,
+  parseISODate,
+  relativeRangeLabel,
+  toISODate,
+  todayISO,
+  weekdayCN,
+  type DailyPlan,
+  type Priority,
+  type Project,
+  type Task,
+} from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
 import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
@@ -12,21 +29,7 @@ import {
 } from "../components/material";
 import { ConfirmDialog, Dialog, EmptyState, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
-import { dailyPlanRepeatLabel } from "../store/recurrence";
 import { useStore } from "../store/store";
-import type { DailyPlan, Priority, Project, Task } from "../types";
-import {
-  addDays,
-  formatDate,
-  formatDateFull,
-  formatTime,
-  monthLabel,
-  parseISODate,
-  relativeRangeLabel,
-  toISODate,
-  todayISO,
-  weekdayCN,
-} from "../utils/date";
 
 const PRIORITY_COLOR: Record<Priority, string> = {
   high: "#BA1A1A",

@@ -1,4 +1,4 @@
-import type { AppState, PomodoroSession, Project } from "../types";
+import type { AppState, PomodoroSession, Project } from "./types";
 
 export function selectActiveProjects(state: AppState): Project[] {
   return state.projects.filter((project) => !project.archived);

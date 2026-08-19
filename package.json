@@ -5,19 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "pnpm --filter @task-orbit/core build && pnpm --filter @task-orbit/mobile typecheck && tsc --noEmit && vite build",
     "test": "vitest run",
+    "mobile": "pnpm --filter @task-orbit/mobile start",
+    "mobile:android": "pnpm --filter @task-orbit/mobile android",
+    "mobile:ios": "pnpm --filter @task-orbit/mobile ios",
+    "mobile:check": "pnpm --filter @task-orbit/mobile typecheck",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@task-orbit/core": "workspace:*",
     "@lit/react": "^1.0.8",
     "@material/web": "^2.5.0",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zod": "^4.4.3"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",
@@ -27,5 +31,10 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.9"
+  },
+  "pnpm": {
+    "overrides": {
+      "metro-config": "0.84.4"
+    }
   }
 }

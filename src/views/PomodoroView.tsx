@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  formatDurationMinutes,
+  selectTodayFocusSessions,
+  todayISO,
+  type ActiveTimer,
+  type PomodoroKind,
+  type PomodoroLink,
+} from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import {
   FilledCard,
@@ -13,10 +21,7 @@ import {
   eventValue,
 } from "../components/material";
 import { Dialog, useSnackbar } from "../components/ui";
-import { selectTodayFocusSessions } from "../store/selectors";
 import { useStore } from "../store/store";
-import type { ActiveTimer, PomodoroKind, PomodoroLink } from "../types";
-import { formatDurationMinutes, todayISO } from "../utils/date";
 
 const PHASES: { key: PomodoroKind; label: string }[] = [
   { key: "focus", label: "专注" },

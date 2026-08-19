@@ -7,19 +7,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  AppState,
-  DailyPlan,
-  InboxItem,
-  PomodoroKind,
-  PomodoroLink,
-  PomodoroSession,
-  Project,
-  Settings,
-  Task,
-  VaultSettings,
-} from "../types";
-import { uid } from "../utils/id";
 import {
   appendDailyPlans,
   appendInboxItem,
@@ -35,13 +22,26 @@ import {
   deleteInboxItemState,
   deleteProjectState,
   deleteTaskState,
+  parseImportSnapshot,
+  parsePersistedState,
+  pauseTimer as pauseTimerState,
+  reconcileTimer,
+  resetTimer as resetTimerState,
+  restoreProjectState,
+  resumeTimer as resumeTimerState,
+  selectTimerPhase as selectTimerPhaseState,
+  serializeExportSnapshot,
+  skipTimer as skipTimerState,
+  startTimer as startTimerState,
+  uid,
   updateDailyPlanState,
   updateInboxItemState,
   updateProjectState,
   updateSettingsState,
   updateTaskState,
+  updateTimerLink,
   updateVaultSettingsState,
-  restoreProjectState,
+  validateAppState,
   type DailyPlanInput,
   type DailyPlanPatch,
   type InboxItemInput,
@@ -51,7 +51,17 @@ import {
   type ProjectPatch,
   type TaskInput,
   type TaskPatch,
-} from "./domain";
+  type AppState,
+  type DailyPlan,
+  type InboxItem,
+  type PomodoroKind,
+  type PomodoroLink,
+  type PomodoroSession,
+  type Project,
+  type Settings,
+  type Task,
+  type VaultSettings,
+} from "@task-orbit/core";
 import {
   clearPersistedState,
   loadPersistedState,
@@ -59,20 +69,8 @@ import {
   type PersistedLoadResult,
 } from "./persistence";
 import { createDefaultState } from "./seed";
-import { parseImportSnapshot, serializeExportSnapshot } from "./transfer";
-import {
-  pauseTimer as pauseTimerState,
-  reconcileTimer,
-  resetTimer as resetTimerState,
-  resumeTimer as resumeTimerState,
-  selectTimerPhase as selectTimerPhaseState,
-  skipTimer as skipTimerState,
-  startTimer as startTimerState,
-  updateTimerLink,
-} from "./timer";
-import { parsePersistedState, validateAppState } from "./schema";
 
-export { STATE_VERSION } from "./version";
+export { STATE_VERSION } from "@task-orbit/core";
 export type {
   DailyPlanInput,
   DailyPlanPatch,
@@ -83,7 +81,7 @@ export type {
   ProjectPatch,
   TaskInput,
   TaskPatch,
-} from "./domain";
+} from "@task-orbit/core";
 
 export type StoreStatus = "loading" | "ready" | "error";
 

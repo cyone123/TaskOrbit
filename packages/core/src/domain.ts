@@ -12,8 +12,8 @@ import type {
   Task,
   Settings,
   VaultSettings,
-} from "../types";
-import { uid } from "../utils/id";
+} from "./types";
+import { uid } from "./id";
 import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
 
 export interface ProjectInput {

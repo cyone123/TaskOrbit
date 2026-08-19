@@ -1,6 +1,6 @@
 import { open as openDirectory } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import type { VaultSettings } from "../types";
+import type { VaultSettings } from "@task-orbit/core";
 import { isTauri } from "./persistence";
 
 export interface ProjectNoteSummary {
