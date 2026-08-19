@@ -111,8 +111,17 @@ function migrateV3ToV4(input: JsonRecord): JsonRecord {
 function migrateV4ToV5(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 5,
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS, ...asRecord(input.vaultSettings) },
+  };
+}
+
+/** v6 adds the lightweight capture inbox. */
+function migrateV5ToV6(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    inboxItems: asArray(input.inboxItems),
   };
 }
 
@@ -133,6 +142,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 2) migrated = migrateV2ToV3(migrated);
   if (version <= 3) migrated = migrateV3ToV4(migrated);
   if (version <= 4) migrated = migrateV4ToV5(migrated);
+  if (version <= 5) migrated = migrateV5ToV6(migrated);
 
   return migrated;
 }

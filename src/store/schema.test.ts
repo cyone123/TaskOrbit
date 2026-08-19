@@ -5,10 +5,11 @@ describe("persisted state schema", () => {
   it("starts with an empty state", () => {
     const state = createEmptyState();
 
-    expect(state.version).toBe(5);
+    expect(state.version).toBe(6);
     expect(state.projects).toHaveLength(0);
     expect(state.tasks).toHaveLength(0);
     expect(state.dailyPlans).toHaveLength(0);
+    expect(state.inboxItems).toHaveLength(0);
     expect(state.pomodoroSessions).toHaveLength(0);
     expect(state.activeTimer).toBeNull();
   });
@@ -52,7 +53,7 @@ describe("persisted state schema", () => {
       },
     });
 
-    expect(state.version).toBe(5);
+    expect(state.version).toBe(6);
     expect(state.projects[0].archivedAt).toBeNull();
     expect(state.pomodoroSessions[0].projectNameSnapshot).toBe("项目一");
   });
@@ -93,7 +94,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(5);
+    expect(state.version).toBe(6);
     expect(state.activeTimer).toBeNull();
   });
 
@@ -122,7 +123,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(5);
+    expect(state.version).toBe(6);
     expect(state.dailyPlans[0].recurrence).toEqual({
       frequency: "none",
       count: 1,
@@ -154,5 +155,44 @@ describe("persisted state schema", () => {
         },
       }),
     ).toThrow("计时器引用了不存在的项目");
+  });
+
+  it("migrates v5 data with an empty inbox", () => {
+    const state = parsePersistedState({
+      version: 5,
+      projects: [],
+      tasks: [],
+      dailyPlans: [],
+      pomodoroSessions: [],
+      settings: {},
+      vaultSettings: {},
+    });
+
+    expect(state.version).toBe(6);
+    expect(state.inboxItems).toEqual([]);
+  });
+
+  it("rejects completed notes", () => {
+    expect(() =>
+      parsePersistedState({
+        version: 6,
+        projects: [],
+        tasks: [],
+        dailyPlans: [],
+        inboxItems: [
+          {
+            id: "i_1",
+            kind: "note",
+            content: "一条备忘",
+            done: true,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+        pomodoroSessions: [],
+        settings: {},
+        vaultSettings: {},
+      }),
+    ).toThrow("备忘不能标记为完成");
   });
 });

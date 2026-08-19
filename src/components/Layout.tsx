@@ -7,6 +7,7 @@ import { Icon } from "./Icon";
 import { IconButton } from "./material";
 
 const NAV: { key: ViewKey; label: string; icon: string }[] = [
+  { key: "inbox", label: "收集箱", icon: "inbox" },
   { key: "projects", label: "项目", icon: "space_dashboard" },
   { key: "calendar", label: "日历", icon: "calendar_month" },
   { key: "pomodoro", label: "专注", icon: "timer" },

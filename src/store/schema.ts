@@ -148,6 +148,26 @@ const dailyPlanSchema = z
     }
   });
 
+const inboxItemSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(["todo", "note"]),
+    content: z.string().trim().min(1),
+    done: z.boolean(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+  .passthrough()
+  .superRefine((item, ctx) => {
+    if (item.kind === "note" && item.done) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["done"],
+        message: "备忘不能标记为完成",
+      });
+    }
+  });
+
 const pomodoroSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -231,6 +251,7 @@ export const appStateSchema = z.object({
   projects: z.array(projectSchema),
   tasks: z.array(taskSchema),
   dailyPlans: z.array(dailyPlanSchema),
+  inboxItems: z.array(inboxItemSchema),
   pomodoroSessions: z.array(pomodoroSessionSchema),
   settings: settingsSchema,
   vaultSettings: vaultSettingsSchema,
@@ -243,6 +264,7 @@ const persistedEnvelopeSchema = z
     projects: z.array(z.unknown()).optional(),
     tasks: z.array(z.unknown()).optional(),
     dailyPlans: z.array(z.unknown()).optional(),
+    inboxItems: z.array(z.unknown()).optional(),
     pomodoroSessions: z.array(z.unknown()).optional(),
     settings: z.unknown().optional(),
     vaultSettings: z.unknown().optional(),
@@ -256,6 +278,7 @@ export function createEmptyState(): AppState {
     projects: [],
     tasks: [],
     dailyPlans: [],
+    inboxItems: [],
     pomodoroSessions: [],
     settings: { ...DEFAULT_SETTINGS },
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
@@ -284,6 +307,7 @@ export function parsePersistedState(raw: unknown): AppState {
     projects: envelope.data.projects ?? [],
     tasks: envelope.data.tasks ?? [],
     dailyPlans: envelope.data.dailyPlans ?? [],
+    inboxItems: envelope.data.inboxItems ?? [],
     pomodoroSessions: envelope.data.pomodoroSessions ?? [],
     settings: envelope.data.settings ?? {},
     vaultSettings: envelope.data.vaultSettings ?? {},

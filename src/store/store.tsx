@@ -10,6 +10,7 @@ import {
 import type {
   AppState,
   DailyPlan,
+  InboxItem,
   PomodoroKind,
   PomodoroLink,
   PomodoroSession,
@@ -21,17 +22,21 @@ import type {
 import { uid } from "../utils/id";
 import {
   appendDailyPlans,
+  appendInboxItem,
   appendPomodoroSession,
   appendProject,
   appendTask,
   archiveProjectState,
   createDailyPlans,
+  createInboxItem,
   createProject,
   createTask,
   deleteDailyPlanState,
+  deleteInboxItemState,
   deleteProjectState,
   deleteTaskState,
   updateDailyPlanState,
+  updateInboxItemState,
   updateProjectState,
   updateSettingsState,
   updateTaskState,
@@ -39,6 +44,8 @@ import {
   restoreProjectState,
   type DailyPlanInput,
   type DailyPlanPatch,
+  type InboxItemInput,
+  type InboxItemPatch,
   type PomodoroInput,
   type ProjectInput,
   type ProjectPatch,
@@ -69,6 +76,8 @@ export { STATE_VERSION } from "./version";
 export type {
   DailyPlanInput,
   DailyPlanPatch,
+  InboxItemInput,
+  InboxItemPatch,
   PomodoroInput,
   ProjectInput,
   ProjectPatch,
@@ -98,6 +107,9 @@ export interface StoreApi {
   addDailyPlan: (input: DailyPlanInput) => DailyPlan;
   updateDailyPlan: (id: string, patch: DailyPlanPatch) => void;
   deleteDailyPlan: (id: string) => void;
+  addInboxItem: (input: InboxItemInput) => InboxItem;
+  updateInboxItem: (id: string, patch: InboxItemPatch) => void;
+  deleteInboxItem: (id: string) => void;
   addPomodoroSession: (input: PomodoroInput) => PomodoroSession;
   updateSettings: (patch: Partial<Settings>) => void;
   updateVaultSettings: (patch: Partial<VaultSettings>) => void;
@@ -332,6 +344,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => deleteTaskState(state, id));
   }, [mutate]);
 
+  const addInboxItem = useCallback<StoreApi["addInboxItem"]>((input) => {
+    const item = createInboxItem(input);
+    mutate((state) => appendInboxItem(state, item));
+    return item;
+  }, [mutate]);
+
+  const updateInboxItem = useCallback<StoreApi["updateInboxItem"]>((id, patch) => {
+    mutate((state) => updateInboxItemState(state, id, patch));
+  }, [mutate]);
+
+  const deleteInboxItem = useCallback<StoreApi["deleteInboxItem"]>((id) => {
+    mutate((state) => deleteInboxItemState(state, id));
+  }, [mutate]);
+
   const addDailyPlan = useCallback<StoreApi["addDailyPlan"]>((input) => {
     const plans = createDailyPlans(input);
     mutate((state) => appendDailyPlans(state, plans));
@@ -489,6 +515,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addTask,
         updateTask,
         deleteTask,
+        addInboxItem,
+        updateInboxItem,
+        deleteInboxItem,
         addDailyPlan,
         updateDailyPlan,
         deleteDailyPlan,

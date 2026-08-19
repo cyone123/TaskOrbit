@@ -56,6 +56,19 @@ export interface DailyPlan {
   updatedAt: number;
 }
 
+export type InboxItemKind = "todo" | "note";
+
+/** A lightweight capture item that intentionally stays outside projects. */
+export interface InboxItem {
+  id: string;
+  kind: InboxItemKind;
+  content: string;
+  /** Notes are always false; keeping one field makes migration and ordering simple. */
+  done: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type PomodoroKind = "focus" | "shortBreak" | "longBreak";
 
 export type TimerStatus = "running" | "paused";
@@ -110,6 +123,7 @@ export interface AppState {
   projects: Project[];
   tasks: Task[];
   dailyPlans: DailyPlan[];
+  inboxItems: InboxItem[];
   pomodoroSessions: PomodoroSession[];
   settings: Settings;
   vaultSettings: VaultSettings;
@@ -118,7 +132,7 @@ export interface AppState {
 
 // ---- Small helper types -----------------------------------------------------
 
-export type ViewKey = "projects" | "calendar" | "pomodoro" | "stats";
+export type ViewKey = "inbox" | "projects" | "calendar" | "pomodoro" | "stats";
 
 export interface ColorOption {
   key: string;

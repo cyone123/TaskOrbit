@@ -220,6 +220,7 @@ export function createDemoState(): AppState {
     projects: [release, learn, fitness],
     tasks,
     dailyPlans: plans,
+    inboxItems: [],
     pomodoroSessions: sessions,
     activeTimer: null,
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },

@@ -10,8 +10,10 @@ import { CalendarView } from "./views/CalendarView";
 import { PomodoroView } from "./views/PomodoroView";
 import { ProjectsView } from "./views/ProjectsView";
 import { StatsView } from "./views/StatsView";
+import { InboxView } from "./views/InboxView";
 
 const TITLES: Record<ViewKey, string> = {
+  inbox: "收集箱",
   projects: "项目",
   calendar: "日历",
   pomodoro: "番茄钟",
@@ -24,6 +26,7 @@ function Shell() {
   return (
     <Layout view={view} title={TITLES[view]} onNavigate={setView}>
       <div className="view-stage" key={view}>
+        {view === "inbox" && <InboxView />}
         {view === "projects" && <ProjectsView />}
         {view === "calendar" && <CalendarView />}
         {view === "pomodoro" && <PomodoroView />}

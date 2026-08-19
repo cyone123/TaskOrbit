@@ -29,7 +29,7 @@ describe("snapshot transfer", () => {
     expect(exported.state.activeTimer).toBeNull();
     expect(exported.state.vaultSettings.rootPath).toBeNull();
     expect(parseImportSnapshot(exported)).toMatchObject({
-      version: 5,
+      version: 6,
       activeTimer: null,
     });
   });
@@ -44,7 +44,7 @@ describe("snapshot transfer", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(5);
+    expect(state.version).toBe(6);
     expect(state.activeTimer).toBeNull();
   });
 

@@ -8,9 +8,12 @@ import {
   archiveProjectState,
   createDailyPlan,
   createDailyPlans,
+  createInboxItem,
   createProject,
   createTask,
+  deleteInboxItemState,
   deleteProjectState,
+  updateInboxItemState,
 } from "./domain";
 import { createEmptyState } from "./schema";
 
@@ -127,5 +130,25 @@ describe("domain commands", () => {
     expect(new Set(plans.map((plan) => plan.recurrence.seriesId)).size).toBe(1);
     expect(plans.map((plan) => plan.recurrence.occurrence)).toEqual([1, 2, 3]);
     expect(next.dailyPlans).toHaveLength(4);
+  });
+
+  it("captures, edits, completes and deletes lightweight inbox items", () => {
+    const state = createEmptyState();
+    const todo = createInboxItem({ kind: "todo", content: "  整理收件箱  " }, 10);
+    const note = createInboxItem({ kind: "note", content: "记录一个想法" }, 11);
+    const withItems = {
+      ...state,
+      inboxItems: [todo, note],
+    };
+
+    expect(todo.content).toBe("整理收件箱");
+    expect(updateInboxItemState(withItems, todo.id, { done: true }, 12).inboxItems[0]).toMatchObject({
+      id: todo.id,
+      done: true,
+      updatedAt: 12,
+    });
+    const edited = updateInboxItemState(withItems, note.id, { content: "  更新后的想法  " }, 13);
+    expect(edited.inboxItems.find((item) => item.id === note.id)?.content).toBe("更新后的想法");
+    expect(deleteInboxItemState(edited, todo.id).inboxItems).toHaveLength(1);
   });
 });

@@ -3,6 +3,8 @@ import type {
   DailyPlan,
   DailyPlanRecurrence,
   DailyPlanRepeat,
+  InboxItem,
+  InboxItemKind,
   PomodoroLink,
   PomodoroSession,
   Priority,
@@ -36,6 +38,13 @@ export interface TaskInput {
 export type TaskPatch = Partial<
   Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "priority">
 >;
+
+export interface InboxItemInput {
+  kind: InboxItemKind;
+  content: string;
+}
+
+export type InboxItemPatch = Partial<Pick<InboxItem, "content" | "done">>;
 
 export interface DailyPlanInput {
   projectId: string | null;
@@ -313,6 +322,49 @@ export function deleteTaskState(state: AppState, id: string): AppState {
           }
         : session,
     ),
+  };
+}
+
+export function createInboxItem(input: InboxItemInput, createdAt = Date.now()): InboxItem {
+  return {
+    id: uid("i_"),
+    kind: input.kind,
+    content: input.content.trim(),
+    done: false,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+export function appendInboxItem(state: AppState, item: InboxItem): AppState {
+  return { ...state, inboxItems: [item, ...state.inboxItems] };
+}
+
+export function updateInboxItemState(
+  state: AppState,
+  id: string,
+  patch: InboxItemPatch,
+  updatedAt = Date.now(),
+): AppState {
+  return {
+    ...state,
+    inboxItems: state.inboxItems.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...patch,
+            content: patch.content === undefined ? item.content : patch.content.trim(),
+            updatedAt,
+          }
+        : item,
+    ),
+  };
+}
+
+export function deleteInboxItemState(state: AppState, id: string): AppState {
+  return {
+    ...state,
+    inboxItems: state.inboxItems.filter((item) => item.id !== id),
   };
 }
 
