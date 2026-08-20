@@ -16,8 +16,14 @@ export default function PomodoroScreen() {
   const [now, setNow] = useState(Date.now());
   const [taskId, setTaskId] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState(false);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(timer); }, []);
   useEffect(() => { if (state.activeTimer?.taskId) setTaskId(state.activeTimer.taskId); }, [state.activeTimer?.taskId]);
+  useEffect(() => {
+    if (!resetFeedback) return;
+    const timeout = setTimeout(() => setResetFeedback(false), 1_600);
+    return () => clearTimeout(timeout);
+  }, [resetFeedback]);
 
   const timer = state.activeTimer ?? createPausedTimer(state.settings);
   const remaining = timer.status === "running" && timer.endAt !== null ? Math.max(0, timer.endAt - now) : timer.remainingMs;
@@ -30,24 +36,17 @@ export default function PomodoroScreen() {
 
   const link: PomodoroLink = linkedTask ? { projectId: linkedTask.projectId, taskId: linkedTask.id, dailyPlanId: null } : { projectId: null, taskId: null, dailyPlanId: null };
   const toggle = async () => {
+    setResetFeedback(false);
     if (timer.status === "running") { pausePomodoro(); return; }
     const scheduled = await startPomodoro(link);
     if (!scheduled) Alert.alert("计时已开始", "当前环境未启用系统通知，请保持应用可见或在系统设置中允许通知。");
   };
 
-  const confirmReset = () => {
-    Alert.alert("重置计时器", "清除当前计时进度并回到一轮新的专注？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "重置",
-        style: "destructive",
-        onPress: () => {
-          resetPomodoro();
-          setTaskId("");
-          setNow(Date.now());
-        },
-      },
-    ]);
+  const handleReset = () => {
+    resetPomodoro();
+    setTaskId("");
+    setNow(Date.now());
+    setResetFeedback(true);
   };
 
   return (
@@ -65,12 +64,12 @@ export default function PomodoroScreen() {
           <View style={[styles.ring, { borderColor: colors.surfaceVariant }]}>
             <View style={[styles.progressArc, { borderColor: timer.phase === "focus" ? colors.danger : colors.success, opacity: Math.max(0.2, progress) }]} />
             <Text style={[styles.timerText, { color: colors.text }]}>{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</Text>
-            <Text style={[styles.timerStatus, { color: colors.textMuted }]}>{timer.status === "running" ? "保持节奏" : timer.remainingMs < timer.durationMs ? "已暂停" : "准备开始"}</Text>
+            <Text accessibilityLiveRegion="polite" style={[styles.timerStatus, { color: resetFeedback ? colors.primary : colors.textMuted }]}>{resetFeedback ? "已重置 · 准备开始" : timer.status === "running" ? "保持节奏" : timer.remainingMs < timer.durationMs ? "已暂停" : "准备开始"}</Text>
           </View>
           <View style={styles.controls}>
             <PrimaryButton label={timer.status === "running" ? "暂停" : "开始"} icon={timer.status === "running" ? "pause" : "play"} onPress={() => void toggle()} />
-            <Pressable style={[styles.roundButton, { backgroundColor: colors.surfaceVariant }]} onPress={skipPomodoro} accessibilityLabel="跳过阶段"><Ionicons name="play-skip-forward" size={21} color={colors.textMuted} /></Pressable>
-            <Pressable style={[styles.roundButton, { backgroundColor: colors.surfaceVariant }]} onPress={confirmReset} accessibilityLabel="重置"><Ionicons name="refresh" size={21} color={colors.textMuted} /></Pressable>
+            <Pressable accessibilityRole="button" style={[styles.roundButton, { backgroundColor: colors.surfaceVariant }]} onPress={skipPomodoro} accessibilityLabel="跳过阶段"><Ionicons name="play-skip-forward" size={21} color={colors.textMuted} /></Pressable>
+            <Pressable accessibilityRole="button" style={[styles.roundButton, { backgroundColor: resetFeedback ? colors.primarySoft : colors.surfaceVariant }]} onPress={handleReset} accessibilityLabel="重置"><Ionicons name="refresh" size={21} color={resetFeedback ? colors.primary : colors.textMuted} /></Pressable>
           </View>
         </Card>
 

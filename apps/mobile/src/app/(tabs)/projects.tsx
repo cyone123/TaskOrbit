@@ -2,9 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { addDays, relativeRangeLabel, toISODate, todayISO } from "@task-orbit/core";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppScreen, Card, ChoiceRow, EmptyState, Field, FormModal, IconButton, PageScroll, ProgressBar } from "@/components/ui";
+import { AppScreen, Card, ChoiceRow, EmptyState, Field, FormModal, IconButton, PageScroll, ProgressBar, SearchField } from "@/components/ui";
 import { useAppColors } from "@/constants/theme";
 import { PROJECT_COLORS, PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
@@ -39,11 +39,7 @@ export default function ProjectsScreen() {
 
   return (
     <AppScreen title="项目" subtitle={`${activeProjects.length} 个进行中`} action={<IconButton icon="add" label="新建项目" onPress={openCreate} />}>
-      <View style={[styles.search, { backgroundColor: colors.surfaceContainerHigh }]}>
-        <Ionicons name="search" size={20} color={colors.textMuted} />
-        <TextInput value={query} onChangeText={setQuery} placeholder="搜索项目" placeholderTextColor={colors.outline} style={[styles.searchInput, { color: colors.text }]} />
-        {query ? <Pressable onPress={() => setQuery("")} accessibilityLabel="清除搜索"><Ionicons name="close-circle" size={19} color={colors.outline} /></Pressable> : null}
-      </View>
+      <SearchField value={query} onChangeText={setQuery} placeholder="搜索项目" />
       <PageScroll>
         {activeProjects.length === 0 ? <EmptyState icon="folder-open-outline" title={query ? "没有匹配的项目" : "创建第一个项目"} description={query ? "换一个关键词试试。" : "项目把任务、每日计划和专注记录组织在一起。"} /> : activeProjects.map((project) => {
           const tasks = state.tasks.filter((task) => task.projectId === project.id);
@@ -93,7 +89,6 @@ export default function ProjectsScreen() {
 }
 
 const styles = StyleSheet.create({
-  search: { height: 52, borderRadius: 28, marginHorizontal: 16, marginBottom: 13, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", gap: 10 }, searchInput: { flex: 1, height: "100%", fontSize: 15 },
   projectCard: { padding: 16, borderRadius: 24 }, projectTop: { flexDirection: "row", alignItems: "center", gap: 11 }, projectIcon: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center" }, projectCopy: { flex: 1 }, projectName: { fontSize: 18, fontWeight: "800" }, projectMeta: { fontSize: 11, marginTop: 4 }, description: { fontSize: 13, lineHeight: 19, marginTop: 13 },
   progressLabel: { flexDirection: "row", justifyContent: "space-between", marginTop: 16, marginBottom: 7 }, progressText: { fontSize: 11 }, progressValue: { fontSize: 12, fontWeight: "800" }, projectFooter: { flexDirection: "row", gap: 8, marginTop: 13 }, infoChip: { minHeight: 32, borderRadius: 16, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 5 },
   sectionLabel: { fontSize: 12, fontWeight: "800", marginTop: 8, marginLeft: 4, letterSpacing: 0.8 }, archivedCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13 }, archivedName: { flex: 1, fontSize: 14, fontWeight: "700" }, textAction: { minWidth: 42, minHeight: 42, alignItems: "center", justifyContent: "center" }, dateFields: { flexDirection: "row", gap: 10 }, flex: { flex: 1 },

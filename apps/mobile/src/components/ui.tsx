@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { PropsWithChildren, ReactElement } from "react";
+import { useEffect, useRef, useState, type PropsWithChildren, type ReactElement } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -166,19 +168,99 @@ export function Field({ label, value, onChangeText, placeholder, multiline, keyb
   keyboardType?: "default" | "number-pad";
 }) {
   const colors = useAppColors();
+  const [focused, setFocused] = useState(false);
+  const focusProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusProgress, {
+      toValue: focused ? 1 : 0,
+      duration: focused ? 180 : 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focusProgress, focused]);
+
   return (
     <View style={styles.fieldWrap}>
-      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{label}</Text>
+      <View
+        style={[
+          styles.fieldOutline,
+          multiline && styles.multilineOutline,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.outline,
+          },
+        ]}
+      >
+        <Animated.View style={[styles.focusedFieldOutline, { borderColor: colors.primary, opacity: focusProgress }]} />
+        <Text style={[styles.floatingLabel, { color: focused ? colors.primary : colors.textMuted, backgroundColor: colors.surface }]}>{label}</Text>
+        <TextInput
+          accessibilityLabel={label}
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          placeholderTextColor={colors.tabInactive}
+          selectionColor={colors.primary}
+          cursorColor={colors.primary}
+          multiline={multiline}
+          keyboardType={keyboardType}
+          style={[styles.fieldInput, multiline && styles.multilineInput, { color: colors.text }]}
+        />
+      </View>
+    </View>
+  );
+}
+
+export function SearchField({ value, onChangeText, placeholder }: {
+  value: string;
+  onChangeText(value: string): void;
+  placeholder: string;
+}) {
+  const colors = useAppColors();
+  const [focused, setFocused] = useState(false);
+  const focusProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusProgress, {
+      toValue: focused ? 1 : 0,
+      duration: focused ? 180 : 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focusProgress, focused]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.searchField,
+        {
+          backgroundColor: colors.surfaceContainerHigh,
+          borderColor: focusProgress.interpolate({ inputRange: [0, 1], outputRange: ["transparent", colors.primary] }),
+          borderWidth: 2,
+        },
+      ]}
+    >
+      <Ionicons name="search" size={20} color={focused ? colors.primary : colors.textMuted} />
       <TextInput
+        accessibilityLabel={placeholder}
         value={value}
         onChangeText={onChangeText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder={placeholder}
-        placeholderTextColor={colors.tabInactive}
-        multiline={multiline}
-        keyboardType={keyboardType}
-        style={[styles.field, multiline && styles.multiline, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+        placeholderTextColor={colors.outline}
+        selectionColor={colors.primary}
+        cursorColor={colors.primary}
+        style={[styles.searchInput, { color: colors.text }]}
       />
-    </View>
+      {value ? (
+        <Pressable onPress={() => onChangeText("")} accessibilityRole="button" accessibilityLabel="清除搜索" style={styles.clearSearch}>
+          <Ionicons name="close-circle" size={19} color={focused ? colors.primary : colors.outline} />
+        </Pressable>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -255,7 +337,8 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 60, paddingHorizontal: 30, alignItems: "center" }, emptyIcon: { width: 62, height: 62, borderRadius: 21, alignItems: "center", justifyContent: "center", marginBottom: 16 }, emptyTitle: { fontSize: 18, fontWeight: "800" }, emptyDescription: { fontSize: 14, textAlign: "center", lineHeight: 21, marginTop: 7 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }, modal: { height: "92%", maxHeight: "92%", borderTopLeftRadius: 28, borderTopRightRadius: 28 },
   modalHeader: { padding: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, modalTitle: { fontSize: 22, fontWeight: "800" }, formScroll: { flex: 1 }, form: { paddingHorizontal: 20, paddingBottom: 16, gap: 15 }, modalFooter: { padding: 20, paddingTop: 10 },
-  fieldWrap: { gap: 7 }, fieldLabel: { fontSize: 12, fontWeight: "700" }, field: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontSize: 15 }, multiline: { height: 88, paddingTop: 12, textAlignVertical: "top" },
+  fieldWrap: { paddingTop: 7 }, fieldLabel: { fontSize: 12, fontWeight: "700" }, fieldOutline: { minHeight: 56, borderWidth: 1, borderRadius: 12, justifyContent: "center" }, focusedFieldOutline: { ...StyleSheet.absoluteFill, pointerEvents: "none", zIndex: 1, borderWidth: 2, borderRadius: 12 }, multilineOutline: { minHeight: 104, justifyContent: "flex-start" }, floatingLabel: { position: "absolute", zIndex: 2, top: -9, left: 12, paddingHorizontal: 5, fontSize: 12, lineHeight: 18, fontWeight: "700" }, fieldInput: { zIndex: 2, minHeight: 54, paddingHorizontal: 15, paddingVertical: 8, fontSize: 16 }, multilineInput: { minHeight: 100, paddingTop: 15, textAlignVertical: "top" },
+  searchField: { height: 56, borderRadius: 28, marginHorizontal: 16, marginBottom: 13, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", gap: 10 }, searchInput: { flex: 1, height: "100%", fontSize: 16 }, clearSearch: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginRight: -10 },
   choiceRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, choice: { minHeight: 38, paddingHorizontal: 13, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 7 }, colorDot: { width: 10, height: 10, borderRadius: 5 },
   segmented: { minHeight: 48, borderWidth: 1, borderRadius: 24, overflow: "hidden", flexDirection: "row" }, segment: { flex: 1, minHeight: 46, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, paddingHorizontal: 8 },
   progressTrack: { height: 8, borderRadius: 4, overflow: "hidden" }, progressFill: { height: 8, borderRadius: 4 },

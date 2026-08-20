@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -22,7 +24,17 @@ export default function InboxScreen() {
   const [kind, setKind] = useState<"todo" | "note">("todo");
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const focusProgress = useRef(new Animated.Value(0)).current;
   const noteExpanded = kind === "note" && inputFocused;
+
+  useEffect(() => {
+    Animated.timing(focusProgress, {
+      toValue: inputFocused ? 1 : 0,
+      duration: inputFocused ? 180 : 140,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focusProgress, inputFocused]);
 
   const submit = () => {
     if (!content.trim()) return;
@@ -47,12 +59,26 @@ export default function InboxScreen() {
         style={styles.content}
       >
         <View style={[styles.composerWrap, noteExpanded && styles.expandedComposerWrap]}>
-          <View style={[styles.composer, noteExpanded && styles.expandedComposer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.composer,
+              noteExpanded && styles.expandedComposer,
+              { backgroundColor: colors.surface, borderColor: colors.outline },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.composerFocusOutline,
+                noteExpanded && styles.expandedComposerFocusOutline,
+                { borderColor: colors.primary, opacity: focusProgress },
+              ]}
+            />
             <Pressable onPress={toggleKind} accessibilityLabel="切换记录类型" style={styles.kindButton}>
               <Ionicons name={kind === "todo" ? "checkbox-outline" : "document-text-outline"} size={22} color={colors.primary} />
             </Pressable>
             <TextInput
               ref={inputRef}
+              accessibilityLabel={kind === "todo" ? "待办内容" : "备忘内容"}
               value={content}
               onChangeText={setContent}
               onFocus={() => setInputFocused(true)}
@@ -60,6 +86,8 @@ export default function InboxScreen() {
               onSubmitEditing={kind === "todo" ? submit : undefined}
               placeholder={kind === "todo" ? "快速添加待办…" : "记录一条备忘…"}
               placeholderTextColor={colors.tabInactive}
+              selectionColor={colors.primary}
+              cursorColor={colors.primary}
               multiline={kind === "note"}
               scrollEnabled={noteExpanded}
               textAlignVertical={kind === "note" ? "top" : "center"}
@@ -100,8 +128,9 @@ export default function InboxScreen() {
 
 const styles = StyleSheet.create({
   content: { flex: 1 }, composerWrap: { paddingHorizontal: 16, paddingBottom: 12 }, expandedComposerWrap: { flex: 1, paddingBottom: 0 },
-  composer: { minHeight: 58, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10 },
+  composer: { minHeight: 58, borderWidth: 1, borderRadius: 18, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10 }, composerFocusOutline: { ...StyleSheet.absoluteFill, pointerEvents: "none", borderWidth: 2, borderRadius: 18 },
   expandedComposer: { flex: 1, alignItems: "flex-start", paddingTop: 14, paddingBottom: 8, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }, kindButton: { paddingVertical: 8 },
+  expandedComposerFocusOutline: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   input: { flex: 1, fontSize: 15, minHeight: 56, paddingVertical: 0 }, expandedInput: { alignSelf: "stretch", minHeight: 0, paddingTop: 8 }, submitDock: { alignSelf: "flex-end" },
   hint: { fontSize: 11, marginTop: 6, marginLeft: 4 }, itemCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 }, check: { padding: 4 }, itemCopy: { flex: 1, gap: 4 }, itemText: { fontSize: 15, lineHeight: 21, fontWeight: "600" }, itemMeta: { fontSize: 11 },
 });
