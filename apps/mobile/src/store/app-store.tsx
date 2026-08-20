@@ -8,6 +8,7 @@ import {
   createDailyPlans,
   createEmptyState,
   createInboxItem,
+  createPausedTimer,
   createProject,
   createTask,
   deleteDailyPlanState,
@@ -17,7 +18,6 @@ import {
   parseImportSnapshot,
   pauseTimer,
   reconcileTimer,
-  resetTimer,
   restoreProjectState,
   serializeExportSnapshot,
   skipTimer,
@@ -78,6 +78,7 @@ interface AppStoreValue {
   updatePlan(id: string, patch: DailyPlanPatch): void;
   removePlan(id: string): void;
   updateTheme(theme: Settings["theme"]): void;
+  updatePomodoroSettings(patch: Pick<Settings, "focusMinutes" | "shortBreakMinutes" | "longBreakMinutes" | "longBreakInterval">): void;
   startPomodoro(link: PomodoroLink): Promise<boolean>;
   pausePomodoro(): void;
   skipPomodoro(): void;
@@ -188,6 +189,13 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     updatePlan: (id, patch) => mutate((current) => updateDailyPlanState(current, id, patch)),
     removePlan: (id) => mutate((current) => deleteDailyPlanState(current, id)),
     updateTheme: (theme) => mutate((current) => updateSettingsState(current, { theme })),
+    updatePomodoroSettings: (patch) => {
+      cancelTimerNotification().catch(() => undefined);
+      mutate((current) => {
+        const next = updateSettingsState(current, patch);
+        return { ...next, activeTimer: createPausedTimer(next.settings) };
+      });
+    },
     startPomodoro: async (link) => {
       const nextTimer = startTimer(latestState.current.activeTimer, latestState.current.settings, link);
       mutate((current) => ({ ...current, activeTimer: nextTimer }));
@@ -203,7 +211,7 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
     },
     resetPomodoro: () => {
       cancelTimerNotification().catch(() => undefined);
-      mutate((current) => ({ ...current, activeTimer: resetTimer() }));
+      mutate((current) => ({ ...current, activeTimer: createPausedTimer(current.settings) }));
     },
     exportSnapshot: () => serializeExportSnapshot(latestState.current),
     importSnapshot: async (raw) => {

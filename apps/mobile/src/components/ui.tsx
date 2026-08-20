@@ -2,7 +2,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { PropsWithChildren, ReactElement } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -141,7 +143,7 @@ export function FormModal({ visible, title, onClose, onSubmit, submitLabel = "ä¿
   const colors = useAppColors();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <SafeAreaView edges={["bottom"]} style={[styles.modal, { backgroundColor: colors.surface }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
@@ -150,7 +152,7 @@ export function FormModal({ visible, title, onClose, onSubmit, submitLabel = "ä¿
           <ScrollView style={styles.formScroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">{children}</ScrollView>
           <View style={styles.modalFooter}><PrimaryButton label={submitLabel} onPress={onSubmit} disabled={!canSubmit} /></View>
         </SafeAreaView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
