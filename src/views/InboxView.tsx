@@ -1,19 +1,26 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import type { InboxItem, InboxItemKind } from "@task-orbit/core";
+import type { MdOutlinedTextField } from "@material/web/textfield/outlined-text-field.js";
 import { Icon } from "../components/Icon";
 import {
-  FilledButton,
   Checkbox,
+  ChipSet,
+  FilledButton,
+  FilledCard,
+  FilterChip,
   IconButton,
-  OutlinedCard,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
   OutlinedTextField,
+  TonalButton,
   TextButton,
   eventValue,
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
+
+/** Keep in sync with --sys-motion-selection-duration used by .inbox-item exit. */
+const ITEM_EXIT_MS = 200;
 
 type InboxFilter = "all" | "todo" | "note";
 
@@ -30,18 +37,20 @@ function formatItemDate(timestamp: number): string {
 
 function InboxItemRow({
   item,
+  leaving = false,
   onToggle,
   onEdit,
   onDelete,
 }: {
   item: InboxItem;
+  leaving?: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const isTodo = item.kind === "todo";
   return (
-    <div className={`inbox-item ${item.done ? "is-done" : ""}`}>
+    <div className={`inbox-item ${item.done ? "is-done" : ""} ${leaving ? "is-leaving" : ""}`}>
       {isTodo ? (
         <Checkbox
           className="inbox-item__checkbox"
@@ -136,6 +145,8 @@ export function InboxView() {
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [editing, setEditing] = useState<InboxItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InboxItem | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  const captureInputRef = useRef<MdOutlinedTextField | null>(null);
 
   const todoCount = store.state.inboxItems.filter(
     (item) => item.kind === "todo" && !item.done,
@@ -169,6 +180,23 @@ export function InboxView() {
     setDraft("");
   };
 
+  const focusCapture = () => {
+    captureInputRef.current?.focus();
+  };
+
+  // Animate the row out before removing it from state.
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    setLeavingId(id);
+    window.setTimeout(() => {
+      store.deleteInboxItem(id);
+      setLeavingId(null);
+      show("内容已删除");
+    }, ITEM_EXIT_MS);
+  };
+
   return (
     <div className="inbox-view">
       <section className="inbox-hero">
@@ -199,14 +227,14 @@ export function InboxView() {
       </section>
 
       <div className="inbox-layout">
-        <OutlinedCard className="inbox-capture-card">
+        <FilledCard className="material-card inbox-capture-card">
           <div className="inbox-card-heading">
             <div className="inbox-card-heading__icon">
               <Icon name="add" size={22} />
             </div>
             <div>
               <h2 className="title-md">快速收集</h2>
-              <p className="body-sm muted">先记下来，不用现在分类。</p>
+              <p className="body-sm inbox-capture__sub">先记下来，不用现在分类。</p>
             </div>
           </div>
           <OutlinedSegmentedButtonSet className="segmented-control inbox-capture__modes">
@@ -234,6 +262,7 @@ export function InboxView() {
               // Material Web caches the native control in its validator; remounting
               // prevents it from trying to assign `type` to a textarea when the mode changes.
               key={mode}
+              ref={captureInputRef}
               label={mode === "todo" ? "想做什么？" : "想记点什么？"}
               type={mode === "note" ? "textarea" : "text"}
               rows={mode === "note" ? 7 : undefined}
@@ -249,18 +278,18 @@ export function InboxView() {
               {mode === "todo" ? "收下待办" : "保存备忘"}
             </FilledButton>
           </form>
-          <p className="inbox-capture__hint body-sm muted">
+          <p className="inbox-capture__hint body-sm inbox-capture__sub">
             {mode === "todo" ? "按 Enter 快速收下一个待办" : "可以写多行，适合记录一闪而过的想法"}
           </p>
-        </OutlinedCard>
+        </FilledCard>
 
-        <OutlinedCard className="inbox-list-card">
+        <FilledCard className="material-card inbox-list-card">
           <div className="inbox-list-toolbar">
             <div>
               <h2 className="title-md">我的收集</h2>
               <p className="body-sm muted">把零散想法变成下一步行动。</p>
             </div>
-            <div className="inbox-filters" role="tablist" aria-label="收集箱筛选">
+            <ChipSet className="inbox-filters" role="tablist" aria-label="收集箱筛选">
               {(
                 [
                   ["all", "全部", store.state.inboxItems.length],
@@ -268,19 +297,17 @@ export function InboxView() {
                   ["note", "备忘", noteCount],
                 ] as [InboxFilter, string, number][]
               ).map(([value, label, count]) => (
-                <button
+                <FilterChip
                   key={value}
-                  type="button"
                   role="tab"
                   aria-selected={filter === value}
-                  className={`inbox-filter ${filter === value ? "is-selected" : ""}`}
+                  selected={filter === value}
                   onClick={() => setFilter(value)}
                 >
-                  {label}
-                  <span>{count}</span>
-                </button>
+                  {label} · {count}
+                </FilterChip>
               ))}
-            </div>
+            </ChipSet>
           </div>
 
           {pendingItems.length > 0 && (
@@ -292,6 +319,7 @@ export function InboxView() {
                 <InboxItemRow
                   key={item.id}
                   item={item}
+                  leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
@@ -306,6 +334,7 @@ export function InboxView() {
                 <InboxItemRow
                   key={item.id}
                   item={item}
+                  leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
@@ -327,9 +356,14 @@ export function InboxView() {
                   ? "把脑海里的第一件事交给收集箱吧。"
                   : "切换上方类型，或从左侧快速收集。"}
               </p>
+              {filter !== "note" && (
+                <TonalButton className="inbox-empty-cta" onClick={focusCapture}>
+                  <Icon name="add" size={18} slot="icon" /> 收下第一件事
+                </TonalButton>
+              )}
             </div>
           )}
-        </OutlinedCard>
+        </FilledCard>
       </div>
 
       <InboxEditDialog
@@ -348,12 +382,7 @@ export function InboxView() {
         title={deleteTarget?.kind === "todo" ? "删除待办" : "删除备忘"}
         message={`确定删除「${deleteTarget?.content ?? "这条内容"}」吗？`}
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (!deleteTarget) return;
-          store.deleteInboxItem(deleteTarget.id);
-          setDeleteTarget(null);
-          show("内容已删除");
-        }}
+        onConfirm={confirmDelete}
       />
     </div>
   );

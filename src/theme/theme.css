@@ -1922,11 +1922,10 @@ md-linear-progress.progress--success {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--sys-space-4);
   padding: 28px 18px 20px;
   overflow-y: auto;
-  background: var(--md-surface-container-lowest);
-  border-right: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-low);
 }
 
 .projects-sidebar__header,
@@ -1943,40 +1942,53 @@ md-linear-progress.progress--success {
   padding: 0 4px;
 }
 
+/* Text-button semantics instead of a tiny underline link. */
 .projects-sidebar__manage {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--sys-space-3);
+  border-radius: var(--shape-full);
   color: var(--md-primary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--sys-type-label-large-size);
+  font-weight: var(--sys-type-label-large-weight);
+  transition: background-color var(--sys-motion-hover-duration)
+    var(--sys-motion-hover-easing);
 }
 
 .projects-sidebar__manage:hover {
-  text-decoration: underline;
+  background: rgb(var(--md-primary-rgb) / var(--sys-state-hover));
 }
 
 .projects-sidebar__tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sys-space-2);
 }
 
+/* MD3 search bar expression: pill on a container-high surface, no border. */
 .projects-search {
   display: flex;
   min-width: 0;
-  height: 46px;
+  height: 48px;
   flex: 1;
   align-items: center;
-  gap: 10px;
-  padding: 0 13px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-md);
+  gap: var(--sys-space-2);
+  padding: 0 var(--sys-space-4);
+  border-radius: var(--shape-full);
   color: var(--md-on-surface-variant);
-  background: var(--md-surface-container-lowest);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  background: var(--md-surface-container-high);
+  transition:
+    box-shadow var(--sys-motion-hover-duration) var(--sys-motion-easing-standard),
+    background-color var(--sys-motion-hover-duration) var(--sys-motion-easing-standard);
+}
+
+.projects-search:hover {
+  background: var(--md-surface-container-highest);
 }
 
 .projects-search:focus-within {
-  border-color: var(--md-primary);
-  box-shadow: 0 0 0 1px var(--md-primary);
+  box-shadow: var(--sys-elevation-level1);
 }
 
 .projects-search input {
@@ -2024,39 +2036,40 @@ md-filled-button.projects-create-button {
   text-align: center;
 }
 
+/* Navigation-drawer-style pill list items. */
 .project-nav-item {
-  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
   align-items: center;
-  gap: 12px;
-  padding: 13px 10px 13px 15px;
-  border-radius: var(--shape-md);
+  gap: var(--sys-space-3);
+  min-height: 56px;
+  padding: var(--sys-space-2) var(--sys-space-3) var(--sys-space-2) var(--sys-space-4);
+  border-radius: var(--shape-full);
   color: var(--md-on-surface);
   text-align: left;
-  transition: background 150ms ease, transform 150ms ease;
+  transition:
+    background-color var(--sys-motion-selection-duration) var(--sys-motion-selection-easing),
+    color var(--sys-motion-selection-duration) var(--sys-motion-selection-easing);
 }
 
 .project-nav-item:hover {
-  background: var(--md-surface-container);
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-hover));
 }
 
 .project-nav-item.is-selected {
-  padding-left: 12px;
-  background: var(--md-primary-container);
-  color: var(--md-on-primary-container);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
 }
 
-.project-nav-item.is-selected::before {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 0;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--md-primary);
-  content: "";
+.project-nav-item.is-selected:hover {
+  background: var(--md-secondary-container);
+}
+
+.project-nav-item.is-selected .project-nav-item__meta,
+.project-nav-item.is-selected .project-nav-item__meta span {
+  color: inherit;
+  opacity: 0.8;
 }
 
 .project-nav-item__dot {
@@ -2075,33 +2088,39 @@ md-filled-button.projects-create-button {
 .project-nav-item__meta {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--sys-space-2);
 }
 
 .project-nav-item__chevron {
   flex: 0 0 auto;
-  color: var(--md-primary);
+  color: inherit;
 }
 
 .projects-sidebar__archived {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: var(--sys-space-4);
   border-top: 1px solid var(--md-outline-variant);
 }
 
 .projects-archived-toggle {
   display: flex;
   width: 100%;
+  min-height: 40px;
   align-items: center;
   justify-content: space-between;
-  padding: 4px;
+  padding: var(--sys-space-1) var(--sys-space-2);
+  border-radius: var(--shape-sm);
   color: var(--md-on-surface-variant);
   font-size: 14px;
   font-weight: 500;
   text-align: left;
+  transition:
+    background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+    color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
 
 .projects-archived-toggle:hover {
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-hover));
   color: var(--md-on-surface);
 }
 
@@ -2109,21 +2128,21 @@ md-filled-button.projects-create-button {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 8px;
+  margin-top: var(--sys-space-2);
 }
 
 .projects-archived-item {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
-  padding: 5px 2px;
+  gap: var(--sys-space-2);
+  padding: var(--sys-space-1) var(--sys-space-2);
 }
 
 .projects-archived-item md-icon-button {
-  --md-icon-button-container-width: 30px;
-  --md-icon-button-container-height: 30px;
-  --md-icon-button-icon-size: 17px;
+  --md-icon-button-container-width: 40px;
+  --md-icon-button-container-height: 40px;
+  --md-icon-button-icon-size: 18px;
 }
 
 .project-detail-area {
@@ -2135,15 +2154,12 @@ md-filled-button.projects-create-button {
   scroll-behavior: smooth;
 }
 
+/* Detail content floats on the workspace background — the pane boundary is
+   carried by the sidebar tone, not a boxed outline. */
 .project-detail-surface {
   width: min(100%, 1200px);
   min-height: 100%;
   margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-lg);
-  background: var(--md-surface-container-lowest);
-  box-shadow: 0 1px 2px rgba(31, 25, 36, 0.04);
 }
 
 .project-detail-empty {
@@ -2252,40 +2268,12 @@ md-filled-button.projects-create-button {
   background: var(--md-surface-container);
 }
 
-.project-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 0 28px;
-  border-bottom: 1px solid var(--md-outline-variant);
-}
-
-.project-tabs button {
-  position: relative;
-  min-width: 72px;
-  padding: 13px 12px 12px;
-  color: var(--md-on-surface-variant);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.project-tabs button:hover {
-  color: var(--md-on-surface);
-  background: var(--md-surface-container-low);
-}
-
-.project-tabs button.is-active {
-  color: var(--md-primary);
-}
-
-.project-tabs button.is-active::after {
-  position: absolute;
-  right: 8px;
-  bottom: -1px;
-  left: 8px;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: var(--md-primary);
-  content: "";
+/* MD3 secondary tabs (md-tabs) — animated indicator, token-driven. */
+.project-tabs-md {
+  --md-secondary-tab-container-color: transparent;
+  --md-secondary-tab-active-indicator-color: var(--md-primary);
+  --md-tabs-divider-color: var(--md-outline-variant);
+  width: 100%;
 }
 
 .project-detail-content {
@@ -2317,9 +2305,10 @@ md-filled-button.projects-create-button {
 .project-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--sys-space-3);
 }
 
+/* Overview KPIs: tonal cards without outlines. */
 .project-stat-card {
   display: flex;
   min-width: 0;
@@ -2327,10 +2316,9 @@ md-filled-button.projects-create-button {
   flex-direction: column;
   align-items: flex-start;
   gap: 7px;
-  padding: 16px;
-  border: 1px solid var(--md-outline-variant);
+  padding: var(--sys-space-4);
   border-radius: var(--shape-lg);
-  background: var(--md-surface-container-lowest);
+  background: var(--md-surface-container-low);
 }
 
 .project-stat-card strong {
@@ -2381,21 +2369,19 @@ md-filled-button.projects-create-button {
   font-weight: 600;
 }
 
-md-outlined-card.project-panel-card {
+/* Detail panels are flat surfaces — hierarchy comes from the tonal items
+   inside them instead of stacked outlined cards. */
+.project-panel {
   display: block;
   min-width: 0;
-  padding: 20px;
-  border-radius: var(--shape-lg);
-  --md-outlined-card-container-color: var(--md-surface-container-lowest);
-  --md-outlined-card-outline-color: var(--md-outline-variant);
 }
 
 .project-panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--sys-space-3);
+  margin-bottom: var(--sys-space-4);
 }
 
 .project-panel-heading--compact {
@@ -2441,18 +2427,13 @@ md-outlined-card.project-panel-card {
 
 .project-task-item {
   overflow: hidden;
-  border: 1px solid var(--md-outline-variant);
   border-radius: var(--shape-md);
   background: var(--md-surface-container-lowest);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
 
 .project-task-item:hover {
-  border-color: var(--md-outline);
-}
-
-.project-task-item:has(.project-task-plans) {
-  border-color: color-mix(in srgb, var(--md-primary) 28%, var(--md-outline-variant));
+  background: var(--md-surface-container-low);
 }
 
 .project-task-row {
@@ -2518,24 +2499,44 @@ md-outlined-card.project-panel-card {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 1px;
 }
 
 .project-row-actions md-icon-button {
-  --md-icon-button-container-width: 32px;
-  --md-icon-button-container-height: 32px;
-  --md-icon-button-icon-size: 18px;
+  --md-icon-button-container-width: 40px;
+  --md-icon-button-container-height: 40px;
+  --md-icon-button-icon-size: 19px;
   --md-icon-button-icon-color: var(--md-on-surface-variant);
 }
 
+/* Container-transform style expand/collapse for the per-task plan area. */
 .project-task-plans {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin: 0 var(--sys-space-2) 0 42px;
+  transition: grid-template-rows var(--sys-motion-list-duration) var(--sys-motion-list-easing);
+}
+
+.project-task-plans.is-open {
+  grid-template-rows: 1fr;
+  margin-bottom: var(--sys-space-2);
+}
+
+.project-task-plans__inner {
   display: flex;
+  min-height: 0;
+  overflow: hidden;
   flex-direction: column;
   gap: 4px;
-  margin: 0 10px 10px 42px;
-  padding: 7px 8px;
+  padding: 0 var(--sys-space-2);
   border-radius: var(--shape-md);
   background: var(--md-surface-container);
+  opacity: 0;
+  transition: opacity var(--sys-motion-list-duration) var(--sys-motion-list-easing);
+}
+
+.project-task-plans.is-open .project-task-plans__inner {
+  opacity: 1;
+  padding: var(--sys-space-2) var(--sys-space-2);
 }
 
 .project-plan-row {
@@ -2545,9 +2546,8 @@ md-outlined-card.project-panel-card {
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
-  border: 1px solid var(--md-outline-variant);
   border-radius: var(--shape-md);
-  background: var(--md-surface-container-lowest);
+  background: color-mix(in srgb, var(--md-surface-container-lowest) 82%, transparent);
 }
 
 .project-plan-row--compact {
@@ -2603,28 +2603,34 @@ md-outlined-card.project-panel-card {
 }
 
 .today-plan-card {
-  padding: 16px !important;
+  padding: 0;
 }
 
 .project-date-picker {
   display: flex;
   width: 100%;
+  min-height: 40px;
   align-items: center;
   gap: 4px;
-  padding: 7px 0 10px;
+  padding: var(--sys-space-2) 0;
+  border-radius: var(--shape-sm);
   color: var(--md-on-surface-variant);
   font-size: 13px;
   text-align: left;
+  transition:
+    background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+    color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
 
 .project-date-picker:hover {
+  background: rgb(var(--md-primary-rgb) / var(--sys-state-hover));
   color: var(--md-primary);
 }
 
 .today-plan-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sys-space-2);
 }
 
 .today-plan-item {
@@ -2632,18 +2638,16 @@ md-outlined-card.project-panel-card {
   min-height: 104px;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--md-outline-variant);
+  gap: var(--sys-space-2);
+  padding: var(--sys-space-3);
   border-radius: var(--shape-md);
   color: var(--md-on-surface);
   text-align: left;
   background: var(--md-surface-container-lowest);
-  transition: background 150ms ease, border-color 150ms ease;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
 
 .today-plan-item:hover {
-  border-color: var(--md-primary);
   background: var(--md-surface-container-low);
 }
 
@@ -2665,20 +2669,20 @@ md-outlined-card.project-panel-card {
 }
 
 .project-calendar-card {
-  padding: 16px !important;
+  padding: 0;
 }
 
 .project-calendar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 9px;
+  gap: var(--sys-space-2);
+  margin-bottom: var(--sys-space-2);
 }
 
 .project-calendar-header md-icon-button {
-  --md-icon-button-container-width: 28px;
-  --md-icon-button-container-height: 28px;
+  --md-icon-button-container-width: 40px;
+  --md-icon-button-container-height: 40px;
   --md-icon-button-icon-size: 18px;
 }
 
@@ -2816,8 +2820,7 @@ md-outlined-card.project-panel-card {
     padding: 16px;
   }
 
-  .project-detail-content,
-  .project-tabs {
+  .project-detail-content {
     padding-right: 20px;
     padding-left: 20px;
   }
@@ -2861,7 +2864,6 @@ md-outlined-card.project-panel-card {
 
   .projects-sidebar {
     max-height: 420px;
-    border-right: 0;
     border-bottom: 1px solid var(--md-outline-variant);
   }
 
@@ -2875,8 +2877,6 @@ md-outlined-card.project-panel-card {
 
   .project-detail-surface {
     width: 100%;
-    border: 0;
-    border-radius: 0;
   }
 
   .project-hero {
@@ -2897,12 +2897,8 @@ md-outlined-card.project-panel-card {
     justify-content: flex-end;
   }
 
-  .project-tabs {
+  .project-tabs-md {
     overflow-x: auto;
-  }
-
-  .project-tabs button {
-    flex: 0 0 auto;
   }
 
   .project-overview-sidebar {
@@ -2943,26 +2939,18 @@ md-outlined-card.project-panel-card {
     margin-left: 34px;
   }
 
-  .project-tabs {
-    padding: 0 12px;
-  }
-
   .project-stat-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: var(--sys-space-2);
   }
 
   .project-stat-card {
     min-height: 132px;
-    padding: 12px;
+    padding: var(--sys-space-3);
   }
 
   .project-stat-card strong {
     font-size: 24px;
-  }
-
-  md-outlined-card.project-panel-card {
-    padding: 16px;
   }
 
   .project-task-row__date,
@@ -2977,9 +2965,9 @@ md-outlined-card.project-panel-card {
   }
 
   .project-row-actions md-icon-button {
-    --md-icon-button-container-width: 28px;
-    --md-icon-button-container-height: 28px;
-    --md-icon-button-icon-size: 16px;
+    --md-icon-button-container-width: 40px;
+    --md-icon-button-container-height: 40px;
+    --md-icon-button-icon-size: 18px;
   }
 
   .project-plan-row {
@@ -3561,11 +3549,7 @@ md-outlined-card.project-panel-card {
   display: grid;
   min-width: 270px;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-lg);
-  background: var(--md-outline-variant);
+  gap: var(--sys-space-2);
 }
 
 .inbox-hero__summary > div {
@@ -3573,7 +3557,8 @@ md-outlined-card.project-panel-card {
   min-width: 82px;
   flex-direction: column;
   gap: 2px;
-  padding: 13px 15px;
+  padding: var(--sys-space-3) var(--sys-space-4);
+  border-radius: var(--shape-md);
   background: var(--md-surface-container-low);
 }
 
@@ -3596,15 +3581,27 @@ md-outlined-card.project-panel-card {
   gap: var(--sys-space-5);
 }
 
-md-outlined-card.inbox-capture-card,
-md-outlined-card.inbox-list-card {
-  --md-outlined-card-container-color: var(--md-surface-container-lowest);
-}
-
-md-outlined-card.inbox-capture-card {
+/* Quick capture is the primary action surface: tonal container. The list
+   stays on a lower surface so hierarchy reads by tone, not outlines. */
+md-filled-card.inbox-capture-card {
+  --md-filled-card-container-color: var(--md-primary-container);
   position: sticky;
   top: 0;
   padding: 20px;
+  color: var(--md-on-primary-container);
+}
+
+.inbox-capture__sub {
+  color: color-mix(in srgb, var(--md-on-primary-container) 74%, transparent);
+}
+
+.inbox-capture-card md-outlined-text-field,
+.inbox-capture-card md-outlined-select {
+  --md-outlined-text-field-container-color: color-mix(
+    in srgb,
+    var(--md-surface) 55%,
+    transparent
+  );
 }
 
 .inbox-card-heading {
@@ -3623,7 +3620,6 @@ md-outlined-card.inbox-capture-card {
   margin-top: 3px;
 }
 
-.inbox-card-heading__icon,
 .inbox-list-empty__icon {
   display: grid;
   flex: 0 0 auto;
@@ -3634,8 +3630,14 @@ md-outlined-card.inbox-capture-card {
 }
 
 .inbox-card-heading__icon {
+  display: grid;
   width: 42px;
   height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 14px;
+  color: inherit;
+  background: color-mix(in srgb, var(--md-on-primary-container) 12%, transparent);
 }
 
 .inbox-capture__modes {
@@ -3663,7 +3665,8 @@ md-outlined-card.inbox-capture-card {
   line-height: 1.5;
 }
 
-md-outlined-card.inbox-list-card {
+md-filled-card.inbox-list-card {
+  --md-filled-card-container-color: var(--md-surface-container-low);
   min-height: 480px;
   padding: 0;
   overflow: hidden;
@@ -3688,44 +3691,9 @@ md-outlined-card.inbox-list-card {
 }
 
 .inbox-filters {
-  display: inline-flex;
   flex: 0 0 auto;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-full);
-  background: var(--md-surface-container-low);
-}
-
-.inbox-filter {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border-radius: var(--shape-full);
-  color: var(--md-on-surface-variant);
-  font-size: 12px;
-  font-weight: 500;
-  transition: background 150ms ease, color 150ms ease;
-}
-
-.inbox-filter span {
-  color: var(--md-outline);
-  font-size: 11px;
-}
-
-.inbox-filter:hover {
-  background: rgba(var(--md-on-surface-rgb), var(--sys-state-hover));
-}
-
-.inbox-filter.is-selected {
-  color: var(--md-on-secondary-container);
-  background: var(--md-secondary-container);
-}
-
-.inbox-filter.is-selected span {
-  color: var(--md-on-secondary-container);
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .inbox-section {
@@ -3766,6 +3734,18 @@ md-outlined-card.inbox-list-card {
   gap: 4px;
 }
 
+/* List insert/exit: items animate in on mount and collapse out on delete. */
+@keyframes inboxItemEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .inbox-item {
   display: grid;
   min-width: 0;
@@ -3775,11 +3755,22 @@ md-outlined-card.inbox-list-card {
   min-height: 64px;
   padding: 5px 6px 5px 2px;
   border-radius: var(--shape-md);
-  transition: background 150ms ease;
+  transition:
+    background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+    opacity var(--sys-motion-selection-duration) var(--sys-motion-easing-standard-accelerate),
+    transform var(--sys-motion-selection-duration) var(--sys-motion-easing-standard-accelerate);
+  animation: inboxItemEnter var(--sys-motion-list-duration)
+    var(--sys-motion-easing-emphasized-decelerate) both;
 }
 
 .inbox-item:hover {
-  background: var(--md-surface-container-low);
+  background: var(--md-surface-container);
+}
+
+.inbox-item.is-leaving {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(16px);
 }
 
 .inbox-item__checkbox {
@@ -3838,7 +3829,7 @@ md-outlined-card.inbox-list-card {
   align-items: center;
   gap: 0;
   opacity: 0.65;
-  transition: opacity 150ms ease;
+  transition: opacity var(--sys-motion-hover-duration) var(--sys-motion-easing-standard);
 }
 
 .inbox-item:hover .inbox-item__actions,
@@ -3847,8 +3838,8 @@ md-outlined-card.inbox-list-card {
 }
 
 .inbox-item__actions md-icon-button {
-  --md-icon-button-container-width: 34px;
-  --md-icon-button-container-height: 34px;
+  --md-icon-button-container-width: 40px;
+  --md-icon-button-container-height: 40px;
   --md-icon-button-icon-size: 18px;
 }
 
@@ -3875,12 +3866,16 @@ md-outlined-card.inbox-list-card {
   margin: 0;
 }
 
+.inbox-empty-cta {
+  margin-top: var(--sys-space-4);
+}
+
 @media (max-width: 900px) {
   .inbox-layout {
     grid-template-columns: 1fr;
   }
 
-  md-outlined-card.inbox-capture-card {
+  md-filled-card.inbox-capture-card {
     position: static;
   }
 }
@@ -3905,17 +3900,12 @@ md-outlined-card.inbox-list-card {
     width: 100%;
   }
 
-  .inbox-filter {
-    flex: 1;
-    justify-content: center;
-  }
-
   .inbox-section {
     padding-right: 14px;
     padding-left: 14px;
   }
 
-  md-outlined-card.inbox-capture-card {
+  md-filled-card.inbox-capture-card {
     padding: 18px;
   }
 

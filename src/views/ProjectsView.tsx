@@ -24,7 +24,8 @@ import {
   FilledButton,
   IconButton,
   LinearProgress,
-  OutlinedCard,
+  SecondaryTab,
+  Tabs,
   TextButton,
 } from "../components/material";
 import { ConfirmDialog, Dialog, EmptyState, useSnackbar } from "../components/ui";
@@ -384,9 +385,11 @@ export function ProjectsView() {
             {taskPlans.length > 0 && <Icon name={expanded ? "expand_less" : "expand_more"} size={20} className="muted" />}
           </div>
         </div>
-        {expanded && taskPlans.length > 0 && (
-          <div className="project-task-plans">
-            {taskPlans.map((plan) => renderPlanRow(plan, true))}
+        {taskPlans.length > 0 && (
+          <div className={`project-task-plans ${expanded ? "is-open" : ""}`}>
+            <div className="project-task-plans__inner">
+              {taskPlans.map((plan) => renderPlanRow(plan, true))}
+            </div>
           </div>
         )}
       </div>
@@ -394,7 +397,7 @@ export function ProjectsView() {
   };
 
   const renderTaskSection = (showAll = true) => (
-    <OutlinedCard className="project-panel-card project-tasks-card" id="project-tasks">
+    <section className="project-panel" id="project-tasks">
       <div className="project-panel-heading">
         <div>
           <div className="title-md">任务</div>
@@ -419,11 +422,11 @@ export function ProjectsView() {
           )}
         </div>
       )}
-    </OutlinedCard>
+    </section>
   );
 
   const renderTodayPlans = () => (
-    <OutlinedCard className="project-panel-card today-plan-card" id="project-plans">
+    <section className="project-panel today-plan-card" id="project-plans">
       <div className="project-panel-heading project-panel-heading--compact">
         <div className="row gap-8">
           <span className="project-heading-icon project-heading-icon--primary"><Icon name="event_note" size={20} /></span>
@@ -474,7 +477,7 @@ export function ProjectsView() {
           查看{planDayTitle}全部计划 <Icon name="arrow_forward" size={17} />
         </button>
       )}
-    </OutlinedCard>
+    </section>
   );
 
   const shiftPlanMonth = (offset: number) => {
@@ -486,7 +489,7 @@ export function ProjectsView() {
   const renderCalendar = () => {
     const currentMonth = parseISODate(planDate).getMonth();
     return (
-      <OutlinedCard className="project-panel-card project-calendar-card">
+      <section className="project-panel project-calendar-card">
         <div className="project-calendar-header">
           <div className="title-sm">日历</div>
           <div className="row gap-4">
@@ -520,12 +523,12 @@ export function ProjectsView() {
             );
           })}
         </div>
-      </OutlinedCard>
+      </section>
     );
   };
 
   const renderStatsTab = () => (
-    <OutlinedCard className="project-panel-card project-stats-card">
+    <section className="project-panel project-stats-card">
       <div className="project-panel-heading">
         <div>
           <div className="title-md">项目统计</div>
@@ -542,11 +545,11 @@ export function ProjectsView() {
         <div className="spread"><span className="body-md">已完成计划</span><span className="body-md muted">{donePlans} / {projectPlans.length}</span></div>
         <div className="spread"><span className="body-md">项目周期</span><span className="body-md muted">{selectedProject ? relativeRangeLabel(selectedProject.startDate, selectedProject.endDate) : "-"}</span></div>
       </div>
-    </OutlinedCard>
+    </section>
   );
 
   const renderPlanTab = () => (
-    <OutlinedCard className="project-panel-card project-all-plans-card">
+    <section className="project-panel project-all-plans-card">
       <div className="project-panel-heading">
         <div>
           <div className="title-md">每日计划</div>
@@ -561,7 +564,7 @@ export function ProjectsView() {
       ) : (
         <div className="project-plan-list">{projectPlans.map((plan) => <div key={plan.id} className="project-plan-group"><div className="project-plan-group__date">{formatDateFull(plan.date)}</div>{renderPlanRow(plan)}</div>)}</div>
       )}
-    </OutlinedCard>
+    </section>
   );
 
   const renderMainContent = () => {
@@ -715,20 +718,20 @@ export function ProjectsView() {
               </div>
             </header>
 
-            <div className="project-tabs" role="tablist" aria-label="项目详情页签">
+            <Tabs
+              className="project-tabs-md"
+              activeTabIndex={Math.max(0, PROJECT_TABS.findIndex((tab) => tab.key === activeTab))}
+              onChange={(event) => {
+                const index = (event.currentTarget as HTMLElement & { activeTabIndex: number })
+                  .activeTabIndex;
+                const next = PROJECT_TABS[index];
+                if (next) setActiveTab(next.key);
+              }}
+            >
               {PROJECT_TABS.map((tab) => (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.key}
-                  className={activeTab === tab.key ? "is-active" : ""}
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                >
-                  {tab.label}
-                </button>
+                <SecondaryTab key={tab.key}>{tab.label}</SecondaryTab>
               ))}
-            </div>
+            </Tabs>
 
             <div className="project-detail-content">{renderMainContent()}</div>
           </div>
