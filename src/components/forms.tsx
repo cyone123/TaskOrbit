@@ -162,9 +162,9 @@ export interface TaskFormProps {
 }
 
 const PRIORITIES: { key: Priority; label: string; color: string }[] = [
-  { key: "high", label: "高", color: "#E53935" },
-  { key: "medium", label: "中", color: "#F9A825" },
-  { key: "low", label: "低", color: "#43A047" },
+  { key: "high", label: "高", color: "var(--md-error)" },
+  { key: "medium", label: "中", color: "var(--color-warning)" },
+  { key: "low", label: "低", color: "var(--color-success)" },
 ];
 
 export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {

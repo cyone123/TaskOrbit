@@ -32,9 +32,9 @@ import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
 const PRIORITY_COLOR: Record<Priority, string> = {
-  high: "#BA1A1A",
-  medium: "#C77700",
-  low: "#2E7D32",
+  high: "var(--md-error)",
+  medium: "var(--color-warning)",
+  low: "var(--color-success)",
 };
 
 const PRIORITY_LABEL: Record<Priority, string> = {

@@ -17,6 +17,21 @@ import { MdOutlinedSelect } from "@material/web/select/outlined-select.js";
 import { MdSelectOption } from "@material/web/select/select-option.js";
 import { MdSwitch } from "@material/web/switch/switch.js";
 import { MdOutlinedTextField } from "@material/web/textfield/outlined-text-field.js";
+import { MdAssistChip } from "@material/web/chips/assist-chip.js";
+import { MdFilterChip } from "@material/web/chips/filter-chip.js";
+import { MdInputChip } from "@material/web/chips/input-chip.js";
+import { MdSuggestionChip } from "@material/web/chips/suggestion-chip.js";
+import { MdChipSet } from "@material/web/chips/chip-set.js";
+import { MdPrimaryTab } from "@material/web/tabs/primary-tab.js";
+import { MdSecondaryTab } from "@material/web/tabs/secondary-tab.js";
+import { MdTabs } from "@material/web/tabs/tabs.js";
+import { MdList } from "@material/web/list/list.js";
+import { MdListItem } from "@material/web/list/list-item.js";
+import { MdMenu } from "@material/web/menu/menu.js";
+import { MdMenuItem } from "@material/web/menu/menu-item.js";
+import { MdRipple } from "@material/web/ripple/ripple.js";
+import { MdFocusRing } from "@material/web/focus/md-focus-ring.js";
+import { MdDivider } from "@material/web/divider/divider.js";
 
 export const FilledButton = createComponent({
   react: React,
@@ -136,6 +151,131 @@ export const OutlinedSegmentedButtonSet = createComponent({
   tagName: "md-outlined-segmented-button-set",
   elementClass: MdOutlinedSegmentedButtonSet,
   events: { onSelection: "segmented-button-set-selection" },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Chips                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export const AssistChip = createComponent({
+  react: React,
+  tagName: "md-assist-chip",
+  elementClass: MdAssistChip,
+  events: { onClick: "click" },
+});
+
+export const FilterChip = createComponent({
+  react: React,
+  tagName: "md-filter-chip",
+  elementClass: MdFilterChip,
+  events: { onClick: "click", onChange: "change" },
+});
+
+export const InputChip = createComponent({
+  react: React,
+  tagName: "md-input-chip",
+  elementClass: MdInputChip,
+  events: { onClick: "click", onRemove: "remove" },
+});
+
+export const SuggestionChip = createComponent({
+  react: React,
+  tagName: "md-suggestion-chip",
+  elementClass: MdSuggestionChip,
+  events: { onClick: "click" },
+});
+
+export const ChipSet = createComponent({
+  react: React,
+  tagName: "md-chip-set",
+  elementClass: MdChipSet,
+});
+
+/* -------------------------------------------------------------------------- */
+/* Tabs                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export const PrimaryTab = createComponent({
+  react: React,
+  tagName: "md-primary-tab",
+  elementClass: MdPrimaryTab,
+  events: { onClick: "click" },
+});
+
+export const SecondaryTab = createComponent({
+  react: React,
+  tagName: "md-secondary-tab",
+  elementClass: MdSecondaryTab,
+  events: { onClick: "click" },
+});
+
+export const Tabs = createComponent({
+  react: React,
+  tagName: "md-tabs",
+  elementClass: MdTabs,
+  events: { onChange: "change" },
+});
+
+/* -------------------------------------------------------------------------- */
+/* List                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export const List = createComponent({
+  react: React,
+  tagName: "md-list",
+  elementClass: MdList,
+});
+
+export const ListItem = createComponent({
+  react: React,
+  tagName: "md-list-item",
+  elementClass: MdListItem,
+  events: { onClick: "click" },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Menu                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export const Menu = createComponent({
+  react: React,
+  tagName: "md-menu",
+  elementClass: MdMenu,
+  events: {
+    onOpening: "opening",
+    onOpened: "opened",
+    onClosing: "closing",
+    onClosed: "closed",
+  },
+});
+
+export const MenuItem = createComponent({
+  react: React,
+  tagName: "md-menu-item",
+  elementClass: MdMenuItem,
+  events: { onClick: "click" },
+});
+
+/* -------------------------------------------------------------------------- */
+/* Interaction primitives                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const Ripple = createComponent({
+  react: React,
+  tagName: "md-ripple",
+  elementClass: MdRipple,
+});
+
+export const FocusRing = createComponent({
+  react: React,
+  tagName: "md-focus-ring",
+  elementClass: MdFocusRing,
+});
+
+export const Divider = createComponent({
+  react: React,
+  tagName: "md-divider",
+  elementClass: MdDivider,
 });
 
 export function eventValue(event: Event): string {

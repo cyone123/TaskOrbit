@@ -213,7 +213,7 @@ export function CalendarView() {
 
   const colorForProject = (projectId: string | null): string => {
     const project = projectId ? projectById.get(projectId) : null;
-    return project ? colorByKey(project.color) : "#79747e";
+    return project ? colorByKey(project.color) : "var(--md-outline)";
   };
 
   const rangeFor = (task: Task): BarRange | null => {
@@ -287,7 +287,7 @@ export function CalendarView() {
         : formatDateFull(selectedISO);
 
   return (
-    <div ref={contentRef} className="calendar-view" style={{ maxWidth: 1180 }}>
+    <div ref={contentRef} className="calendar-view">
       <div className="spread mb-16 calendar-toolbar">
         <div className="row gap-8 calendar-toolbar__navigation">
           <IconButton onClick={() => navigate(-1)} aria-label="上一页" title="上一页">
@@ -499,10 +499,7 @@ export function CalendarView() {
                     <div className="col" style={{ minWidth: 0 }}>
                       <div className="row gap-8">
                         <span className="dot" style={{ background: color }} />
-                        <span
-                          className="body-md ellipsis"
-                          style={{ textDecoration: task.done ? "line-through" : "none" }}
-                        >
+                        <span className={`body-md ellipsis ${task.done ? "text-done" : ""}`}>
                           {task.name}
                         </span>
                       </div>
@@ -706,7 +703,7 @@ export function CalendarView() {
                       }}
                       onClick={() => openPlanEditor(plan)}
                     >
-                      <strong className="body-sm" style={{ textDecoration: plan.done ? "line-through" : "none" }}>
+                      <strong className={`body-sm ${plan.done ? "text-done" : ""}`}>
                         {plan.name}
                       </strong>
                       <span className="body-sm" style={{ fontSize: 11, opacity: 0.9 }}>
@@ -767,10 +764,7 @@ export function CalendarView() {
                           onChange={() => store.updateDailyPlan(plan.id, { done: !plan.done })}
                         />
                         <span className="dot" style={{ background: color }} />
-                        <span
-                          className="body-md grow ellipsis"
-                          style={{ textDecoration: plan.done ? "line-through" : "none" }}
-                        >
+                        <span className={`body-md grow ellipsis ${plan.done ? "text-done" : ""}`}>
                           {plan.name}
                         </span>
                         {plan.recurrence.frequency !== "none" && (

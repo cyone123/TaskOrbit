@@ -226,12 +226,12 @@ export function PomodoroView() {
   const todayMinutes = todaySessions.reduce((totalMinutes, session) => totalMinutes + session.minutes, 0);
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 48 }}>
+    <div className="page-shell page-shell--narrow">
       <div className="spread mb-16">
         <div className="title-lg">番茄钟</div>
         <div className="row gap-8">
           <div className="chip">
-            <Icon name="check_circle" size={16} style={{ color: "#43A047" }} />
+            <Icon name="check_circle" size={16} style={{ color: "var(--color-success)" }} />
             今日 {todaySessions.length} 个 · {formatDurationMinutes(todayMinutes)}
           </div>
           <IconButton onClick={() => setSettingsOpen(true)} aria-label="设置" title="设置">
@@ -260,12 +260,15 @@ export function PomodoroView() {
               cy={144}
               r={R}
               fill="none"
-              stroke={phase === "focus" ? "var(--md-primary)" : "#43A047"}
+              stroke={phase === "focus" ? "var(--md-primary)" : "var(--color-success)"}
               strokeWidth={14}
               strokeLinecap="round"
               strokeDasharray={C}
               strokeDashoffset={C * (1 - progress)}
-              style={{ transition: "stroke-dashoffset 250ms linear" }}
+              style={{
+                transition:
+                  "stroke-dashoffset var(--sys-motion-progress-duration) var(--sys-motion-progress-easing)",
+              }}
             />
           </svg>
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>

@@ -88,17 +88,17 @@ export function StatsView() {
   ];
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", paddingBottom: 48 }}>
+    <div className="page-shell page-shell--medium">
       <div className="title-lg mb-16">时间统计</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="stat-grid">
         {summary.map((c) => (
           <FilledCard className="material-card" key={c.label}>
             <div className="row gap-8 muted">
               <Icon name={c.icon} size={18} />
               <span className="label-md">{c.label}</span>
             </div>
-            <div className="title-lg" style={{ fontSize: 24, marginTop: 8 }}>{c.value}</div>
+            <div className="title-lg stat-card__value">{c.value}</div>
             <div className="body-sm muted mt-8">{c.sub}</div>
           </FilledCard>
         ))}
@@ -139,7 +139,7 @@ export function StatsView() {
               .sort((a, b) => b[1] - a[1])
               .map(([pid, mins]) => {
                 const proj = state.projects.find((p) => p.id === pid);
-                const color = proj ? colorByKey(proj.color) : "#9e9e9e";
+                const color = proj ? colorByKey(proj.color) : "var(--md-outline)";
                 return (
                   <div key={pid}>
                     <div className="spread mb-8">
