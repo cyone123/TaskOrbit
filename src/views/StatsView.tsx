@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   addDays,
   formatDurationMinutes,
@@ -9,7 +9,7 @@ import {
   toISODate,
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
-import { FilledCard, LinearProgress } from "../components/material";
+import { LinearProgress } from "../components/material";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
@@ -80,59 +80,138 @@ export function StatsView() {
   const planTotal = state.dailyPlans.length;
   const planDone = state.dailyPlans.filter((p) => p.done).length;
 
-  const summary = [
-    { icon: "timer", label: "今日专注", value: formatDurationMinutes(todayMinutes), sub: `${todayCount} 个番茄` },
-    { icon: "calendar_view_week", label: "本周专注", value: formatDurationMinutes(weekMinutes), sub: `${weekCount} 个番茄` },
-    { icon: "check_circle", label: "任务完成", value: `${taskDone}/${taskTotal}`, sub: taskTotal ? `${Math.round((taskDone / taskTotal) * 100)}%` : "暂无任务" },
-    { icon: "event_available", label: "计划完成", value: `${planDone}/${planTotal}`, sub: planTotal ? `${Math.round((planDone / planTotal) * 100)}%` : "暂无计划" },
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const secondaryMetrics = [
+    {
+      icon: "calendar_view_week",
+      label: "本周专注",
+      value: formatDurationMinutes(weekMinutes),
+      sub: `${weekCount} 个番茄`,
+      tone: "secondary" as const,
+    },
+    {
+      icon: "check_circle",
+      label: "任务完成",
+      value: `${taskDone}/${taskTotal}`,
+      sub: taskTotal ? `${Math.round((taskDone / taskTotal) * 100)}%` : "暂无任务",
+      tone: "tertiary" as const,
+    },
+    {
+      icon: "event_available",
+      label: "计划完成",
+      value: `${planDone}/${planTotal}`,
+      sub: planTotal ? `${Math.round((planDone / planTotal) * 100)}%` : "暂无计划",
+      tone: "success" as const,
+    },
   ];
+
+  const weekHasData = last7.some((iso) => (minutesByDay.get(iso) ?? 0) > 0);
+  const avgDay = Math.round(
+    last7.reduce((sum, iso) => sum + (minutesByDay.get(iso) ?? 0), 0) / 7,
+  );
+  const selectedMins = selectedDay ? minutesByDay.get(selectedDay) ?? 0 : 0;
 
   return (
     <div className="page-shell page-shell--medium">
       <div className="title-lg mb-16">时间统计</div>
 
-      <div className="stat-grid">
-        {summary.map((c) => (
-          <FilledCard className="material-card" key={c.label}>
-            <div className="row gap-8 muted">
-              <Icon name={c.icon} size={18} />
-              <span className="label-md">{c.label}</span>
-            </div>
-            <div className="title-lg stat-card__value">{c.value}</div>
-            <div className="body-sm muted mt-8">{c.sub}</div>
-          </FilledCard>
+      {/* Hero KPI — the one number that matters most, in primary-container. */}
+      <section className="stats-hero">
+        <div className="stats-hero__icon">
+          <Icon name="timer" size={28} />
+        </div>
+        <div className="stats-hero__copy">
+          <span className="label-lg">今日专注</span>
+          <strong className="stats-hero__value">
+            {formatDurationMinutes(todayMinutes)}
+          </strong>
+          <span className="body-sm">
+            {todayCount > 0 ? `今日 ${todayCount} 个番茄，继续加油` : "今天还没有专注记录"}
+          </span>
+        </div>
+        <Icon
+          className="stats-hero__spark"
+          name="local_fire_department"
+          size={44}
+        />
+      </section>
+
+      <div className="stat-grid stats-secondary-grid">
+        {secondaryMetrics.map((m) => (
+          <section className={`stat-tile stat-tile--${m.tone}`} key={m.label}>
+            <Icon name={m.icon} size={20} />
+            <span className="label-md">{m.label}</span>
+            <strong className="stat-tile__value">{m.value}</strong>
+            <span className="body-sm">{m.sub}</span>
+          </section>
         ))}
       </div>
 
-      <FilledCard className="material-card mt-16">
+      <section className="stats-panel">
         <div className="title-md mb-16">近 7 天专注时长</div>
-        <div className="bar-chart">
-          {last7.map((iso) => {
-            const mins = minutesByDay.get(iso) ?? 0;
-            const d = parseISODate(iso);
-            const heightPct = Math.max(2, Math.round((mins / maxDay) * 100));
-            const isT = iso === today;
-            return (
-              <div className="bar-chart__col" key={iso}>
-                <span className="body-sm muted">{mins > 0 ? `${mins}′` : ""}</span>
-                <div
-                  className="bar-chart__bar"
-                  style={{ height: `${heightPct}%`, background: isT ? "var(--md-primary)" : "var(--md-primary-container)" }}
-                  title={`${iso}: ${mins} 分钟`}
-                />
-                <span className="body-sm muted" style={{ fontWeight: isT ? 600 : 400, color: isT ? "var(--md-primary)" : undefined }}>
-                  {d.getMonth() + 1}/{d.getDate()}
-                </span>
+        {!weekHasData ? (
+          <div className="empty stats-empty">
+            <Icon name="hourglass_empty" size={40} />
+            <div>最近 7 天还没有专注记录</div>
+            <div className="body-sm">去番茄钟页开始第一个番茄吧</div>
+          </div>
+        ) : (
+          <>
+            <div className="bar-chart">
+              <div
+                className="bar-chart__avg"
+                style={{ bottom: `${Math.max(4, Math.round((avgDay / maxDay) * 100))}%` }}
+                title={`日均 ${avgDay} 分钟`}
+              >
+                <span className="body-sm">日均 {avgDay}′</span>
               </div>
-            );
-          })}
-        </div>
-      </FilledCard>
+              {last7.map((iso) => {
+                const mins = minutesByDay.get(iso) ?? 0;
+                const d = parseISODate(iso);
+                const heightPct = Math.max(2, Math.round((mins / maxDay) * 100));
+                const isT = iso === today;
+                const isSelected = selectedDay === iso;
+                return (
+                  <div className="bar-chart__col" key={iso}>
+                    <span className="body-sm muted bar-chart__value">
+                      {mins > 0 ? `${mins}′` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      className={`bar-chart__bar${isT ? " is-today" : ""}${isSelected ? " is-selected" : ""}`}
+                      style={{ height: `${heightPct}%`, ...eventTone(isT) }}
+                      onClick={() => setSelectedDay(isSelected ? null : iso)}
+                      aria-pressed={isSelected}
+                      aria-label={`${d.getMonth() + 1}月${d.getDate()}日专注 ${mins} 分钟`}
+                      title={`${iso}: ${mins} 分钟`}
+                    />
+                    <span
+                      className={`body-sm muted bar-chart__label${isT ? " is-today" : ""}`}
+                    >
+                      {d.getMonth() + 1}/{d.getDate()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="body-sm muted bar-chart-detail">
+              {selectedDay
+                ? `${selectedDay} · 专注 ${formatDurationMinutes(selectedMins)}`
+                : "点击柱形查看某天的专注时长"}
+            </div>
+          </>
+        )}
+      </section>
 
-      <FilledCard className="material-card mt-16">
+      <section className="stats-panel">
         <div className="title-md mb-16">各项目专注时长</div>
         {projectMinutes.size === 0 ? (
-          <div className="body-sm muted">暂无专注记录，开始一个番茄钟试试吧。</div>
+          <div className="empty stats-empty">
+            <Icon name="folder_off" size={40} />
+            <div>暂无项目专注记录</div>
+            <div className="body-sm">在番茄钟中关联项目后，这里会按时长排序</div>
+          </div>
         ) : (
           <div className="col gap-12">
             {[...projectMinutes.entries()]
@@ -153,7 +232,7 @@ export function StatsView() {
                       className="progress--project"
                       value={mins}
                       max={maxProject}
-                      style={{ "--md-linear-progress-active-indicator-color": color } as React.CSSProperties}
+                      style={{ "--md-linear-progress-active-indicator-color": color } as CSSProperties}
                       aria-label={`${proj?.name ?? projectLabels.get(pid) ?? "项目"}专注进度`}
                     />
                   </div>
@@ -161,9 +240,9 @@ export function StatsView() {
               })}
           </div>
         )}
-      </FilledCard>
+      </section>
 
-      <FilledCard className="material-card mt-16">
+      <section className="stats-panel">
         <div className="title-md mb-16">任务与计划完成率</div>
         <div className="col gap-12">
           <div>
@@ -172,6 +251,7 @@ export function StatsView() {
               <span className="body-sm muted">{taskDone} / {taskTotal}</span>
             </div>
             <LinearProgress
+              className="progress--tertiary"
               value={taskTotal ? (taskDone / taskTotal) * 100 : 0}
               max={100}
               aria-label="任务完成率"
@@ -190,7 +270,14 @@ export function StatsView() {
             />
           </div>
         </div>
-      </FilledCard>
+      </section>
     </div>
   );
+}
+
+/** Bars read today vs. past days from tokens instead of inline colors. */
+function eventTone(isTodayBar: boolean): CSSProperties {
+  return isTodayBar
+    ? ({ "--bar-color": "var(--md-primary)" } as CSSProperties)
+    : ({ "--bar-color": "var(--md-secondary)" } as CSSProperties);
 }

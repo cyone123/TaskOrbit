@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   DAY_MS,
   addDays,
@@ -21,15 +27,14 @@ import { Icon } from "../components/Icon";
 import { DailyPlanForm, TaskForm } from "../components/forms";
 import {
   Checkbox,
-  FilledCard,
+  FilledButton,
   IconButton,
-  OutlinedCard,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
   TonalButton,
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
-import { colorByKey, contrastText } from "../store/colors";
+import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
 const HOUR_HEIGHT = 44;
@@ -216,6 +221,10 @@ export function CalendarView() {
     return project ? colorByKey(project.color) : "var(--md-outline)";
   };
 
+  /** Events read a raw project hex and derive container/on-container pairs in CSS. */
+  const eventVars = (projectId: string | null): CSSProperties =>
+    ({ "--event-color": colorForProject(projectId) }) as CSSProperties;
+
   const rangeFor = (task: Task): BarRange | null => {
     const weekStart = startOfWeek(anchor);
     const start = parseISODate(task.startDate);
@@ -303,27 +312,9 @@ export function CalendarView() {
         </div>
 
         <div className="row gap-8 calendar-toolbar__actions">
-          <TonalButton onClick={() => openNewPlan()}>
+          <FilledButton onClick={() => openNewPlan()}>
             <Icon name="add" size={18} slot="icon" /> 添加计划
-          </TonalButton>
-          {mode === "week" && (
-            <OutlinedSegmentedButtonSet className="segmented-control calendar-submode-switcher">
-              <OutlinedSegmentedButton
-                label="甘特图"
-                selected={weekView === "gantt"}
-                onClick={() => setWeekView("gantt")}
-              >
-                <Icon name="timeline" size={16} slot="icon" />
-              </OutlinedSegmentedButton>
-              <OutlinedSegmentedButton
-                label="每日计划"
-                selected={weekView === "detail"}
-                onClick={() => setWeekView("detail")}
-              >
-                <Icon name="calendar_view_day" size={16} slot="icon" />
-              </OutlinedSegmentedButton>
-            </OutlinedSegmentedButtonSet>
-          )}
+          </FilledButton>
           <OutlinedSegmentedButtonSet className="segmented-control calendar-view-switcher">
             <OutlinedSegmentedButton
               label="月"
@@ -349,6 +340,32 @@ export function CalendarView() {
           </OutlinedSegmentedButtonSet>
         </div>
       </div>
+
+      {mode === "week" && (
+        <div className="calendar-subtoolbar">
+          <span className="label-lg muted">
+            {weekView === "gantt"
+              ? `本周 ${tasksInWeek.length} 个任务`
+              : `本周 ${plansOfWeek.reduce((total, plans) => total + plans.length, 0)} 项计划`}
+          </span>
+          <OutlinedSegmentedButtonSet className="segmented-control calendar-submode-switcher">
+            <OutlinedSegmentedButton
+              label="甘特图"
+              selected={weekView === "gantt"}
+              onClick={() => setWeekView("gantt")}
+            >
+              <Icon name="timeline" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+            <OutlinedSegmentedButton
+              label="每日计划"
+              selected={weekView === "detail"}
+              onClick={() => setWeekView("detail")}
+            >
+              <Icon name="calendar_view_day" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+          </OutlinedSegmentedButtonSet>
+        </div>
+      )}
 
       {mode === "month" && (
         <div className="month-calendar">
@@ -394,30 +411,28 @@ export function CalendarView() {
                     {visibleEvents.map((event) => {
                       if (event.type === "task") {
                         const task = event.item;
-                        const color = colorForProject(task.projectId);
                         return (
                           <button
                             key={`task-${task.id}`}
                             type="button"
                             className="month-event month-event--task"
-                            style={{ borderLeftColor: color, background: `${color}22` }}
+                            style={eventVars(task.projectId)}
                             onClick={() => openTaskEditor(task)}
                             title={`${task.name} · ${task.startDate} ~ ${task.endDate}`}
                           >
-                            <span className="month-event__dot" style={{ background: color }} />
+                            <span className="month-event__dot" />
                             <span className="ellipsis">{task.name}</span>
                           </button>
                         );
                       }
 
                       const plan = event.item;
-                      const color = colorForProject(plan.projectId);
                       return (
                         <button
                           key={`plan-${plan.id}`}
                           type="button"
                           className="month-event month-event--plan"
-                          style={{ background: color, color: contrastText(color) }}
+                          style={eventVars(plan.projectId)}
                           onClick={() => openPlanEditor(plan)}
                           title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
                         >
@@ -455,8 +470,9 @@ export function CalendarView() {
                 const iso = toISODate(day);
                 const count = state.dailyPlans.filter((plan) => plan.date === iso).length;
                 return (
-                  <div
+                  <button
                     key={iso}
+                    type="button"
                     className={`gantt-dayhead ${isToday(iso) ? "today" : ""} ${isWeekend(day) ? "weekend" : ""}`}
                     onClick={() => {
                       setAnchor(day);
@@ -469,7 +485,7 @@ export function CalendarView() {
                     <div className="body-sm" style={{ fontSize: 11 }}>
                       {count > 0 ? `${count} 项计划` : "\u00A0"}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -491,21 +507,21 @@ export function CalendarView() {
               const project = projectById.get(task.projectId);
               return (
                 <div className="gantt-row" key={task.id}>
-                  <div
-                    className="gantt-gutter"
-                    style={{ cursor: "pointer" }}
+                  <button
+                    type="button"
+                    className="gantt-gutter gantt-gutter--task"
                     onClick={() => openTaskEditor(task)}
                   >
-                    <div className="col" style={{ minWidth: 0 }}>
-                      <div className="row gap-8">
+                    <span className="col" style={{ minWidth: 0 }}>
+                      <span className="row gap-8">
                         <span className="dot" style={{ background: color }} />
                         <span className={`body-md ellipsis ${task.done ? "text-done" : ""}`}>
                           {task.name}
                         </span>
-                      </div>
-                      <div className="body-sm muted ellipsis">{project?.name ?? "独立"}</div>
-                    </div>
-                  </div>
+                      </span>
+                      <span className="body-sm muted ellipsis">{project?.name ?? "独立"}</span>
+                    </span>
+                  </button>
                   <div className="gantt-row__track">
                     <div className="gantt-row__days">
                       {days.map((day) => (
@@ -513,20 +529,20 @@ export function CalendarView() {
                       ))}
                     </div>
                     {range && (
-                      <div
+                      <button
+                        type="button"
                         className="gantt-bar"
                         style={{
                           left: `calc(${left}% + 3px)`,
                           width: `calc(${width}% - 6px)`,
-                          background: color,
-                          color: contrastText(color),
                           top: 8,
+                          ...eventVars(task.projectId),
                         }}
                         onClick={() => openTaskEditor(task)}
                         title={`${task.name} · ${task.startDate} ~ ${task.endDate}`}
                       >
                         {task.name}
-                      </div>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -561,34 +577,31 @@ export function CalendarView() {
             </div>
             <div className="week-detail__all-day">
               <div className="week-detail__all-day-label">任务</div>
-              {days.map((day) => {
-                const iso = toISODate(day);
-                const activeTasks = state.tasks.filter(
-                  (task) => task.startDate <= iso && task.endDate >= iso,
-                );
-                return (
-                  <div className="week-detail__all-day-cell" key={iso}>
-                    {activeTasks.slice(0, 2).map((task) => {
-                      const color = colorForProject(task.projectId);
-                      return (
+                {days.map((day) => {
+                  const iso = toISODate(day);
+                  const activeTasks = state.tasks.filter(
+                    (task) => task.startDate <= iso && task.endDate >= iso,
+                  );
+                  return (
+                    <div className="week-detail__all-day-cell" key={iso}>
+                      {activeTasks.slice(0, 2).map((task) => (
                         <button
                           key={task.id}
                           type="button"
                           className="week-detail__task"
-                          style={{ background: color, color: contrastText(color) }}
+                          style={eventVars(task.projectId)}
                           onClick={() => openTaskEditor(task)}
                           title={task.name}
                         >
                           {task.name}
                         </button>
-                      );
-                    })}
-                    {activeTasks.length > 2 && (
-                      <span className="week-detail__task-more">+{activeTasks.length - 2}</span>
-                    )}
-                  </div>
-                );
-              })}
+                      ))}
+                      {activeTasks.length > 2 && (
+                        <span className="week-detail__task-more">+{activeTasks.length - 2}</span>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
             <div className="week-detail__body">
               <div className="week-detail__time-axis">
@@ -618,7 +631,6 @@ export function CalendarView() {
                       };
                       const top = ((visibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
                       const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
-                      const color = colorForProject(plan.projectId);
                       if (visibleEnd <= visibleStart) return null;
                       return (
                         <button
@@ -630,9 +642,8 @@ export function CalendarView() {
                             height,
                             left: `calc(${(layout.column / layout.columnCount) * 100}% + 3px)`,
                             width: `calc(${(100 / layout.columnCount)}% - 6px)`,
-                            background: color,
-                            color: contrastText(color),
                             opacity: plan.done ? 0.58 : 1,
+                            ...eventVars(plan.projectId),
                           }}
                           onClick={() => openPlanEditor(plan)}
                           title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
@@ -652,7 +663,7 @@ export function CalendarView() {
 
       {mode === "day" && (
         <div className="calendar-day-layout">
-          <OutlinedCard className="calendar-timeline-card" style={{ padding: 0 }}>
+          <section className="calendar-timeline-panel">
             <div className="timeline" style={{ gridTemplateColumns: "56px 1fr" }}>
               <div
                 className="col"
@@ -687,7 +698,6 @@ export function CalendarView() {
                   const total = (DAY_MINUTES / 60) * HOUR_HEIGHT;
                   const top = (start / DAY_MINUTES) * total;
                   const height = Math.max(((end - start) / DAY_MINUTES) * total - 4, 20);
-                  const color = colorForProject(plan.projectId);
                   const project = plan.projectId ? projectById.get(plan.projectId) : null;
                   return (
                     <button
@@ -697,9 +707,8 @@ export function CalendarView() {
                       style={{
                         top,
                         height,
-                        background: color,
-                        color: contrastText(color),
                         opacity: plan.done ? 0.55 : 1,
+                        ...eventVars(plan.projectId),
                       }}
                       onClick={() => openPlanEditor(plan)}
                     >
@@ -715,11 +724,11 @@ export function CalendarView() {
                 })}
               </div>
             </div>
-          </OutlinedCard>
+          </section>
 
           <aside className="calendar-day-sidebar">
             {tasksOfDay.length > 0 && (
-              <FilledCard className="material-card calendar-task-card" style={{ padding: "12px 16px" }}>
+              <section className="calendar-side-block">
                 <div className="label-lg muted mb-8">今日进行中的任务</div>
                 <div className="col gap-8">
                   {tasksOfDay.map((task) => {
@@ -736,26 +745,25 @@ export function CalendarView() {
                     );
                   })}
                 </div>
-              </FilledCard>
+              </section>
             )}
 
             <section className="calendar-day-plans">
               <div className="label-lg muted mb-8">当日计划清单（{plansOfDay.length}）</div>
               {plansOfDay.length === 0 ? (
-                <FilledCard className="material-card empty" style={{ padding: 24 }}>
+                <div className="empty calendar-day-empty">
                   <Icon name="free_breakfast" size={40} />
                   <div>当天暂无计划，点击右上角「添加计划」安排一项</div>
-                </FilledCard>
+                </div>
               ) : (
                 <div className="col gap-4">
                   {plansOfDay.map((plan) => {
                     const color = colorForProject(plan.projectId);
                     return (
-                      <OutlinedCard
-                        className="list-item calendar-plan-card"
+                      <div
+                        className="list-item calendar-plan-row"
                         key={plan.id}
                         onClick={() => openPlanEditor(plan)}
-                        style={{ padding: "10px 14px" }}
                       >
                         <Checkbox
                           checked={plan.done}
@@ -783,7 +791,7 @@ export function CalendarView() {
                         >
                           <Icon name="delete" size={18} />
                         </IconButton>
-                      </OutlinedCard>
+                      </div>
                     );
                   })}
                 </div>

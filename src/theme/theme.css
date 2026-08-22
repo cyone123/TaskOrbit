@@ -639,9 +639,9 @@ h4 {
 }
 
 /* ============================================================================
-   Navigation rail — MD3 rail: the active indicator is a rounded pill that
-   wraps only the icon, the label sits below it and the whole destination is
-   one click target. Utilities stay pinned to the bottom on every view.
+   Navigation rail — MD3 rail destinations: the active highlight is a tonal
+   pill that wraps the whole item (icon + label), and the whole destination
+   stays one click target. Utilities stay pinned to the bottom on every view.
    ========================================================================== */
 
 .nav-rail {
@@ -686,7 +686,7 @@ h4 {
   min-height: 48px;
   width: 100%;
   padding: var(--sys-space-1) 0 var(--sys-space-2);
-  border-radius: var(--shape-md);
+  border-radius: var(--shape-lg);
   color: var(--md-on-surface-variant);
   -webkit-tap-highlight-color: transparent;
   transition:
@@ -694,16 +694,13 @@ h4 {
     background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
 
-/* Pill indicator wraps the icon only. */
+/* Icon sits in a transparent spacer so the pill geometry stays stable. */
 .nav-item__indicator {
   display: grid;
   place-items: center;
   width: var(--rail-indicator-width);
   height: var(--rail-indicator-height);
   border-radius: var(--shape-full);
-  background: transparent;
-  transition: background-color var(--sys-motion-selection-duration)
-    var(--sys-motion-selection-easing);
 }
 
 .nav-item__label {
@@ -734,12 +731,26 @@ h4 {
   background: rgb(var(--md-on-surface-rgb) / var(--sys-state-pressed));
 }
 
+/* Active destination: the whole tile (icon + label) takes secondary-container. */
 .nav-item.is-active {
+  background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
 }
 
-.nav-item.is-active .nav-item__indicator {
-  background: var(--md-secondary-container);
+.nav-item.is-active::after {
+  background: color-mix(
+    in srgb,
+    var(--md-on-secondary-container) var(--sys-state-hover),
+    transparent
+  );
+}
+
+.nav-item.is-active:active {
+  background: color-mix(
+    in srgb,
+    var(--md-on-secondary-container) var(--sys-state-pressed),
+    transparent
+  );
 }
 
 .nav-rail__spacer {
@@ -865,6 +876,14 @@ md-icon-button {
   max-width: min(760px, calc(100% - 48px));
 }
 
+/* md-dialog's scrim is a sibling of the showModal() panel, so it stays in
+   normal stacking — this layer lifts it above app chrome (top bar, fab).
+   Below the snackbar (200) so toasts still surface over dialogs. */
+.dialog-layer {
+  position: relative;
+  z-index: 100;
+}
+
 .material-dialog__content {
   min-width: 0;
 }
@@ -879,19 +898,32 @@ md-outlined-card.material-card {
 
 md-filled-card.pomodoro-card {
   --md-filled-card-container-color: var(--md-surface-container);
-}
-
-md-filled-card.archived-card {
+}md-filled-card.archived-card {
   --md-filled-card-container-color: var(--md-surface-container-high);
 }
 
-md-outlined-card.calendar-timeline-card {
+/* Day view panels — flat tonal surfaces instead of outlined cards */
+.calendar-timeline-panel {
   overflow: hidden;
+  min-width: 0;
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
 }
 
-md-outlined-card.calendar-plan-card {
+.calendar-plan-row {
   flex-direction: row;
-  min-width: 0;
+  min-height: 44px;
+  padding: var(--sys-space-2) var(--sys-space-3);
+  background: var(--md-surface-container-lowest);
+}
+
+.calendar-plan-row:hover {
+  background: var(--md-surface-container-low);
+}
+
+.calendar-plan-row md-icon-button {
+  --md-icon-button-container-width: 40px;
+  --md-icon-button-container-height: 40px;
 }
 
 md-outlined-segmented-button-set.segmented-control {
@@ -944,6 +976,17 @@ md-outlined-segmented-button-set.segmented-control md-outlined-segmented-button 
   flex-wrap: wrap;
 }
 
+/* Week view's internal toolbar — sub-mode switcher lives here, not in the
+   page toolbar, keeping the top layer to navigation / today / add-plan. */
+.calendar-subtoolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sys-space-3);
+  margin-bottom: var(--sys-space-3);
+  flex-wrap: wrap;
+}
+
 .calendar-heading {
   margin-left: 8px;
   white-space: nowrap;
@@ -969,6 +1012,10 @@ md-linear-progress {
 
 md-linear-progress.progress--success {
   --md-linear-progress-active-indicator-color: var(--color-success);
+}
+
+md-linear-progress.progress--tertiary {
+  --md-linear-progress-active-indicator-color: var(--md-tertiary);
 }
 
 /* ============================================================================
@@ -1108,8 +1155,7 @@ md-linear-progress.progress--success {
 
 .month-calendar {
   overflow: hidden;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-md);
+  border-radius: var(--shape-lg);
   background: var(--md-surface-container-low);
 }
 
@@ -1155,7 +1201,7 @@ md-linear-progress.progress--success {
 }
 
 .month-calendar__cell.weekend {
-  background: rgba(var(--md-primary-rgb), 0.025);
+  background: color-mix(in srgb, var(--md-on-surface) 2%, var(--md-surface-container-low));
 }
 
 .month-calendar__cell.outside {
@@ -1194,7 +1240,64 @@ md-linear-progress.progress--success {
   margin-top: 4px;
 }
 
+/* ---------------------------------------------------------------------------
+   Tonal event chips — every calendar event reads a raw project hex from
+   --event-color (set inline) and derives container/on-container pairs, so
+   events stay readable in both themes instead of being filled with saturated
+   project colors.
+   ------------------------------------------------------------------------- */
+.month-event,
+.week-detail__task,
+.week-detail__plan,
+.timeline__block,
+.gantt-bar {
+  --event-container: color-mix(
+    in srgb,
+    var(--event-color, var(--md-primary)) 16%,
+    var(--md-surface-container-lowest)
+  );
+  --event-on: color-mix(in srgb, var(--event-color, var(--md-primary)) 58%, #1d1b20);
+}
+
+[data-theme="dark"] .month-event,
+[data-theme="dark"] .week-detail__task,
+[data-theme="dark"] .week-detail__plan,
+[data-theme="dark"] .timeline__block,
+[data-theme="dark"] .gantt-bar {
+  --event-container: color-mix(
+    in srgb,
+    var(--event-color, var(--md-primary)) 30%,
+    var(--md-surface-container)
+  );
+  --event-on: color-mix(in srgb, var(--event-color, var(--md-primary)) 65%, #ffffff);
+}
+
+/* Unified MD3 state layer: an on-container overlay shared by all event chips. */
+.month-event::after,
+.week-detail__task::after,
+.week-detail__plan::after,
+.timeline__block::after,
+.gantt-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.month-event:hover::after,
+.week-detail__task:hover::after,
+.week-detail__plan:hover::after,
+.timeline__block:hover::after,
+.gantt-bar:hover::after {
+  opacity: var(--sys-state-hover);
+}
+
 .month-event {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -1213,13 +1316,15 @@ md-linear-progress.progress--success {
 
 .month-event--task {
   gap: 5px;
-  border-left: 3px solid transparent;
-  color: var(--md-on-surface);
+  border-left: 3px solid var(--event-color, var(--md-primary));
+  background: color-mix(in srgb, var(--event-color, var(--md-primary)) 9%, transparent);
+  color: var(--event-on);
 }
 
 .month-event--plan {
   gap: 4px;
-  box-shadow: var(--elev-1);
+  background: var(--event-container);
+  color: var(--event-on);
 }
 
 .month-event__dot {
@@ -1227,6 +1332,7 @@ md-linear-progress.progress--success {
   height: 6px;
   flex: 0 0 auto;
   border-radius: 50%;
+  background: currentColor;
 }
 
 .month-event__time {
@@ -1247,8 +1353,7 @@ md-linear-progress.progress--success {
 .week-detail {
   min-width: 780px;
   overflow: hidden;
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-md);
+  border-radius: var(--shape-lg);
   background: var(--md-surface-container-low);
 }
 
@@ -1333,11 +1438,14 @@ md-linear-progress.progress--success {
 }
 
 .week-detail__task {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   padding: 4px 6px;
   border: 0;
   border-radius: 5px;
+  background: var(--event-container);
+  color: var(--event-on);
   font-family: inherit;
   font-size: 11px;
   line-height: 1.25;
@@ -1399,6 +1507,8 @@ md-linear-progress.progress--success {
   padding: 6px 7px;
   border: 0;
   border-radius: var(--shape-sm);
+  background: var(--event-container);
+  color: var(--event-on);
   box-shadow: var(--elev-1);
   font-family: inherit;
   font-size: 11px;
@@ -1432,14 +1542,28 @@ md-linear-progress.progress--success {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--sys-space-4);
+}
+
+.calendar-side-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-space-2);
+  padding: var(--sys-space-4);
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
+}
+
+.calendar-day-empty {
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
 }
 
 .calendar-day-plans {
   min-width: 0;
 }
 
-.calendar-day-layout .calendar-timeline-card {
+.calendar-day-layout .calendar-timeline-panel {
   min-width: 0;
 }
 
@@ -1604,20 +1728,140 @@ md-linear-progress.progress--success {
   position: absolute;
   left: 4px;
   right: 4px;
+  border: 0;
   border-radius: var(--shape-sm);
   padding: 4px 8px;
   overflow: hidden;
   cursor: pointer;
+  background: var(--event-container);
+  color: var(--event-on);
   box-shadow: var(--elev-1);
-  color: #fff;
 }
 
 /* ============================================================================
    Pomodoro
    ========================================================================== */
 
+/* Phase color roles: focus = primary, short break = tertiary, long break =
+   success. All three are coordinated scheme roles, switched with emphasized
+   easing so mode changes feel intentional rather than abrupt. */
+.pomodoro-card {
+  --pomo-color: var(--md-primary);
+  --pomo-on-color: var(--md-on-primary);
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--sys-space-8) var(--sys-space-6);
+}
+
+.pomodoro-card.pomo-phase-shortBreak {
+  --pomo-color: var(--md-tertiary);
+  --pomo-on-color: var(--md-on-tertiary);
+}
+
+.pomodoro-card.pomo-phase-longBreak {
+  --pomo-color: var(--color-success);
+  --pomo-on-color: var(--color-on-success);
+}
+
+/* Soft state transition while running: the card surface picks up a whisper
+   of the phase hue (7%) — perceptible but never a color flip. */
+.pomodoro-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--pomo-color) 7%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sys-motion-selection-duration) var(--sys-motion-easing-emphasized);
+}
+
+.pomodoro-card.is-running::after {
+  opacity: 1;
+}
+
+/* Running de-emphasizes secondary controls (phase switcher, focus target). */
+.pomodoro-card .pomo-secondary {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity var(--sys-motion-selection-duration) var(--sys-motion-easing-emphasized);
+}
+
+.pomodoro-card.is-running .pomo-secondary {
+  opacity: 0.4;
+}
+
+.pomo-link-field {
+  max-width: 420px;
+  margin-top: var(--sys-space-6);
+  margin-bottom: 0;
+}
+
+.pomo-stage {
+  position: relative;
+  width: 288px;
+  height: 288px;
+  margin-top: var(--sys-space-5);
+}
+
+.pomo-readout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pomo-clock {
+  font-size: 48px;
+  line-height: 56px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.pomo-controls {
+  margin-top: var(--sys-space-5);
+}
+
 .pomo-ring {
   transform: rotate(-90deg);
+}
+
+/* Timer changes stay linear; the phase hue itself eases with emphasis. */
+.pomo-ring__progress {
+  stroke: var(--pomo-color);
+  transition:
+    stroke-dashoffset var(--sys-motion-progress-duration) var(--sys-motion-progress-easing),
+    stroke var(--sys-motion-selection-duration) var(--sys-motion-easing-emphasized);
+}
+
+/* The main action carries the phase role too — start stays brand, breaks
+   tint toward their rest hue. */
+.pomodoro-card.pomo-phase-shortBreak .timer-start-button {
+  --md-filled-button-container-color: var(--md-tertiary);
+  --md-filled-button-label-text-color: var(--md-on-tertiary);
+  --md-filled-button-icon-color: var(--md-on-tertiary);
+  --md-filled-button-hover-label-text-color: var(--md-on-tertiary);
+  --md-filled-button-hover-icon-color: var(--md-on-tertiary);
+}
+
+.pomodoro-card.pomo-phase-longBreak .timer-start-button {
+  --md-filled-button-container-color: var(--color-success);
+  --md-filled-button-label-text-color: var(--color-on-success);
+  --md-filled-button-icon-color: var(--color-on-success);
+  --md-filled-button-hover-label-text-color: var(--color-on-success);
+  --md-filled-button-hover-icon-color: var(--color-on-success);
+}
+
+/* Settings summary — plain text now that panels are flat. */
+.pomodoro-note {
+  margin-top: var(--sys-space-4);
 }
 
 /* ============================================================================
@@ -1706,6 +1950,106 @@ md-linear-progress.progress--success {
   line-height: var(--sys-type-headline-small-line-height);
 }
 
+/* Stats view — one hero KPI in primary-container, three tonal secondary
+   tiles differentiated by scheme roles instead of borders. */
+.stats-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-4);
+  overflow: hidden;
+  padding: var(--sys-space-6);
+  border-radius: var(--shape-xl);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.stats-hero__icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--shape-lg);
+  background: color-mix(in srgb, var(--md-on-primary-container) 12%, transparent);
+}
+
+.stats-hero__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-hero__value {
+  font-size: var(--sys-type-display-small-size);
+  line-height: var(--sys-type-display-small-line-height);
+  font-weight: var(--sys-type-headline-medium-weight);
+}
+
+.stats-hero__spark {
+  align-self: flex-start;
+  opacity: 0.28;
+}
+
+.stats-secondary-grid {
+  margin-top: var(--sys-space-3);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-space-1);
+  padding: var(--sys-space-4);
+  border-radius: var(--shape-lg);
+}
+
+.stat-tile--secondary {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.stat-tile--tertiary {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.stat-tile--success {
+  background: var(--color-success-container);
+  color: var(--color-on-success-container);
+}
+
+.stat-tile__value {
+  margin-top: var(--sys-space-1);
+  font-size: var(--sys-type-headline-small-size);
+  line-height: var(--sys-type-headline-small-line-height);
+  font-weight: 500;
+}
+
+/* Chart panels are flat sections like the rest of the app. */
+.stats-panel {
+  padding: var(--sys-space-5);
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
+}
+
+.stats-panel + .stats-panel,
+.stats-panel + .stats-panel + .stats-panel {
+  margin-top: var(--sys-space-3);
+}
+
+.stats-empty {
+  padding: var(--sys-space-8) var(--sys-space-4);
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container-lowest);
+}
+
+.stats-empty svg {
+  width: 40px;
+  height: 40px;
+  opacity: 0.5;
+}
+
 .color-dot {
   width: 28px;
   height: 28px;
@@ -1722,32 +2066,70 @@ md-linear-progress.progress--success {
   border-color: var(--md-on-surface);
 }
 
+.gantt-gutter--task {
+  border: 0;
+  border-right: 1px solid var(--md-outline-variant);
+  width: 172px;
+  padding: 10px 12px;
+  font-family: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.gantt-gutter--task:hover {
+  background: rgba(var(--md-on-surface-rgb), var(--sys-state-hover));
+}
+
 .gantt-bar {
   position: absolute;
   height: 26px;
-  border-radius: 6px;
-  color: #fff;
+  border: 0;
+  border-radius: var(--shape-full);
+  background: var(--event-container);
+  color: var(--event-on);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--event-color, currentColor) 40%, transparent);
+  font-family: inherit;
   font-size: 12px;
   line-height: 26px;
-  padding: 0 8px;
+  padding: 0 10px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  text-align: left;
   cursor: pointer;
-  box-shadow: var(--elev-1);
-  transition: filter var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
-}
-.gantt-bar:hover {
-  filter: brightness(1.1);
 }
 
 .bar-chart {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 12px;
   height: 160px;
-  padding: 8px 4px;
+  padding: 8px 4px 0;
+  border-bottom: 2px solid var(--md-outline-variant);
 }
+
+/* Average baseline — the reference line the doc asks for. */
+.bar-chart__avg {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--md-tertiary) 70%, transparent);
+  pointer-events: none;
+}
+
+.bar-chart__avg .body-sm {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  padding: 1px 6px;
+  border-radius: var(--shape-full);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface-variant);
+}
+
 .bar-chart__col {
   flex: 1;
   display: flex;
@@ -1757,15 +2139,40 @@ md-linear-progress.progress--success {
   height: 100%;
   justify-content: flex-end;
 }
+
+.bar-chart__value {
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 .bar-chart__bar {
   width: 100%;
   max-width: 40px;
+  border: 0;
   border-radius: 6px 6px 2px 2px;
-  background: var(--md-primary);
+  background: var(--bar-color, var(--md-primary));
   min-height: 2px;
   transform-origin: bottom;
   animation: barGrow var(--sys-motion-duration-long2)
     var(--sys-motion-easing-emphasized-decelerate) both;
+  cursor: pointer;
+  transition: box-shadow var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.bar-chart__bar.is-selected {
+  box-shadow:
+    0 0 0 2px var(--md-surface-container-low),
+    0 0 0 4px var(--md-primary);
+}
+
+.bar-chart__label.is-today {
+  color: var(--md-primary);
+  font-weight: 600;
+}
+
+.bar-chart-detail {
+  min-height: 20px;
+  margin-top: var(--sys-space-2);
 }
 
 @keyframes barGrow {
@@ -1775,8 +2182,7 @@ md-linear-progress.progress--success {
 
 /* Gantt (week view) */
 .gantt {
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-md);
+  border-radius: var(--shape-lg);
   overflow: hidden;
   background: var(--md-surface-container-low);
 }
@@ -1805,14 +2211,18 @@ md-linear-progress.progress--success {
 }
 
 .gantt-dayhead {
-  text-align: center;
+  border: 0;
+  width: 100%;
   padding: 6px 2px;
+  font-family: inherit;
+  background: transparent;
+  text-align: center;
   cursor: pointer;
   color: var(--md-on-surface-variant);
-  border-left: 1px solid var(--md-outline-variant);
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
 }
-.gantt-dayhead:first-child {
-  border-left: none;
+.gantt-dayhead + .gantt-dayhead {
+  border-left: 1px solid var(--md-outline-variant);
 }
 .gantt-dayhead:hover {
   background: rgba(var(--md-on-surface-rgb), var(--sys-state-hover));
@@ -3581,18 +3991,21 @@ md-filled-button.projects-create-button {
   gap: var(--sys-space-5);
 }
 
-/* Quick capture is the primary action surface: tonal container. The list
-   stays on a lower surface so hierarchy reads by tone, not outlines. */
+/* Quick capture is the primary action surface: theme surface lifted by a
+   faint brand tint (reads calm in dark mode too, unlike a full container). */
 md-filled-card.inbox-capture-card {
-  --md-filled-card-container-color: var(--md-primary-container);
+  --md-filled-card-container-color: color-mix(
+    in srgb,
+    var(--md-primary) 8%,
+    var(--md-surface-container-high)
+  );
   position: sticky;
   top: 0;
   padding: 20px;
-  color: var(--md-on-primary-container);
 }
 
 .inbox-capture__sub {
-  color: color-mix(in srgb, var(--md-on-primary-container) 74%, transparent);
+  color: var(--md-on-surface-variant);
 }
 
 .inbox-capture-card md-outlined-text-field,
@@ -3636,8 +4049,8 @@ md-filled-card.inbox-capture-card {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 14px;
-  color: inherit;
-  background: color-mix(in srgb, var(--md-on-primary-container) 12%, transparent);
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
 }
 
 .inbox-capture__modes {

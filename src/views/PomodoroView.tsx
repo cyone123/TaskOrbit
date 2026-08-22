@@ -240,19 +240,23 @@ export function PomodoroView() {
         </div>
       </div>
 
-      <FilledCard className="material-card pomodoro-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 24px" }}>
-        <OutlinedSegmentedButtonSet className="segmented-control mb-16">
-          {PHASES.map((item) => (
-            <OutlinedSegmentedButton
-              key={item.key}
-              label={item.label}
-              selected={phase === item.key}
-              onClick={() => store.selectTimerPhase(item.key)}
-            />
-          ))}
-        </OutlinedSegmentedButtonSet>
+      <FilledCard
+        className={`material-card pomodoro-card pomo-phase-${phase}${running ? " is-running" : ""}`}
+      >
+        <div className="pomo-secondary">
+          <OutlinedSegmentedButtonSet className="segmented-control mb-16">
+            {PHASES.map((item) => (
+              <OutlinedSegmentedButton
+                key={item.key}
+                label={item.label}
+                selected={phase === item.key}
+                onClick={() => store.selectTimerPhase(item.key)}
+              />
+            ))}
+          </OutlinedSegmentedButtonSet>
+        </div>
 
-        <div style={{ position: "relative", width: 288, height: 288 }}>
+        <div className="pomo-stage">
           <svg width={288} height={288} className="pomo-ring">
             <circle cx={144} cy={144} r={R} fill="none" stroke="var(--md-surface-container-highest)" strokeWidth={14} />
             <circle
@@ -260,24 +264,30 @@ export function PomodoroView() {
               cy={144}
               r={R}
               fill="none"
-              stroke={phase === "focus" ? "var(--md-primary)" : "var(--color-success)"}
+              className="pomo-ring__progress"
               strokeWidth={14}
               strokeLinecap="round"
               strokeDasharray={C}
               strokeDashoffset={C * (1 - progress)}
-              style={{
-                transition:
-                  "stroke-dashoffset var(--sys-motion-progress-duration) var(--sys-motion-progress-easing)",
-              }}
             />
           </svg>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
-            <div className="display" style={{ fontSize: 48, lineHeight: "56px", fontWeight: 500 }}>{clock(remaining)}</div>
-            <div className="body-md muted">{running ? "专注中…" : "已暂停"}</div>
+          <div className="pomo-readout">
+            <div className="display pomo-clock">{clock(remaining)}</div>
+            <div className="body-md muted">
+              {running
+                ? phase === "focus"
+                  ? "专注中…"
+                  : phase === "shortBreak"
+                    ? "短休息中…"
+                    : "长休息中…"
+                : timer
+                  ? "已暂停"
+                  : "准备开始"}
+            </div>
           </div>
         </div>
 
-        <div className="row gap-16" style={{ marginTop: 20 }}>
+        <div className="row gap-16 pomo-controls">
           <IconButton onClick={() => store.resetTimer()} aria-label="重置" title="重置">
             <Icon name="replay" />
           </IconButton>
@@ -290,7 +300,7 @@ export function PomodoroView() {
           </IconButton>
         </div>
 
-        <div className="field" style={{ width: "100%", maxWidth: 420, marginTop: 24, marginBottom: 0 }}>
+        <div className="field pomo-secondary pomo-link-field">
           <OutlinedSelect
             label="本次专注对象"
             value={linkValue}
@@ -310,11 +320,9 @@ export function PomodoroView() {
         </div>
       </FilledCard>
 
-      <FilledCard className="material-card mt-16" style={{ padding: "14px 18px" }}>
-        <div className="body-sm muted">
-          专注 {s.focusMinutes} 分钟 · 短休息 {s.shortBreakMinutes} 分钟 · 长休息 {s.longBreakMinutes} 分钟 · 每 {s.longBreakInterval} 个番茄进入长休息。完成专注后会自动记录到统计中。
-        </div>
-      </FilledCard>
+      <div className="body-sm muted pomodoro-note">
+        专注 {s.focusMinutes} 分钟 · 短休息 {s.shortBreakMinutes} 分钟 · 长休息 {s.longBreakMinutes} 分钟 · 每 {s.longBreakInterval} 个番茄进入长休息。完成专注后会自动记录到统计中。
+      </div>
 
       <SettingsDialog
         open={settingsOpen}

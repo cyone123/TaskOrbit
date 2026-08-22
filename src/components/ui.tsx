@@ -28,17 +28,19 @@ export function Dialog({ open, onClose, title, children, actions, wide }: Dialog
   if (!open) return null;
 
   return createPortal(
-    <MaterialDialog
-      open={open}
-      className={`material-dialog ${wide ? "material-dialog--wide" : ""}`}
-      onCancel={onClose}
-    >
-      <div slot="headline">{title}</div>
-      <div slot="content" className="material-dialog__content">
-        {children}
-      </div>
-      {actions && <div slot="actions">{actions}</div>}
-    </MaterialDialog>,
+    <div className="dialog-layer">
+      <MaterialDialog
+        open={open}
+        className={`material-dialog ${wide ? "material-dialog--wide" : ""}`}
+        onCancel={onClose}
+      >
+        <div slot="headline">{title}</div>
+        <div slot="content" className="material-dialog__content">
+          {children}
+        </div>
+        {actions && <div slot="actions">{actions}</div>}
+      </MaterialDialog>
+    </div>,
     document.body,
   );
 }
