@@ -1706,17 +1706,26 @@ md-linear-progress.progress--tertiary {
   display: grid;
   grid-template-columns: 56px 1fr;
   position: relative;
+  border-top: 1px solid var(--md-outline-variant);
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.timeline__time-axis {
+  position: relative;
 }
 
 .timeline__hour {
-  height: 48px;
+  height: 44px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--md-outline-variant);
   font-size: 11px;
   color: var(--md-on-surface-variant);
   text-align: right;
-  padding-right: 8px;
-  position: relative;
-  top: -7px;
+  padding: 4px 8px 0 0;
+}
+
+.timeline__hour:last-child {
+  border-bottom: none;
 }
 
 .timeline__col {
@@ -1724,10 +1733,12 @@ md-linear-progress.progress--tertiary {
   border-left: 1px solid var(--md-outline-variant);
 }
 
+.timeline__grid-row:last-child {
+  border-bottom: none !important;
+}
+
 .timeline__block {
   position: absolute;
-  left: 4px;
-  right: 4px;
   border: 0;
   border-radius: var(--shape-sm);
   padding: 4px 8px;
@@ -1736,6 +1747,27 @@ md-linear-progress.progress--tertiary {
   background: var(--event-container);
   color: var(--event-on);
   box-shadow: var(--elev-1);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  transition: transform var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              box-shadow var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.timeline__block strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline__block span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================================================

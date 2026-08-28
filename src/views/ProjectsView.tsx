@@ -4,7 +4,6 @@ import {
   dailyPlanRepeatLabel,
   formatDate,
   formatDateFull,
-  formatTime,
   monthLabel,
   parseISODate,
   relativeRangeLabel,
@@ -59,10 +58,6 @@ function statusLabel(startISO: string, endISO: string): { text: string; color: s
   if (today < startISO) return { text: "未开始", color: "var(--md-on-surface-variant)" };
   if (today > endISO) return { text: "已结束", color: "var(--md-outline)" };
   return { text: "进行中", color: "var(--md-primary)" };
-}
-
-function shortTime(time: string): string {
-  return formatTime(time).replace("上午 ", "").replace("下午 ", "");
 }
 
 function monthDays(anchor: Date): Date[] {
@@ -298,7 +293,7 @@ export function ProjectsView() {
           </div>
         </div>
         <span className="chip chip--small project-time-chip">
-          {shortTime(plan.startTime)} - {shortTime(plan.endTime)}
+          {plan.startTime} - {plan.endTime}
         </span>
         {!compact && (
           <div className="project-row-actions">
@@ -462,7 +457,7 @@ export function ProjectsView() {
                 editing: plan,
               })}
             >
-              <span className="chip chip--small today-plan-item__time">{shortTime(plan.startTime)} - {shortTime(plan.endTime)}</span>
+              <span className="chip chip--small today-plan-item__time">{plan.startTime} - {plan.endTime}</span>
               <span className="title-sm today-plan-item__name">{plan.name}</span>
               <span className="row gap-6 body-sm muted">
                 <span className="dot" style={{ background: selectedProject ? colorByKey(selectedProject.color) : "var(--md-outline)" }} />

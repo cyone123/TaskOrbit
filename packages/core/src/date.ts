@@ -123,3 +123,71 @@ export function isTimeRangeValid(start: string, end: string): boolean {
 export function inDateRange(iso: string, startISO: string, endISO: string): boolean {
   return iso >= startISO && iso <= endISO;
 }
+
+export interface PlanColumnLayout {
+  column: number;
+  columnCount: number;
+}
+
+/**
+ * Layout overlapping daily plans into horizontal columns using cluster grouping.
+ * Plans that overlap with each other share the available width equally.
+ */
+export function layoutPlanColumns<T extends { id: string; startTime: string; endTime: string }>(
+  plans: T[],
+): Map<string, PlanColumnLayout> {
+  const layouts = new Map<string, PlanColumnLayout>();
+  if (plans.length === 0) return layouts;
+
+  const sorted = [...plans].sort((a, b) => {
+    const startDiff = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+    if (startDiff !== 0) return startDiff;
+    return timeToMinutes(b.endTime) - timeToMinutes(a.endTime);
+  });
+
+  const clusters: T[][] = [];
+  let currentCluster: T[] = [];
+  let clusterEnd = -1;
+
+  for (const plan of sorted) {
+    const start = timeToMinutes(plan.startTime);
+    const end = timeToMinutes(plan.endTime);
+
+    if (currentCluster.length === 0 || start < clusterEnd) {
+      currentCluster.push(plan);
+      clusterEnd = Math.max(clusterEnd, end);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [plan];
+      clusterEnd = end;
+    }
+  }
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  for (const cluster of clusters) {
+    const columns: T[][] = [];
+
+    for (const plan of cluster) {
+      const start = timeToMinutes(plan.startTime);
+      const reusableColumn = columns.findIndex((items) => {
+        const previous = items[items.length - 1];
+        return previous ? timeToMinutes(previous.endTime) <= start : false;
+      });
+
+      const columnIndex = reusableColumn === -1 ? columns.length : reusableColumn;
+      if (!columns[columnIndex]) columns[columnIndex] = [];
+      columns[columnIndex].push(plan);
+    }
+
+    const columnCount = columns.length;
+    columns.forEach((items, column) => {
+      items.forEach((plan) => {
+        layouts.set(plan.id, { column, columnCount });
+      });
+    });
+  }
+
+  return layouts;
+}

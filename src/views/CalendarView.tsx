@@ -13,6 +13,7 @@ import {
   formatDateFull,
   isToday,
   isWeekend,
+  layoutPlanColumns,
   monthLabel,
   parseISODate,
   startOfWeek,
@@ -38,7 +39,9 @@ import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
 const HOUR_HEIGHT = 44;
-const DAY_MINUTES = 24 * 60;
+const DAY_START_HOUR = 6;
+const DAY_END_HOUR = 24;
+const DAY_TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR;
 const WEEK_DETAIL_START_HOUR = 6;
 const WEEK_DETAIL_END_HOUR = 24;
 
@@ -48,41 +51,6 @@ type WeekViewMode = "gantt" | "detail";
 interface BarRange {
   startIdx: number;
   endIdx: number;
-}
-
-interface PlanLayout {
-  column: number;
-  columnCount: number;
-}
-
-function layoutPlans(plans: DailyPlan[]): Map<string, PlanLayout> {
-  const columns: DailyPlan[][] = [];
-  const layouts = new Map<string, PlanLayout>();
-
-  const sorted = [...plans].sort(
-    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime),
-  );
-
-  for (const plan of sorted) {
-    const start = timeToMinutes(plan.startTime);
-    const column = columns.findIndex((items) => {
-      const previous = items[items.length - 1];
-      return previous && timeToMinutes(previous.endTime) <= start;
-    });
-    const columnIndex = column === -1 ? columns.length : column;
-    if (!columns[columnIndex]) columns[columnIndex] = [];
-    columns[columnIndex].push(plan);
-  }
-
-  for (const items of columns) {
-    for (const plan of items) {
-      layouts.set(plan.id, {
-        column: columns.findIndex((column) => column.includes(plan)),
-        columnCount: columns.length,
-      });
-    }
-  }
-  return layouts;
 }
 
 function monthGridDays(anchor: Date): Date[] {
@@ -184,8 +152,13 @@ export function CalendarView() {
   );
 
   const layoutsOfWeek = useMemo(
-    () => plansOfWeek.map((plans) => layoutPlans(plans)),
+    () => plansOfWeek.map((plans) => layoutPlanColumns(plans)),
     [plansOfWeek],
+  );
+
+  const layoutOfDay = useMemo(
+    () => layoutPlanColumns(plansOfDay),
+    [plansOfDay],
   );
 
   const monthTasksByDate = useMemo(() => {
@@ -212,7 +185,7 @@ export function CalendarView() {
 
   useEffect(() => {
     if (mode === "day") {
-      contentRef.current?.parentElement?.scrollTo({ top: 8 * HOUR_HEIGHT - 60 });
+      contentRef.current?.parentElement?.scrollTo({ top: (8 - DAY_START_HOUR) * HOUR_HEIGHT });
     }
   }, [mode, anchor]);
 
@@ -664,40 +637,50 @@ export function CalendarView() {
       {mode === "day" && (
         <div className="calendar-day-layout">
           <section className="calendar-timeline-panel">
-            <div className="timeline" style={{ gridTemplateColumns: "56px 1fr" }}>
+            <div className="timeline">
               <div
-                className="col"
-                style={{ position: "relative", height: DAY_MINUTES / 60 * HOUR_HEIGHT }}
+                className="timeline__time-axis"
+                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
               >
-                {Array.from({ length: 24 }, (_, hour) => (
-                  <div key={hour} className="timeline__hour" style={{ height: HOUR_HEIGHT }}>
-                    {`${String(hour).padStart(2, "0")}:00`}
-                  </div>
-                ))}
+                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => {
+                  const hour = DAY_START_HOUR + index;
+                  return (
+                    <div key={hour} className="timeline__hour" style={{ height: HOUR_HEIGHT }}>
+                      {`${String(hour).padStart(2, "0")}:00`}
+                    </div>
+                  );
+                })}
               </div>
               <div
                 className="timeline__col"
-                style={{ height: DAY_MINUTES / 60 * HOUR_HEIGHT }}
+                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
               >
-                {Array.from({ length: 24 }, (_, hour) => (
+                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => (
                   <div
-                    key={hour}
+                    key={index}
+                    className="timeline__grid-row"
                     style={{
                       position: "absolute",
-                      top: hour * HOUR_HEIGHT,
+                      top: index * HOUR_HEIGHT,
                       left: 0,
                       right: 0,
-                      borderTop: "1px solid var(--md-outline-variant)",
-                      height: 0,
+                      height: HOUR_HEIGHT,
+                      borderBottom: "1px solid var(--md-outline-variant)",
+                      boxSizing: "border-box",
+                      pointerEvents: "none",
                     }}
                   />
                 ))}
                 {plansOfDay.map((plan) => {
                   const start = timeToMinutes(plan.startTime);
                   const end = timeToMinutes(plan.endTime);
-                  const total = (DAY_MINUTES / 60) * HOUR_HEIGHT;
-                  const top = (start / DAY_MINUTES) * total;
-                  const height = Math.max(((end - start) / DAY_MINUTES) * total - 4, 20);
+                  const visibleStart = Math.max(start, DAY_START_HOUR * 60);
+                  const visibleEnd = Math.min(end, DAY_END_HOUR * 60);
+                  if (visibleEnd <= visibleStart) return null;
+
+                  const layout = layoutOfDay.get(plan.id) ?? { column: 0, columnCount: 1 };
+                  const top = ((visibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                  const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                   const project = plan.projectId ? projectById.get(plan.projectId) : null;
                   return (
                     <button
@@ -707,10 +690,13 @@ export function CalendarView() {
                       style={{
                         top,
                         height,
+                        left: `calc(${(layout.column / layout.columnCount) * 100}% + 4px)`,
+                        width: `calc(${(100 / layout.columnCount)}% - 8px)`,
                         opacity: plan.done ? 0.55 : 1,
                         ...eventVars(plan.projectId),
                       }}
                       onClick={() => openPlanEditor(plan)}
+                      title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
                     >
                       <strong className={`body-sm ${plan.done ? "text-done" : ""}`}>
                         {plan.name}
