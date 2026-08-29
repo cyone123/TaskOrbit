@@ -22,6 +22,11 @@ import { MdFilterChip } from "@material/web/chips/filter-chip.js";
 import { MdInputChip } from "@material/web/chips/input-chip.js";
 import { MdSuggestionChip } from "@material/web/chips/suggestion-chip.js";
 import { MdChipSet } from "@material/web/chips/chip-set.js";
+import { MdBadge } from "@material/web/labs/badge/badge.js";
+import { MdElevatedCard } from "@material/web/labs/card/elevated-card.js";
+import { MdCircularProgress } from "@material/web/progress/circular-progress.js";
+import { MdRadio } from "@material/web/radio/radio.js";
+import { MdSlider } from "@material/web/slider/slider.js";
 import { MdPrimaryTab } from "@material/web/tabs/primary-tab.js";
 import { MdSecondaryTab } from "@material/web/tabs/secondary-tab.js";
 import { MdTabs } from "@material/web/tabs/tabs.js";
@@ -115,6 +120,32 @@ export const LinearProgress = createComponent({
   elementClass: MdLinearProgress,
 });
 
+export const CircularProgress = createComponent({
+  react: React,
+  tagName: "md-circular-progress",
+  elementClass: MdCircularProgress,
+});
+
+export const Radio = createComponent({
+  react: React,
+  tagName: "md-radio",
+  elementClass: MdRadio,
+  events: { onInput: "input", onChange: "change", onClick: "click" },
+});
+
+export const Slider = createComponent({
+  react: React,
+  tagName: "md-slider",
+  elementClass: MdSlider,
+  events: { onInput: "input", onChange: "change" },
+});
+
+export const MaterialBadge = createComponent({
+  react: React,
+  tagName: "md-badge",
+  elementClass: MdBadge,
+});
+
 export const MaterialDialog = createComponent({
   react: React,
   tagName: "md-dialog",
@@ -137,6 +168,12 @@ export const OutlinedCard = createComponent({
   react: React,
   tagName: "md-outlined-card",
   elementClass: MdOutlinedCard,
+});
+
+export const ElevatedCard = createComponent({
+  react: React,
+  tagName: "md-elevated-card",
+  elementClass: MdElevatedCard,
 });
 
 export const OutlinedSegmentedButton = createComponent({
