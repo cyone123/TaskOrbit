@@ -20,14 +20,24 @@ import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
 import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
 import {
   Checkbox,
-  FilledButton,
   IconButton,
   LinearProgress,
+  Ripple,
   SecondaryTab,
   Tabs,
   TextButton,
 } from "../components/material";
-import { ConfirmDialog, Dialog, EmptyState, useSnackbar } from "../components/ui";
+import {
+  Badge,
+  ConfirmDialog,
+  Dialog,
+  EmptyState,
+  ExtendedFab,
+  SearchBar,
+  SectionHeader,
+  StatCard,
+  useSnackbar,
+} from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
@@ -393,15 +403,16 @@ export function ProjectsView() {
 
   const renderTaskSection = (showAll = true) => (
     <section className="project-panel" id="project-tasks">
-      <div className="project-panel-heading">
-        <div>
-          <div className="title-md">任务</div>
-          <div className="body-sm muted mt-4">把项目拆成可执行的下一步</div>
-        </div>
-        <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
-          <Icon name="add" size={17} slot="icon" /> 添加任务
-        </TextButton>
-      </div>
+      <SectionHeader
+        title="任务"
+        subtitle="把项目拆成可执行的下一步"
+        badge={<Badge value={projectTasks.length} variant="primary" />}
+        actions={
+          <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
+            <Icon name="add" size={18} slot="icon" /> 添加任务
+          </TextButton>
+        }
+      />
       {projectTasks.length === 0 ? (
         <div className="project-empty-row">
           <Icon name="checklist" size={24} />
@@ -524,12 +535,10 @@ export function ProjectsView() {
 
   const renderStatsTab = () => (
     <section className="project-panel project-stats-card">
-      <div className="project-panel-heading">
-        <div>
-          <div className="title-md">项目统计</div>
-          <div className="body-sm muted mt-4">持续推进，及时看见进展</div>
-        </div>
-      </div>
+      <SectionHeader
+        title="项目统计"
+        subtitle="持续推进，及时看见进展"
+      />
       <div className="project-stat-detail-grid">
         <div><span className="body-sm muted">任务完成率</span><strong>{taskProgress}%</strong><LinearProgress value={taskProgress} max={100} /></div>
         <div><span className="body-sm muted">计划完成率</span><strong>{planProgress}%</strong><LinearProgress className="progress--success" value={planProgress} max={100} /></div>
@@ -545,15 +554,15 @@ export function ProjectsView() {
 
   const renderPlanTab = () => (
     <section className="project-panel project-all-plans-card">
-      <div className="project-panel-heading">
-        <div>
-          <div className="title-md">每日计划</div>
-          <div className="body-sm muted mt-4">{projectPlans.length} 个计划 · {donePlans} 个已完成</div>
-        </div>
-        <TextButton onClick={() => selectedProject && openNewPlan(selectedProject.id)}>
-          <Icon name="add" size={17} slot="icon" /> 添加计划
-        </TextButton>
-      </div>
+      <SectionHeader
+        title="每日计划"
+        subtitle={`${projectPlans.length} 个计划 · ${donePlans} 个已完成`}
+        actions={
+          <TextButton onClick={() => selectedProject && openNewPlan(selectedProject.id)}>
+            <Icon name="add" size={18} slot="icon" /> 添加计划
+          </TextButton>
+        }
+      />
       {projectPlans.length === 0 ? (
         <div className="project-empty-row"><Icon name="calendar_add_on" size={24} /><span>还没有每日计划。</span></div>
       ) : (
@@ -572,32 +581,40 @@ export function ProjectsView() {
       <div className="project-overview-grid">
         <div className="project-overview-main">
           <section className="project-overview-section">
-            <div className="project-section-title">项目概览</div>
+            <SectionHeader title="项目概览" />
             <div className="project-stat-grid">
-              <div className="project-stat-card">
-                <span className="project-stat-icon project-stat-icon--primary"><Icon name="task_alt" size={21} /></span>
-                <span className="body-md muted">任务总数</span>
-                <strong>{projectTasks.length}</strong>
-                <span className="body-sm muted"><span className="project-stat-accent">{doneTasks}</span> 已完成</span>
-              </div>
-              <div className="project-stat-card">
-                <span className="project-stat-icon project-stat-icon--blue"><Icon name="event_available" size={21} /></span>
-                <span className="body-md muted">计划总数</span>
-                <strong>{projectPlans.length}</strong>
-                <span className="body-sm muted">{planDate === todayISO() ? "今日计划" : `${formatDate(planDate)}计划`} <span className="project-stat-accent">{todayPlans.length}</span></span>
-              </div>
-              <div className="project-stat-card">
-                <span className="project-stat-icon project-stat-icon--green"><Icon name="trending_up" size={21} /></span>
-                <span className="body-md muted">整体进度</span>
-                <strong>{taskProgress}<small>%</small></strong>
-                <span className="body-sm muted">任务完成率</span>
-              </div>
-              <div className="project-stat-card">
-                <span className="project-stat-icon project-stat-icon--orange"><Icon name="schedule" size={21} /></span>
-                <span className="body-md muted">预计剩余</span>
-                <strong>{daysRemaining(selectedProject.endDate)}<small> 天</small></strong>
-                <span className="body-sm muted">预计 {formatDate(selectedProject.endDate)} 结束</span>
-              </div>
+              <StatCard
+                title="任务总数"
+                value={projectTasks.length}
+                subtitle={<>{doneTasks} 已完成</>}
+                icon="task_alt"
+                colorVariant="primary"
+                onClick={() => setActiveTab("tasks")}
+              />
+              <StatCard
+                title="计划总数"
+                value={projectPlans.length}
+                subtitle={<>{planDate === todayISO() ? "今日计划" : `${formatDate(planDate)}计划`} {todayPlans.length} 个</>}
+                icon="event_available"
+                colorVariant="info"
+                onClick={() => setActiveTab("plans")}
+              />
+              <StatCard
+                title="整体进度"
+                value={taskProgress}
+                unit="%"
+                subtitle="任务完成率"
+                icon="trending_up"
+                colorVariant="success"
+              />
+              <StatCard
+                title="预计剩余"
+                value={daysRemaining(selectedProject.endDate)}
+                unit="天"
+                subtitle={`预计 ${formatDate(selectedProject.endDate)} 结束`}
+                icon="schedule"
+                colorVariant="warning"
+              />
             </div>
           </section>
           {renderTaskSection(false)}
@@ -621,16 +638,21 @@ export function ProjectsView() {
         </div>
 
         <div className="projects-sidebar__tools">
-          <label className="projects-search">
-            <Icon name="search" size={20} />
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索项目..." aria-label="搜索项目" />
-          </label>
-          <IconButton aria-label="筛选项目" title="筛选项目"><Icon name="tune" size={20} /></IconButton>
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="搜索项目..."
+            className="projects-search-bar"
+          />
         </div>
 
-        <FilledButton className="projects-create-button" onClick={() => setProjForm({ open: true, editing: null })}>
-          <Icon name="add" size={19} slot="icon" /> 新建项目
-        </FilledButton>
+        <ExtendedFab
+          label="新建项目"
+          icon="add"
+          variant="primary"
+          className="projects-create-fab"
+          onClick={() => setProjForm({ open: true, editing: null })}
+        />
 
         <div className="projects-sidebar__list">
           {filteredProjects.length === 0 ? (
@@ -656,6 +678,7 @@ export function ProjectsView() {
                     </span>
                   </span>
                   {selected && <Icon name="chevron_right" size={19} className="project-nav-item__chevron" />}
+                  <Ripple />
                 </button>
               );
             })

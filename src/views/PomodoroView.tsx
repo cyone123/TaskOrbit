@@ -20,7 +20,8 @@ import {
   TextButton,
   eventValue,
 } from "../components/material";
-import { Dialog, useSnackbar } from "../components/ui";
+import { Badge, Dialog, SectionHeader, useSnackbar } from "../components/ui";
+import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
 const PHASES: { key: PomodoroKind; label: string }[] = [
@@ -40,6 +41,11 @@ function clock(ms: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatSessionTime(timestamp: number): string {
+  const d = new Date(timestamp);
+  return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
 function playBeep(times = 3) {
@@ -228,14 +234,14 @@ export function PomodoroView() {
   return (
     <div className="page-shell page-shell--narrow">
       <div className="spread mb-16">
-        <div className="title-lg">番茄钟</div>
+        <div className="headline-md">番茄钟</div>
         <div className="row gap-8">
-          <div className="chip">
+          <div className="chip chip--small pomo-summary-chip">
             <Icon name="check_circle" size={16} style={{ color: "var(--color-success)" }} />
             今日 {todaySessions.length} 个 · {formatDurationMinutes(todayMinutes)}
           </div>
           <IconButton onClick={() => setSettingsOpen(true)} aria-label="设置" title="设置">
-            <Icon name="settings" />
+            <Icon name="settings" size={20} />
           </IconButton>
         </div>
       </div>
@@ -272,8 +278,8 @@ export function PomodoroView() {
             />
           </svg>
           <div className="pomo-readout">
-            <div className="display pomo-clock">{clock(remaining)}</div>
-            <div className="body-md muted">
+            <div className="display-lg pomo-clock tabular-nums">{clock(remaining)}</div>
+            <div className="label-lg muted pomo-phase-label">
               {running
                 ? phase === "focus"
                   ? "专注中…"
@@ -289,14 +295,14 @@ export function PomodoroView() {
 
         <div className="row gap-16 pomo-controls">
           <IconButton onClick={() => store.resetTimer()} aria-label="重置" title="重置">
-            <Icon name="replay" />
+            <Icon name="replay" size={22} />
           </IconButton>
           <FilledButton className="timer-start-button" onClick={toggle}>
-            <Icon name={running ? "pause" : "play_arrow"} slot="icon" />
+            <Icon name={running ? "pause" : "play_arrow"} slot="icon" size={22} />
             {running ? "暂停" : timer && remaining < total ? "继续" : "开始"}
           </FilledButton>
           <IconButton onClick={() => store.skipTimer()} aria-label="跳过" title="跳过">
-            <Icon name="skip_next" />
+            <Icon name="skip_next" size={22} />
           </IconButton>
         </div>
 
@@ -323,6 +329,40 @@ export function PomodoroView() {
       <div className="body-sm muted pomodoro-note">
         专注 {s.focusMinutes} 分钟 · 短休息 {s.shortBreakMinutes} 分钟 · 长休息 {s.longBreakMinutes} 分钟 · 每 {s.longBreakInterval} 个番茄进入长休息。完成专注后会自动记录到统计中。
       </div>
+
+      {todaySessions.length > 0 && (
+        <div className="pomo-today-sessions">
+          <SectionHeader
+            title="今日专注记录"
+            badge={<Badge value={todaySessions.length} variant="success" />}
+            subtitle={`共计 ${formatDurationMinutes(todayMinutes)}`}
+          />
+          <div className="pomo-session-list">
+            {todaySessions.map((session) => {
+              const project = session.projectId
+                ? state.projects.find((p) => p.id === session.projectId)
+                : null;
+              const targetName =
+                session.dailyPlanNameSnapshot ??
+                session.taskNameSnapshot ??
+                session.projectNameSnapshot ??
+                "自由专注";
+              const dotColor = project ? colorByKey(project.color) : "var(--md-primary)";
+
+              return (
+                <div className="pomo-session-item" key={session.id}>
+                  <span className="dot" style={{ background: dotColor }} />
+                  <span className="body-md pomo-session-target ellipsis">{targetName}</span>
+                  <span className="body-sm muted pomo-session-time">{formatSessionTime(session.startedAt)}</span>
+                  <span className="chip chip--small pomo-session-duration">
+                    {session.minutes} 分钟
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <SettingsDialog
         open={settingsOpen}

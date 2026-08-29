@@ -14,10 +14,11 @@ import {
   IconButton,
   OutlinedButton,
   OutlinedTextField,
+  Switch,
   TextButton,
   eventValue,
 } from "./material";
-import { ConfirmDialog, Dialog, useSnackbar } from "./ui";
+import { ConfirmDialog, Dialog, SearchBar, useSnackbar } from "./ui";
 import { isTauri } from "../store/persistence";
 import {
   chooseVaultDirectory,
@@ -495,10 +496,12 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
       <div className="project-notes-layout">
         <aside className="project-notes-list">
           <div className="project-notes-list-toolbar">
-            <label className="project-notes-search">
-              <Icon name="search" size={18} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索笔记" aria-label="搜索笔记" />
-            </label>
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="搜索笔记..."
+              className="project-notes-search-bar"
+            />
           </div>
           {filteredNotes.length === 0 ? (
             <div className="project-notes-list-empty"><Icon name="note_add" size={28} /><span>{notes.length ? "没有匹配的笔记" : "还没有项目笔记"}</span><small>点击右上角新建第一篇</small></div>
@@ -741,8 +744,26 @@ function VaultSettingsDialog({
       <div className="field">
         <OutlinedTextField label="笔记目录（相对 Vault 根目录）" value={notesFolder} onInput={(event) => onNotesFolderChange(eventValue(event))} />
       </div>
-      <label className="project-notes-setting-toggle"><input type="checkbox" checked={autoReload} onChange={(event) => onAutoReloadChange(event.target.checked)} /><span><strong>自动检查外部变化</strong><small>每 5 秒检查 Obsidian 中的更新</small></span></label>
-      <label className="project-notes-setting-toggle"><input type="checkbox" checked={openWithObsidian} onChange={(event) => onOpenWithObsidianChange(event.target.checked)} /><span><strong>允许在 Obsidian 中打开</strong><small>使用 obsidian:// URI 跳转到当前笔记</small></span></label>
+      <div className="project-notes-setting-toggle">
+        <span>
+          <strong>自动检查外部变化</strong>
+          <small>每 5 秒检查 Obsidian 中的更新</small>
+        </span>
+        <Switch
+          selected={autoReload}
+          onChange={(event) => onAutoReloadChange((event.target as HTMLInputElement & { selected: boolean }).selected)}
+        />
+      </div>
+      <div className="project-notes-setting-toggle">
+        <span>
+          <strong>允许在 Obsidian 中打开</strong>
+          <small>使用 obsidian:// URI 跳转到当前笔记</small>
+        </span>
+        <Switch
+          selected={openWithObsidian}
+          onChange={(event) => onOpenWithObsidianChange((event.target as HTMLInputElement & { selected: boolean }).selected)}
+        />
+      </div>
       {error && <p className="error-text body-sm">{error}</p>}
       <button type="button" className="project-notes-disconnect" onClick={onDisconnect}>断开当前 Vault</button>
     </Dialog>

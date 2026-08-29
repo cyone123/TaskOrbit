@@ -12,11 +12,12 @@ import {
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
   OutlinedTextField,
+  Ripple,
   TonalButton,
   TextButton,
   eventValue,
 } from "../components/material";
-import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
+import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
 
 /** Keep in sync with --sys-motion-selection-duration used by .inbox-item exit. */
@@ -73,6 +74,7 @@ function InboxItemRow({
         <span className="inbox-item__meta">
           {isTodo ? "待办" : "备忘"} · {formatItemDate(item.updatedAt)}
         </span>
+        <Ripple />
       </button>
       <div className="inbox-item__actions">
         <IconButton aria-label="编辑" title="编辑" onClick={onEdit}>
@@ -285,10 +287,10 @@ export function InboxView() {
 
         <FilledCard className="material-card inbox-list-card">
           <div className="inbox-list-toolbar">
-            <div>
-              <h2 className="title-md">我的收集</h2>
-              <p className="body-sm muted">把零散想法变成下一步行动。</p>
-            </div>
+            <SectionHeader
+              title="我的收集"
+              subtitle="把零散想法变成下一步行动。"
+            />
             <ChipSet className="inbox-filters" role="tablist" aria-label="收集箱筛选">
               {(
                 [
@@ -344,23 +346,19 @@ export function InboxView() {
           )}
 
           {visibleItems.length === 0 && (
-            <div className="inbox-list-empty">
-              <div className="inbox-list-empty__icon">
-                <Icon name={filter === "note" ? "sticky_note_2" : "inbox"} size={30} />
-              </div>
-              <div className="title-md">
-                {filter === "all" ? "这里还很安静" : filter === "todo" ? "没有待办" : "没有备忘"}
-              </div>
-              <p className="body-sm muted">
-                {filter === "all"
-                  ? "把脑海里的第一件事交给收集箱吧。"
-                  : "切换上方类型，或从左侧快速收集。"}
-              </p>
-              {filter !== "note" && (
-                <TonalButton className="inbox-empty-cta" onClick={focusCapture}>
-                  <Icon name="add" size={18} slot="icon" /> 收下第一件事
-                </TonalButton>
-              )}
+            <div className="inbox-empty-container">
+              <EmptyState
+                icon={filter === "note" ? "sticky_note_2" : "inbox"}
+                title={filter === "all" ? "这里还很安静" : filter === "todo" ? "没有待办" : "没有备忘"}
+                hint={filter === "all" ? "把脑海里的第一件事交给收集箱吧。" : "切换上方类型，或从左侧快速收集。"}
+                action={
+                  filter !== "note" ? (
+                    <TonalButton className="inbox-empty-cta" onClick={focusCapture}>
+                      <Icon name="add" size={18} slot="icon" /> 收下第一件事
+                    </TonalButton>
+                  ) : undefined
+                }
+              />
             </div>
           )}
         </FilledCard>
@@ -403,7 +401,7 @@ function InboxSection({
     <section className={`inbox-section ${muted ? "is-muted" : ""}`}>
       <div className="inbox-section__heading">
         <span className="label-lg">{title}</span>
-        <span className="inbox-section__count">{count}</span>
+        <Badge value={count} variant={muted ? "neutral" : "primary"} />
       </div>
       <div className="inbox-items">{children}</div>
     </section>

@@ -221,7 +221,7 @@ export function StatCard({
 export interface BadgeProps {
   value?: string | number;
   dot?: boolean;
-  variant?: "primary" | "secondary" | "tertiary" | "error";
+  variant?: "primary" | "secondary" | "tertiary" | "error" | "neutral" | "success" | "warning" | "info";
   className?: string;
   style?: React.CSSProperties;
   children?: ReactNode;

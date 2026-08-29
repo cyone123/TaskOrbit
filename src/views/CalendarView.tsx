@@ -34,7 +34,7 @@ import {
   OutlinedSegmentedButtonSet,
   TonalButton,
 } from "../components/material";
-import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
+import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
@@ -281,7 +281,7 @@ export function CalendarView() {
           <TonalButton className="compact-action" onClick={goToday}>
             今天
           </TonalButton>
-          <span className="title-lg calendar-heading">{heading}</span>
+          <span className="headline-sm calendar-heading">{heading}</span>
         </div>
 
         <div className="row gap-8 calendar-toolbar__actions">
@@ -465,10 +465,11 @@ export function CalendarView() {
           </div>
 
           {tasksInWeek.length === 0 ? (
-            <div className="empty">
-              <Icon name="event_busy" size={48} />
-              <div className="title-md">本周没有任务</div>
-            </div>
+            <EmptyState
+              icon="event_busy"
+              title="本周没有任务"
+              hint="点击上方「添加计划」或在项目中创建任务"
+            />
           ) : (
             tasksInWeek.map((task) => {
               const range = rangeFor(task);
@@ -737,10 +738,11 @@ export function CalendarView() {
             <section className="calendar-day-plans">
               <div className="label-lg muted mb-8">当日计划清单（{plansOfDay.length}）</div>
               {plansOfDay.length === 0 ? (
-                <div className="empty calendar-day-empty">
-                  <Icon name="free_breakfast" size={40} />
-                  <div>当天暂无计划，点击右上角「添加计划」安排一项</div>
-                </div>
+                <EmptyState
+                  icon="free_breakfast"
+                  title="当天暂无计划"
+                  hint="点击右上角「添加计划」安排一项"
+                />
               ) : (
                 <div className="col gap-4">
                   {plansOfDay.map((plan) => {

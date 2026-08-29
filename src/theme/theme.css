@@ -346,6 +346,26 @@
   --sys-elevation-level5: 0 8px 12px 6px rgba(0, 0, 0, 0.45), 0 4px 4px rgba(0, 0, 0, 0.55);
 }
 
+[data-theme="dark"] .material-card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .project-panel,
+[data-theme="dark"] .stats-panel,
+[data-theme="dark"] .pomo-today-sessions {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .material-dialog {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .project-nav-item.is-selected {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .top-bar--scrolled {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
 /* ============================================================================
    Base / reset
    ========================================================================== */
@@ -399,6 +419,24 @@ a {
   outline: var(--sys-focus-ring-width) solid var(--sys-focus-ring-color);
   outline-offset: var(--sys-focus-ring-offset);
   border-radius: var(--shape-xs);
+}
+
+.project-nav-item:focus-visible,
+.today-plan-item:focus-visible,
+.bar-chart__bar:focus-visible,
+.month-calendar__date:focus-visible,
+.month-event:focus-visible,
+.gantt-dayhead:focus-visible,
+.gantt-bar:focus-visible,
+.gantt-gutter--task:focus-visible,
+.pomo-session-item:focus-visible,
+.nav-item:focus-visible,
+.inbox-item__body:focus-visible,
+.project-task-row:focus-visible,
+.project-plan-row:focus-visible {
+  outline: var(--sys-focus-ring-width) solid var(--sys-focus-ring-color);
+  outline-offset: var(--sys-focus-ring-offset);
+  border-radius: var(--shape-sm);
 }
 
 md-filled-button:focus-visible,
@@ -1527,6 +1565,26 @@ md-dialog {
   color: var(--md-on-error);
 }
 
+.badge--neutral {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+}
+
+.badge--success {
+  background: var(--color-success);
+  color: var(--color-on-success);
+}
+
+.badge--warning {
+  background: var(--color-warning);
+  color: var(--color-on-warning);
+}
+
+.badge--info {
+  background: var(--color-info);
+  color: var(--color-on-info);
+}
+
 /* ============================================================================
    Section Header
    ========================================================================== */
@@ -2441,6 +2499,49 @@ md-dialog {
   margin-top: var(--sys-space-4);
 }
 
+.pomo-today-sessions {
+  margin-top: var(--sys-space-6);
+  padding: var(--sys-space-4) var(--sys-space-5);
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
+}
+
+.pomo-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-space-2);
+  margin-top: var(--sys-space-3);
+}
+
+.pomo-session-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-3);
+  padding: 10px 14px;
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container);
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.pomo-session-item:hover {
+  background: var(--md-surface-container-high);
+}
+
+.pomo-session-target {
+  flex: 1;
+  min-width: 0;
+  color: var(--md-on-surface);
+  font-weight: 500;
+}
+
+.pomo-session-time {
+  color: var(--md-on-surface-variant);
+}
+
+.pomo-session-duration {
+  flex: 0 0 auto;
+}
+
 /* ============================================================================
    Misc utilities
    ========================================================================== */
@@ -3001,13 +3102,8 @@ md-dialog {
   border-radius: var(--shape-md);
 }
 
-md-filled-button.projects-create-button {
+.projects-create-fab {
   width: 100%;
-  --md-filled-button-container-height: 44px;
-  --md-filled-button-container-shape: var(--shape-md);
-  --md-filled-button-label-text-size: 14px;
-  --md-filled-button-leading-space: 18px;
-  --md-filled-button-trailing-space: 18px;
 }
 
 .projects-sidebar__list {
@@ -3025,6 +3121,8 @@ md-filled-button.projects-create-button {
 
 /* Navigation-drawer-style pill list items. */
 .project-nav-item {
+  position: relative;
+  overflow: hidden;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -4431,18 +4529,13 @@ md-filled-button.projects-create-button {
 
 .project-notes-setting-toggle {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 16px 0;
-  cursor: pointer;
-}
-
-.project-notes-setting-toggle input,
-.project-notes-association-item input {
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  accent-color: var(--md-primary);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container);
 }
 
 .project-notes-setting-toggle span,
@@ -4450,7 +4543,13 @@ md-filled-button.projects-create-button {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+}
+
+.project-notes-setting-toggle strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
 }
 
 .project-notes-setting-toggle small,
@@ -4608,6 +4707,13 @@ md-filled-card.inbox-capture-card {
 
 .inbox-card-heading p {
   margin-top: 3px;
+}
+
+.inbox-empty-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 64px 20px;
 }
 
 .inbox-list-empty__icon {
@@ -4781,6 +4887,8 @@ md-filled-card.inbox-list-card {
 }
 
 .inbox-item__body {
+  position: relative;
+  overflow: hidden;
   display: flex;
   min-width: 0;
   flex-direction: column;

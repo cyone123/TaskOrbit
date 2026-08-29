@@ -10,6 +10,7 @@ import {
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import { LinearProgress } from "../components/material";
+import { EmptyState, SectionHeader, StatCard } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
@@ -82,30 +83,6 @@ export function StatsView() {
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  const secondaryMetrics = [
-    {
-      icon: "calendar_view_week",
-      label: "本周专注",
-      value: formatDurationMinutes(weekMinutes),
-      sub: `${weekCount} 个番茄`,
-      tone: "secondary" as const,
-    },
-    {
-      icon: "check_circle",
-      label: "任务完成",
-      value: `${taskDone}/${taskTotal}`,
-      sub: taskTotal ? `${Math.round((taskDone / taskTotal) * 100)}%` : "暂无任务",
-      tone: "tertiary" as const,
-    },
-    {
-      icon: "event_available",
-      label: "计划完成",
-      value: `${planDone}/${planTotal}`,
-      sub: planTotal ? `${Math.round((planDone / planTotal) * 100)}%` : "暂无计划",
-      tone: "success" as const,
-    },
-  ];
-
   const weekHasData = last7.some((iso) => (minutesByDay.get(iso) ?? 0) > 0);
   const avgDay = Math.round(
     last7.reduce((sum, iso) => sum + (minutesByDay.get(iso) ?? 0), 0) / 7,
@@ -114,7 +91,7 @@ export function StatsView() {
 
   return (
     <div className="page-shell page-shell--medium">
-      <div className="title-lg mb-16">时间统计</div>
+      <div className="headline-md mb-16">时间统计</div>
 
       {/* Hero KPI — the one number that matters most, in primary-container. */}
       <section className="stats-hero">
@@ -123,7 +100,7 @@ export function StatsView() {
         </div>
         <div className="stats-hero__copy">
           <span className="label-lg">今日专注</span>
-          <strong className="stats-hero__value">
+          <strong className="stats-hero__value tabular-nums">
             {formatDurationMinutes(todayMinutes)}
           </strong>
           <span className="body-sm">
@@ -138,24 +115,40 @@ export function StatsView() {
       </section>
 
       <div className="stat-grid stats-secondary-grid">
-        {secondaryMetrics.map((m) => (
-          <section className={`stat-tile stat-tile--${m.tone}`} key={m.label}>
-            <Icon name={m.icon} size={20} />
-            <span className="label-md">{m.label}</span>
-            <strong className="stat-tile__value">{m.value}</strong>
-            <span className="body-sm">{m.sub}</span>
-          </section>
-        ))}
+        <StatCard
+          title="本周专注"
+          value={formatDurationMinutes(weekMinutes)}
+          subtitle={`${weekCount} 个番茄`}
+          icon="calendar_view_week"
+          colorVariant="secondary"
+        />
+        <StatCard
+          title="任务完成"
+          value={`${taskDone}/${taskTotal}`}
+          subtitle={taskTotal ? `${Math.round((taskDone / taskTotal) * 100)}% 完成率` : "暂无任务"}
+          icon="check_circle"
+          colorVariant="tertiary"
+        />
+        <StatCard
+          title="计划完成"
+          value={`${planDone}/${planTotal}`}
+          subtitle={planTotal ? `${Math.round((planDone / planTotal) * 100)}% 完成率` : "暂无计划"}
+          icon="event_available"
+          colorVariant="success"
+        />
       </div>
 
       <section className="stats-panel">
-        <div className="title-md mb-16">近 7 天专注时长</div>
+        <SectionHeader
+          title="近 7 天专注时长"
+          subtitle={selectedDay ? `${selectedDay} · 专注 ${formatDurationMinutes(selectedMins)}` : "点击柱形查看某天的专注时长"}
+        />
         {!weekHasData ? (
-          <div className="empty stats-empty">
-            <Icon name="hourglass_empty" size={40} />
-            <div>最近 7 天还没有专注记录</div>
-            <div className="body-sm">去番茄钟页开始第一个番茄吧</div>
-          </div>
+          <EmptyState
+            icon="hourglass_empty"
+            title="最近 7 天还没有专注记录"
+            hint="去番茄钟页开始第一个番茄吧"
+          />
         ) : (
           <>
             <div className="bar-chart">
@@ -205,13 +198,16 @@ export function StatsView() {
       </section>
 
       <section className="stats-panel">
-        <div className="title-md mb-16">各项目专注时长</div>
+        <SectionHeader
+          title="各项目专注时长"
+          subtitle="按专注时长排序"
+        />
         {projectMinutes.size === 0 ? (
-          <div className="empty stats-empty">
-            <Icon name="folder_off" size={40} />
-            <div>暂无项目专注记录</div>
-            <div className="body-sm">在番茄钟中关联项目后，这里会按时长排序</div>
-          </div>
+          <EmptyState
+            icon="folder_off"
+            title="暂无项目专注记录"
+            hint="在番茄钟中关联项目后，这里会按时长排序"
+          />
         ) : (
           <div className="col gap-12">
             {[...projectMinutes.entries()]
@@ -243,7 +239,9 @@ export function StatsView() {
       </section>
 
       <section className="stats-panel">
-        <div className="title-md mb-16">任务与计划完成率</div>
+        <SectionHeader
+          title="任务与计划完成率"
+        />
         <div className="col gap-12">
           <div>
             <div className="spread mb-8">
