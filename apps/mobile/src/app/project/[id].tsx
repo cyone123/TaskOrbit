@@ -16,8 +16,22 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppScreen, Card, ChoiceRow, EmptyState, Field, FormModal, IconButton, PageScroll, ProgressBar, SegmentedControl } from "@/components/ui";
-import { useAppColors } from "@/constants/theme";
+import {
+  AppScreen,
+  AssistChip,
+  Card,
+  ChoiceRow,
+  EmptyState,
+  FAB,
+  Field,
+  FormModal,
+  IconButton,
+  MD3Checkbox,
+  PageScroll,
+  ProgressBar,
+  SegmentedControl,
+} from "@/components/ui";
+import { MD3Shape, MD3Typography, useAppColors } from "@/constants/theme";
 import { calculateProjectMetrics } from "@/features/project-metrics";
 import { PRIORITY_LABEL, PROJECT_COLORS, PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
@@ -59,7 +73,7 @@ export default function ProjectDetailScreen() {
   const goToProjects = () => { if (router.canGoBack()) router.back(); else router.replace("/projects"); };
 
   if (!project) {
-    return <AppScreen title="项目不存在" leading={<IconButton icon="arrow-back" label="返回项目" onPress={goToProjects} />}><EmptyState icon="folder-open-outline" title="找不到这个项目" description="项目可能已经被删除，返回项目列表继续。" /></AppScreen>;
+    return <AppScreen title="项目不存在" leading={<IconButton icon="arrow-back" label="返回项目" onPress={goToProjects} variant="standard" />}><EmptyState icon="folder-open-outline" title="找不到这个项目" description="项目可能已经被删除，返回项目列表继续。" /></AppScreen>;
   }
 
   const accent = PROJECT_COLOR_HEX[project.color] ?? colors.primary;
@@ -99,20 +113,20 @@ export default function ProjectDetailScreen() {
     <AppScreen
       title={project.name}
       subtitle={relativeRangeLabel(project.startDate, project.endDate)}
-      leading={<IconButton icon="arrow-back" label="返回项目" onPress={goToProjects} />}
-      action={<IconButton icon="create-outline" label="编辑项目" onPress={openProjectForm} />}
+      leading={<IconButton icon="arrow-back" label="返回项目" onPress={goToProjects} variant="standard" />}
+      action={<IconButton icon="create-outline" label="编辑项目" onPress={openProjectForm} variant="tonal" />}
     >
       <PageScroll key={section}>
-        <Card style={[styles.hero, { backgroundColor: colors.surfaceContainerHigh }]}>
+        <Card variant="filled" style={[styles.hero, { backgroundColor: colors.surfaceContainerHigh }]}>
           <View style={styles.heroTop}>
-            <View style={[styles.heroIcon, { backgroundColor: `${accent}24` }]}><Ionicons name="folder-open" size={28} color={accent} /></View>
-            <View style={styles.heroCopy}><Text style={[styles.heroTitle, { color: colors.text }]}>{project.name}</Text><Text style={[styles.heroDate, { color: colors.textMuted }]}>{formatDateFull(project.startDate)} — {formatDateFull(project.endDate)}</Text></View>
-            <Pressable accessibilityRole="button" accessibilityLabel="归档项目" onPress={() => confirmAction("归档项目", `归档「${project.name}」？归档后可在项目列表恢复。`, () => { store.archiveProject(project.id); goToProjects(); })} style={[styles.archiveButton, { backgroundColor: colors.surfaceContainer }]}><Ionicons name="archive-outline" size={20} color={colors.textMuted} /></Pressable>
+            <View style={[styles.heroIcon, { backgroundColor: `${accent}24` }]}><Ionicons name="folder-open" size={26} color={accent} /></View>
+            <View style={styles.heroCopy}><Text style={[styles.heroTitle, { color: colors.onSurface }]}>{project.name}</Text><Text style={[styles.heroDate, { color: colors.onSurfaceVariant }]}>{formatDateFull(project.startDate)} — {formatDateFull(project.endDate)}</Text></View>
+            <Pressable accessibilityRole="button" accessibilityLabel="归档项目" onPress={() => confirmAction("归档项目", `归档「${project.name}」？归档后可在项目列表恢复。`, () => { store.archiveProject(project.id); goToProjects(); })} style={[styles.archiveButton, { backgroundColor: colors.surfaceContainer }]}><Ionicons name="archive-outline" size={20} color={colors.onSurfaceVariant} /></Pressable>
           </View>
-          {project.description ? <Text style={[styles.heroDescription, { color: colors.textMuted }]}>{project.description}</Text> : null}
-          <View style={styles.heroProgressLabel}><Text style={[styles.heroProgressText, { color: colors.text }]}>整体进度</Text><Text style={[styles.heroProgressValue, { color: accent }]}>{metrics.taskProgress}%</Text></View>
+          {project.description ? <Text style={[styles.heroDescription, { color: colors.onSurfaceVariant }]}>{project.description}</Text> : null}
+          <View style={styles.heroProgressLabel}><Text style={[styles.heroProgressText, { color: colors.onSurface }]}>整体进度</Text><Text style={[styles.heroProgressValue, { color: accent }]}>{metrics.taskProgress}%</Text></View>
           <ProgressBar value={metrics.taskProgress} color={accent} />
-          <Text style={[styles.heroProgressMeta, { color: colors.textMuted }]}>{metrics.taskDone} / {metrics.taskTotal} 个任务完成</Text>
+          <Text style={[styles.heroProgressMeta, { color: colors.onSurfaceVariant }]}>{metrics.taskDone} / {metrics.taskTotal} 个任务完成</Text>
         </Card>
 
         <SegmentedControl value={section} onChange={(value) => setSection(value as DetailSection)} options={[
@@ -125,6 +139,9 @@ export default function ProjectDetailScreen() {
         {section === "plans" ? <PlanSection plans={plans} tasks={tasks} accent={accent} onAdd={() => openNewPlan()} onEdit={openEditPlan} onToggle={(plan) => store.togglePlan(plan.id, !plan.done)} onDelete={(plan) => confirmAction("删除计划", `确定删除「${plan.name}」？`, () => store.removePlan(plan.id))} /> : null}
         {section === "stats" ? <StatsSection metrics={metrics} project={project} accent={accent} /> : null}
       </PageScroll>
+
+      {section === "tasks" ? <FAB icon="add" label="添加任务" onPress={openNewTask} /> : null}
+      {section === "plans" ? <FAB icon="add" label="添加计划" onPress={() => openNewPlan()} /> : null}
 
       <FormModal visible={taskForm.open} title={taskForm.editing ? "编辑任务" : "添加任务"} onClose={resetTaskForm} onSubmit={submitTask} canSubmit={Boolean(taskName.trim())}>
         <Field label="任务名称" value={taskName} onChangeText={setTaskName} placeholder="例如：完成项目详情页" />
@@ -157,10 +174,67 @@ function TaskSection({ tasks, plans, accent, onAdd, onEdit, onAddPlan, onToggle,
   tasks: Task[]; plans: DailyPlan[]; accent: string; onAdd(): void; onEdit(task: Task): void; onAddPlan(taskId: string): void; onToggle(task: Task): void; onDelete(task: Task): void;
 }) {
   const colors = useAppColors();
-  return <View style={styles.section}><View style={styles.sectionHeader}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>任务</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>把项目拆成可执行的下一步</Text></View><IconButton icon="add" label="添加任务" onPress={onAdd} /></View>{tasks.length === 0 ? <EmptyState icon="checkmark-done-outline" title="还没有任务" description="添加一个明确、可完成的下一步。" /> : tasks.map((task) => {
-    const taskPlans = plans.filter((plan) => plan.taskId === task.id);
-    return <Card key={task.id} style={styles.itemCard}><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: task.done }} onPress={() => onToggle(task)} style={styles.checkButton}><Ionicons name={task.done ? "checkmark-circle" : "ellipse-outline"} size={25} color={task.done ? colors.success : accent} /></Pressable><View style={styles.itemCopy}><Text style={[styles.itemName, { color: colors.text, opacity: task.done ? 0.5 : 1, textDecorationLine: task.done ? "line-through" : "none" }]}>{task.name}</Text>{task.description ? <Text style={[styles.itemDescription, { color: colors.textMuted }]} numberOfLines={2}>{task.description}</Text> : null}<View style={styles.metaRow}><View style={[styles.smallChip, { backgroundColor: colors.secondarySoft }]}><Text style={{ color: colors.onSecondarySoft, fontSize: 10, fontWeight: "700" }}>{PRIORITY_LABEL[task.priority]}优先级</Text></View><Text style={[styles.itemMeta, { color: colors.textMuted }]}>{relativeRangeLabel(task.startDate, task.endDate)} · {taskPlans.length} 个计划</Text></View></View><View style={styles.rowActions}><Pressable accessibilityLabel="为任务添加计划" onPress={() => onAddPlan(task.id)} style={styles.miniAction}><Ionicons name="calendar-outline" size={18} color={colors.primary} /></Pressable><Pressable accessibilityLabel="编辑任务" onPress={() => onEdit(task)} style={styles.miniAction}><Ionicons name="create-outline" size={18} color={colors.textMuted} /></Pressable><Pressable accessibilityLabel="删除任务" onPress={() => onDelete(task)} style={styles.miniAction}><Ionicons name="trash-outline" size={18} color={colors.danger} /></Pressable></View></Card>;
-  })}</View>;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>任务</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>把项目拆成可执行的下一步</Text>
+        </View>
+      </View>
+      {tasks.length === 0 ? (
+        <EmptyState icon="checkmark-done-outline" title="还没有任务" description="添加一个明确、可完成的下一步。" />
+      ) : (
+        tasks.map((task) => {
+          const taskPlans = plans.filter((plan) => plan.taskId === task.id);
+          return (
+            <Card key={task.id} variant="elevated" style={styles.itemCard}>
+              <MD3Checkbox checked={task.done} onPress={() => onToggle(task)} color={accent} />
+              <View style={styles.itemCopy}>
+                <Text
+                  style={[
+                    styles.itemName,
+                    {
+                      color: colors.onSurface,
+                      opacity: task.done ? 0.5 : 1,
+                      textDecorationLine: task.done ? "line-through" : "none",
+                    },
+                  ]}
+                >
+                  {task.name}
+                </Text>
+                {task.description ? (
+                  <Text style={[styles.itemDescription, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+                    {task.description}
+                  </Text>
+                ) : null}
+                <View style={styles.metaRow}>
+                  <AssistChip
+                    label={`${PRIORITY_LABEL[task.priority]}优先级`}
+                    color={task.priority === "high" ? colors.error : undefined}
+                  />
+                  <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
+                    {relativeRangeLabel(task.startDate, task.endDate)} · {taskPlans.length} 个计划
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.rowActions}>
+                <Pressable accessibilityLabel="为任务添加计划" onPress={() => onAddPlan(task.id)} style={styles.miniAction}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                </Pressable>
+                <Pressable accessibilityLabel="编辑任务" onPress={() => onEdit(task)} style={styles.miniAction}>
+                  <Ionicons name="create-outline" size={18} color={colors.onSurfaceVariant} />
+                </Pressable>
+                <Pressable accessibilityLabel="删除任务" onPress={() => onDelete(task)} style={styles.miniAction}>
+                  <Ionicons name="trash-outline" size={18} color={colors.error} />
+                </Pressable>
+              </View>
+            </Card>
+          );
+        })
+      )}
+    </View>
+  );
 }
 
 function PlanSection({ plans, tasks, accent, onAdd, onEdit, onToggle, onDelete }: {
@@ -168,26 +242,120 @@ function PlanSection({ plans, tasks, accent, onAdd, onEdit, onToggle, onDelete }
 }) {
   const colors = useAppColors();
   let lastDate = "";
-  return <View style={styles.section}><View style={styles.sectionHeader}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>每日计划</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{plans.length} 个计划 · {plans.filter((plan) => plan.done).length} 个已完成</Text></View><IconButton icon="add" label="添加每日计划" onPress={onAdd} /></View>{plans.length === 0 ? <EmptyState icon="calendar-outline" title="还没有每日计划" description="安排一个具体的日期和时间段。" /> : plans.map((plan) => {
-    const showDate = plan.date !== lastDate; lastDate = plan.date;
-    const task = tasks.find((item) => item.id === plan.taskId);
-    return <View key={plan.id}>{showDate ? <Text style={[styles.dateHeading, { color: colors.textMuted }]}>{formatDateFull(plan.date)}</Text> : null}<Card style={styles.planCard}><View style={[styles.planRail, { backgroundColor: accent }]} /><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: plan.done }} onPress={() => onToggle(plan)} style={styles.checkButton}><Ionicons name={plan.done ? "checkmark-circle" : "ellipse-outline"} size={24} color={plan.done ? colors.success : accent} /></Pressable><View style={styles.itemCopy}><Text style={[styles.itemName, { color: colors.text, opacity: plan.done ? 0.5 : 1, textDecorationLine: plan.done ? "line-through" : "none" }]}>{plan.name}</Text><Text style={[styles.itemMeta, { color: colors.textMuted }]}>{plan.startTime}–{plan.endTime} · {task?.name ?? "独立计划"}{plan.recurrence.frequency !== "none" ? ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}` : ""}</Text></View><Pressable accessibilityLabel="编辑计划" onPress={() => onEdit(plan)} style={styles.miniAction}><Ionicons name="create-outline" size={18} color={colors.textMuted} /></Pressable><Pressable accessibilityLabel="删除计划" onPress={() => onDelete(plan)} style={styles.miniAction}><Ionicons name="trash-outline" size={18} color={colors.danger} /></Pressable></Card></View>;
-  })}</View>;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>每日计划</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>
+            {plans.length} 个计划 · {plans.filter((plan) => plan.done).length} 个已完成
+          </Text>
+        </View>
+      </View>
+      {plans.length === 0 ? (
+        <EmptyState icon="calendar-outline" title="还没有每日计划" description="安排一个具体的日期和时间段。" />
+      ) : (
+        plans.map((plan) => {
+          const showDate = plan.date !== lastDate;
+          lastDate = plan.date;
+          const task = tasks.find((item) => item.id === plan.taskId);
+          return (
+            <View key={plan.id}>
+              {showDate ? (
+                <Text style={[styles.dateHeading, { color: colors.onSurfaceVariant }]}>
+                  {formatDateFull(plan.date)}
+                </Text>
+              ) : null}
+              <Card variant="elevated" style={styles.planCard}>
+                <View style={[styles.planRail, { backgroundColor: accent }]} />
+                <MD3Checkbox checked={plan.done} onPress={() => onToggle(plan)} color={accent} />
+                <View style={styles.itemCopy}>
+                  <Text
+                    style={[
+                      styles.itemName,
+                      {
+                        color: colors.onSurface,
+                        opacity: plan.done ? 0.5 : 1,
+                        textDecorationLine: plan.done ? "line-through" : "none",
+                      },
+                    ]}
+                  >
+                    {plan.name}
+                  </Text>
+                  <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
+                    {plan.startTime}–{plan.endTime} · {task?.name ?? "独立计划"}
+                    {plan.recurrence.frequency !== "none" ? ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}` : ""}
+                  </Text>
+                </View>
+                <Pressable accessibilityLabel="编辑计划" onPress={() => onEdit(plan)} style={styles.miniAction}>
+                  <Ionicons name="create-outline" size={18} color={colors.onSurfaceVariant} />
+                </Pressable>
+                <Pressable accessibilityLabel="删除计划" onPress={() => onDelete(plan)} style={styles.miniAction}>
+                  <Ionicons name="trash-outline" size={18} color={colors.error} />
+                </Pressable>
+              </Card>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
 }
 
 function StatsSection({ metrics, project, accent }: { metrics: ReturnType<typeof calculateProjectMetrics>; project: Project; accent: string }) {
   const colors = useAppColors();
-  return <View style={styles.section}><View><Text style={[styles.sectionTitle, { color: colors.text }]}>项目统计</Text><Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>持续推进，及时看见进展</Text></View><View style={styles.metricGrid}><MetricCard icon="checkmark-done-outline" value={`${metrics.taskProgress}%`} label="任务完成率" tint={accent} /><MetricCard icon="calendar-outline" value={`${metrics.planProgress}%`} label="计划完成率" tint={colors.success} /><MetricCard icon="hourglass-outline" value={`${metrics.remainingDays}`} label="剩余天数" tint={colors.warning} /><MetricCard icon="timer-outline" value={`${metrics.focusMinutes}m`} label={`${metrics.focusSessions} 次专注`} tint={colors.primary} /></View><Card style={styles.statsCard}><StatProgress label="任务进度" value={metrics.taskProgress} caption={`${metrics.taskDone} / ${metrics.taskTotal} 已完成`} color={accent} /><StatProgress label="计划进度" value={metrics.planProgress} caption={`${metrics.planDone} / ${metrics.planTotal} 已完成`} color={colors.success} /><View style={[styles.statLine, { borderTopColor: colors.border }]}><Text style={[styles.statLineLabel, { color: colors.text }]}>项目周期</Text><Text style={[styles.statLineValue, { color: colors.textMuted }]}>{relativeRangeLabel(project.startDate, project.endDate)}</Text></View><View style={[styles.statLine, { borderTopColor: colors.border }]}><Text style={[styles.statLineLabel, { color: colors.text }]}>预计结束</Text><Text style={[styles.statLineValue, { color: colors.textMuted }]}>{formatDateFull(project.endDate)}</Text></View></Card></View>;
+  return (
+    <View style={styles.section}>
+      <View>
+        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>项目统计</Text>
+        <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>持续推进，及时看见进展</Text>
+      </View>
+      <View style={styles.metricGrid}>
+        <MetricCard icon="checkmark-done-outline" value={`${metrics.taskProgress}%`} label="任务完成率" tint={accent} />
+        <MetricCard icon="calendar-outline" value={`${metrics.planProgress}%`} label="计划完成率" tint={colors.success} />
+        <MetricCard icon="hourglass-outline" value={`${metrics.remainingDays}`} label="剩余天数" tint={colors.warning} />
+        <MetricCard icon="timer-outline" value={`${metrics.focusMinutes}m`} label={`${metrics.focusSessions} 次专注`} tint={colors.primary} />
+      </View>
+      <Card variant="elevated" style={styles.statsCard}>
+        <StatProgress label="任务进度" value={metrics.taskProgress} caption={`${metrics.taskDone} / ${metrics.taskTotal} 已完成`} color={accent} />
+        <StatProgress label="计划进度" value={metrics.planProgress} caption={`${metrics.planDone} / ${metrics.planTotal} 已完成`} color={colors.success} />
+        <View style={[styles.statLine, { borderTopColor: colors.outlineVariant }]}>
+          <Text style={[styles.statLineLabel, { color: colors.onSurface }]}>项目周期</Text>
+          <Text style={[styles.statLineValue, { color: colors.onSurfaceVariant }]}>{relativeRangeLabel(project.startDate, project.endDate)}</Text>
+        </View>
+        <View style={[styles.statLine, { borderTopColor: colors.outlineVariant }]}>
+          <Text style={[styles.statLineLabel, { color: colors.onSurface }]}>预计结束</Text>
+          <Text style={[styles.statLineValue, { color: colors.onSurfaceVariant }]}>{formatDateFull(project.endDate)}</Text>
+        </View>
+      </Card>
+    </View>
+  );
 }
 
 function MetricCard({ icon, value, label, tint }: { icon: keyof typeof Ionicons.glyphMap; value: string; label: string; tint: string }) {
   const colors = useAppColors();
-  return <Card style={styles.metricCard}><View style={[styles.metricIcon, { backgroundColor: `${tint}22` }]}><Ionicons name={icon} size={21} color={tint} /></View><Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text><Text style={[styles.metricLabel, { color: colors.textMuted }]}>{label}</Text></Card>;
+  return (
+    <Card variant="elevated" style={styles.metricCard}>
+      <View style={[styles.metricIcon, { backgroundColor: `${tint}20` }]}>
+        <Ionicons name={icon} size={20} color={tint} />
+      </View>
+      <Text style={[styles.metricValue, { color: colors.onSurface }]}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>{label}</Text>
+    </Card>
+  );
 }
 
 function StatProgress({ label, value, caption, color }: { label: string; value: number; caption: string; color: string }) {
   const colors = useAppColors();
-  return <View style={styles.statProgress}><View style={styles.statProgressLabel}><Text style={[styles.statLineLabel, { color: colors.text }]}>{label}</Text><Text style={[styles.statLineValue, { color: colors.textMuted }]}>{caption}</Text></View><ProgressBar value={value} color={color} /></View>;
+  return (
+    <View style={styles.statProgress}>
+      <View style={styles.statProgressLabel}>
+        <Text style={[styles.statLineLabel, { color: colors.onSurface }]}>{label}</Text>
+        <Text style={[styles.statLineValue, { color: colors.onSurfaceVariant }]}>{caption}</Text>
+      </View>
+      <ProgressBar value={value} color={color} />
+    </View>
+  );
 }
 
 function confirmAction(title: string, message: string, onConfirm: () => void) {
@@ -199,9 +367,45 @@ function validTimeRange(start: string, end: string) { return /^(?:[01]\d|2[0-3])
 function timeMinutes(value: string) { const [hour = 0, minute = 0] = value.split(":").map(Number); return hour * 60 + minute; }
 
 const styles = StyleSheet.create({
-  hero: { borderRadius: 28, padding: 18 }, heroTop: { flexDirection: "row", alignItems: "center", gap: 12 }, heroIcon: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" }, heroCopy: { flex: 1 }, heroTitle: { fontSize: 20, fontWeight: "800" }, heroDate: { fontSize: 10, marginTop: 4 }, archiveButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" }, heroDescription: { fontSize: 13, lineHeight: 19, marginTop: 15 }, heroProgressLabel: { flexDirection: "row", justifyContent: "space-between", marginTop: 17, marginBottom: 8 }, heroProgressText: { fontSize: 12, fontWeight: "700" }, heroProgressValue: { fontSize: 13, fontWeight: "800" }, heroProgressMeta: { fontSize: 10, marginTop: 7 },
-  section: { gap: 11 }, sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 4 }, sectionTitle: { fontSize: 19, fontWeight: "800" }, sectionSubtitle: { fontSize: 11, marginTop: 3 }, itemCard: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 }, checkButton: { width: 38, height: 44, alignItems: "center", justifyContent: "center" }, itemCopy: { flex: 1, minWidth: 0 }, itemName: { fontSize: 14, fontWeight: "700" }, itemDescription: { fontSize: 11, lineHeight: 16, marginTop: 3 }, itemMeta: { fontSize: 10, marginTop: 4 }, metaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 7, marginTop: 5 }, smallChip: { minHeight: 24, borderRadius: 12, paddingHorizontal: 8, justifyContent: "center" }, rowActions: { flexDirection: "row" }, miniAction: { width: 38, height: 42, alignItems: "center", justifyContent: "center" },
-  dateHeading: { fontSize: 11, fontWeight: "800", marginTop: 5, marginLeft: 5 }, planCard: { padding: 10, flexDirection: "row", alignItems: "center", gap: 5, overflow: "hidden" }, planRail: { width: 4, alignSelf: "stretch", borderRadius: 2 },
-  metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, metricCard: { width: "48%", flexGrow: 1, minHeight: 130 }, metricIcon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center" }, metricValue: { fontSize: 27, fontWeight: "800", marginTop: 12 }, metricLabel: { fontSize: 11, marginTop: 2 }, statsCard: { gap: 18 }, statProgress: { gap: 8 }, statProgressLabel: { flexDirection: "row", justifyContent: "space-between" }, statLine: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 14, flexDirection: "row", justifyContent: "space-between" }, statLineLabel: { fontSize: 12, fontWeight: "700" }, statLineValue: { fontSize: 11 },
-  formRow: { flexDirection: "row", gap: 10 }, flex: { flex: 1 },
+  hero: { borderRadius: MD3Shape.large, padding: 18 },
+  heroTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  heroIcon: { width: 48, height: 48, borderRadius: MD3Shape.medium, alignItems: "center", justifyContent: "center" },
+  heroCopy: { flex: 1 },
+  heroTitle: { ...MD3Typography.titleMedium, fontWeight: "600" },
+  heroDate: { ...MD3Typography.bodySmall, fontSize: 11, marginTop: 2 },
+  archiveButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  heroDescription: { ...MD3Typography.bodyMedium, lineHeight: 20, marginTop: 12 },
+  heroProgressLabel: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, marginBottom: 6 },
+  heroProgressText: { ...MD3Typography.labelMedium },
+  heroProgressValue: { ...MD3Typography.labelMedium, fontWeight: "600" },
+  heroProgressMeta: { ...MD3Typography.bodySmall, marginTop: 6 },
+  section: { gap: 10 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 4 },
+  sectionTitle: { ...MD3Typography.titleMedium, fontWeight: "600" },
+  sectionSubtitle: { ...MD3Typography.bodySmall, marginTop: 2 },
+  itemCard: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: MD3Shape.medium },
+  checkButton: { width: 38, height: 40, alignItems: "center", justifyContent: "center" },
+  itemCopy: { flex: 1, minWidth: 0 },
+  itemName: { ...MD3Typography.titleSmall, fontWeight: "600" },
+  itemDescription: { ...MD3Typography.bodySmall, lineHeight: 17, marginTop: 2 },
+  itemMeta: { ...MD3Typography.labelSmall, marginTop: 2 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 },
+  rowActions: { flexDirection: "row" },
+  miniAction: { width: 36, height: 38, alignItems: "center", justifyContent: "center" },
+  dateHeading: { ...MD3Typography.labelLarge, fontWeight: "600", marginTop: 6, marginLeft: 4 },
+  planCard: { padding: 10, flexDirection: "row", alignItems: "center", gap: 6, overflow: "hidden", borderRadius: MD3Shape.medium },
+  planRail: { width: 4, alignSelf: "stretch", borderRadius: 2 },
+  metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  metricCard: { width: "48%", flexGrow: 1, minHeight: 110, borderRadius: MD3Shape.medium, padding: 12 },
+  metricIcon: { width: 36, height: 36, borderRadius: MD3Shape.small, alignItems: "center", justifyContent: "center" },
+  metricValue: { ...MD3Typography.headlineSmall, fontWeight: "600", marginTop: 8 },
+  metricLabel: { ...MD3Typography.labelSmall, marginTop: 2 },
+  statsCard: { gap: 16, borderRadius: MD3Shape.large },
+  statProgress: { gap: 6 },
+  statProgressLabel: { flexDirection: "row", justifyContent: "space-between" },
+  statLine: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, flexDirection: "row", justifyContent: "space-between" },
+  statLineLabel: { ...MD3Typography.titleSmall, fontWeight: "600" },
+  statLineValue: { ...MD3Typography.bodySmall },
+  formRow: { flexDirection: "row", gap: 10 },
+  flex: { flex: 1 },
 });

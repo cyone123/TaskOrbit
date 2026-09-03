@@ -30,15 +30,18 @@ import {
 
 import {
   AppScreen,
+  AssistChip,
   Card,
   ChoiceRow,
   EmptyState,
+  FAB,
   Field,
   FormModal,
   IconButton,
+  MD3Checkbox,
   SegmentedControl,
 } from "@/components/ui";
-import { useAppColors, type AppColors } from "@/constants/theme";
+import { MD3Shape, MD3Typography, useAppColors, type AppColors } from "@/constants/theme";
 import {
   calendarHeading,
   layoutPlanColumns,
@@ -208,7 +211,6 @@ export default function CalendarScreen() {
     <AppScreen
       title="日历"
       subtitle="从任务跨度到每日时间块"
-      action={<IconButton icon="add" label="添加计划" onPress={() => openNewPlan()} />}
     >
       <View style={styles.toolbar}>
         <SegmentedControl
@@ -323,6 +325,7 @@ export default function CalendarScreen() {
         ) : null}
         {!planForm.editing && repeat !== "none" ? <Field label="次数（2-365）" value={repeatCount} onChangeText={setRepeatCount} keyboardType="number-pad" /> : null}
       </FormModal>
+      <FAB icon="add" label="添加计划" onPress={() => openNewPlan()} />
     </AppScreen>
   );
 }
@@ -414,16 +417,14 @@ function DayView({ date, plans, tasks, projectById, colors, colorForProject, onE
           const project = plan.projectId ? projectById.get(plan.projectId) : null;
           const accent = colorForProject(plan.projectId);
           return (
-            <Card key={plan.id} style={styles.planCard}>
-              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: plan.done }} onPress={() => onTogglePlan(plan.id, !plan.done)} style={styles.roundAction}>
-                <Ionicons name={plan.done ? "checkmark-circle" : "ellipse-outline"} size={25} color={plan.done ? colors.success : accent} />
-              </Pressable>
+            <Card key={plan.id} variant="elevated" style={styles.planCard}>
+              <MD3Checkbox checked={plan.done} onPress={() => onTogglePlan(plan.id, !plan.done)} color={accent} />
               <Pressable onPress={() => onEditPlan(plan)} style={styles.planCopy}>
-                <Text style={[styles.planName, { color: colors.text, opacity: plan.done ? 0.5 : 1, textDecorationLine: plan.done ? "line-through" : "none" }]} numberOfLines={2}>{plan.name}</Text>
-                <Text style={[styles.planMeta, { color: colors.textMuted }]}>{plan.startTime}–{plan.endTime} · {project?.name ?? "独立日程"}</Text>
+                <Text style={[styles.planName, { color: colors.onSurface, opacity: plan.done ? 0.5 : 1, textDecorationLine: plan.done ? "line-through" : "none" }]} numberOfLines={2}>{plan.name}</Text>
+                <Text style={[styles.planMeta, { color: colors.onSurfaceVariant }]}>{plan.startTime}–{plan.endTime} · {project?.name ?? "独立日程"}</Text>
                 {plan.recurrence.frequency !== "none" ? <Text style={[styles.recurrence, { color: colors.primary }]}>{dailyPlanRepeatLabel(plan.recurrence.frequency)} · 第 {plan.recurrence.occurrence}/{plan.recurrence.count} 次</Text> : null}
               </Pressable>
-              <Pressable accessibilityLabel={`删除 ${plan.name}`} onPress={() => onDeletePlan(plan)} style={styles.roundAction}><Ionicons name="trash-outline" size={20} color={colors.danger} /></Pressable>
+              <IconButton icon="trash-outline" label={`删除 ${plan.name}`} onPress={() => onDeletePlan(plan)} danger variant="standard" />
             </Card>
           );
         })}
@@ -595,12 +596,22 @@ function MonthView({ anchor, days, plans, taskStarts, colors, colorForProject, o
   );
 }
 
-function SummaryChip({ icon, label, colors }: { icon: keyof typeof Ionicons.glyphMap; label: string; colors: AppColors }) {
-  return <View style={[styles.summaryChip, { backgroundColor: colors.secondarySoft }]}><Ionicons name={icon} size={17} color={colors.onSecondarySoft} /><Text style={[styles.summaryChipText, { color: colors.onSecondarySoft }]}>{label}</Text></View>;
+function SummaryChip({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string; colors?: AppColors }) {
+  return <AssistChip icon={icon} label={label} />;
 }
 
 function ChartIntroduction({ icon, title, description, colors }: { icon: keyof typeof Ionicons.glyphMap; title: string; description: string; colors: AppColors }) {
-  return <View style={styles.chartIntro}><View style={[styles.chartIcon, { backgroundColor: colors.primarySoft }]}><Ionicons name={icon} size={22} color={colors.primary} /></View><View style={styles.flex}><Text style={[styles.chartTitle, { color: colors.text }]}>{title}</Text><Text style={[styles.chartDescription, { color: colors.textMuted }]}>{description}</Text></View></View>;
+  return (
+    <View style={styles.chartIntro}>
+      <View style={[styles.chartIcon, { backgroundColor: colors.primaryContainer }]}>
+        <Ionicons name={icon} size={22} color={colors.onPrimaryContainer} />
+      </View>
+      <View style={styles.flex}>
+        <Text style={[styles.chartTitle, { color: colors.onSurface }]}>{title}</Text>
+        <Text style={[styles.chartDescription, { color: colors.onSurfaceVariant }]}>{description}</Text>
+      </View>
+    </View>
+  );
 }
 
 function sortPlans(a: DailyPlan, b: DailyPlan): number {
@@ -621,85 +632,85 @@ function isISODate(value: string): boolean {
 }
 
 const styles = StyleSheet.create({
-  toolbar: { paddingHorizontal: 16, paddingBottom: 12, gap: 10, width: "100%", maxWidth: 860, alignSelf: "center" },
+  toolbar: { paddingHorizontal: 16, paddingBottom: 10, gap: 10, width: "100%", maxWidth: 860, alignSelf: "center" },
   dateNavigation: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  headingButton: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
-  heading: { fontSize: 16, fontWeight: "800", textAlign: "center" },
-  todayHint: { fontSize: 11, fontWeight: "700", marginTop: 3 },
-  page: { paddingHorizontal: 16, paddingBottom: 32, width: "100%", alignSelf: "center" },
+  headingButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  heading: { ...MD3Typography.titleMedium, fontWeight: "600", textAlign: "center" },
+  todayHint: { ...MD3Typography.labelSmall, fontWeight: "600", marginTop: 2 },
+  page: { paddingHorizontal: 16, paddingBottom: 88, width: "100%", alignSelf: "center" },
   sectionGap: { gap: 16 },
-  blockGap: { gap: 9 },
+  blockGap: { gap: 8 },
   summaryRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  summaryChip: { minHeight: 38, borderRadius: 19, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 7 },
-  summaryChipText: { fontSize: 12, fontWeight: "700" },
-  sectionLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
+  summaryChip: { minHeight: 32, borderRadius: MD3Shape.small, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 6 },
+  summaryChipText: { ...MD3Typography.labelMedium },
+  sectionLabel: { ...MD3Typography.labelLarge, fontWeight: "600", letterSpacing: 0.1 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  inlineAction: { minHeight: 40, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 4 },
+  inlineAction: { minHeight: 36, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 4 },
   taskChips: { gap: 8, paddingRight: 16 },
-  taskChip: { maxWidth: 230, minHeight: 42, borderRadius: 14, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 8 },
-  taskChipText: { flexShrink: 1, fontSize: 13, fontWeight: "700" },
-  dot: { width: 9, height: 9, borderRadius: 5 },
-  timelineCard: { padding: 10, flexDirection: "row", overflow: "hidden" },
+  taskChip: { maxWidth: 230, minHeight: 36, borderRadius: MD3Shape.small, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  taskChipText: { flexShrink: 1, ...MD3Typography.labelMedium, fontWeight: "500" },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  timelineCard: { padding: 10, flexDirection: "row", overflow: "hidden", borderRadius: MD3Shape.medium },
   timeAxis: { width: TIME_AXIS_WIDTH, position: "relative" },
-  hourLabel: { position: "absolute", right: 8, fontSize: 10, fontWeight: "600" },
+  hourLabel: { position: "absolute", right: 8, ...MD3Typography.labelSmall, fontSize: 10 },
   timelineTrack: { flex: 1, borderLeftWidth: StyleSheet.hairlineWidth, position: "relative" },
   hourLine: { position: "absolute", left: 0, right: 0, borderTopWidth: StyleSheet.hairlineWidth },
-  dayPlanBlock: { position: "absolute", borderRadius: 8, borderWidth: 2, borderColor: "rgba(255,255,255,0.76)", paddingHorizontal: 7, paddingVertical: 4, overflow: "hidden" },
-  blockTitle: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
-  blockMeta: { color: "rgba(255,255,255,0.88)", fontSize: 9, marginTop: 2 },
+  dayPlanBlock: { position: "absolute", borderRadius: MD3Shape.extraSmall, paddingHorizontal: 7, paddingVertical: 4, overflow: "hidden" },
+  blockTitle: { color: "#FFFFFF", ...MD3Typography.labelSmall, fontWeight: "600" },
+  blockMeta: { color: "rgba(255,255,255,0.88)", fontSize: 9, marginTop: 1 },
   nowLine: { position: "absolute", left: -4, right: 0, height: 2, zIndex: 8 },
   nowDot: { position: "absolute", left: -4, top: -3, width: 8, height: 8, borderRadius: 4 },
-  planCard: { minHeight: 84, padding: 12, flexDirection: "row", alignItems: "center", gap: 8 },
-  roundAction: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
-  planCopy: { flex: 1, paddingVertical: 5 },
-  planName: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
-  planMeta: { fontSize: 11, marginTop: 4 },
-  recurrence: { fontSize: 10, fontWeight: "700", marginTop: 4 },
+  planCard: { minHeight: 76, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: MD3Shape.medium },
+  roundAction: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  planCopy: { flex: 1, paddingVertical: 4 },
+  planName: { ...MD3Typography.titleSmall, fontWeight: "600", lineHeight: 20 },
+  planMeta: { ...MD3Typography.bodySmall, marginTop: 2 },
+  recurrence: { ...MD3Typography.labelSmall, fontWeight: "600", marginTop: 2 },
   chartIntro: { flexDirection: "row", alignItems: "center", gap: 12 },
-  chartIcon: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  chartTitle: { fontSize: 17, fontWeight: "800" },
-  chartDescription: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  chartCard: { padding: 0, overflow: "hidden", borderRadius: 20 },
-  ganttHeader: { height: 78, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
+  chartIcon: { width: 44, height: 44, borderRadius: MD3Shape.medium, alignItems: "center", justifyContent: "center" },
+  chartTitle: { ...MD3Typography.titleMedium, fontWeight: "600" },
+  chartDescription: { ...MD3Typography.bodySmall, lineHeight: 17, marginTop: 2 },
+  chartCard: { padding: 0, overflow: "hidden", borderRadius: MD3Shape.large },
+  ganttHeader: { height: 74, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   ganttLabel: { width: GANTT_LABEL_WIDTH, paddingHorizontal: 12, justifyContent: "center" },
-  ganttLabelTitle: { fontSize: 11, fontWeight: "800" },
+  ganttLabelTitle: { ...MD3Typography.labelMedium, fontWeight: "600" },
   ganttDayHeader: { alignItems: "center", justifyContent: "center" },
-  weekday: { fontSize: 10, fontWeight: "700" },
-  dayNumber: { fontSize: 18, lineHeight: 22, fontWeight: "800" },
-  planCount: { fontSize: 9, marginTop: 2 },
-  ganttRow: { height: 66, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
+  weekday: { ...MD3Typography.labelSmall, fontWeight: "500" },
+  dayNumber: { ...MD3Typography.titleMedium, fontWeight: "600" },
+  planCount: { ...MD3Typography.labelSmall, fontSize: 9, marginTop: 1 },
+  ganttRow: { height: 64, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   labelNameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  ganttTaskName: { flex: 1, fontSize: 12, fontWeight: "700" },
-  ganttProject: { marginLeft: 16, marginTop: 4, fontSize: 10 },
-  ganttTrack: { height: 66, flexDirection: "row", position: "relative" },
-  ganttGridCell: { height: 66, borderLeftWidth: StyleSheet.hairlineWidth },
-  ganttBar: { position: "absolute", height: 34, top: 16, borderRadius: 10, paddingHorizontal: 10, justifyContent: "center", zIndex: 2 },
-  ganttBarText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
-  weekPlanHeader: { height: 68, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
+  ganttTaskName: { flex: 1, ...MD3Typography.labelMedium, fontWeight: "600" },
+  ganttProject: { marginLeft: 16, marginTop: 2, ...MD3Typography.bodySmall, fontSize: 10 },
+  ganttTrack: { height: 64, flexDirection: "row", position: "relative" },
+  ganttGridCell: { height: 64, borderLeftWidth: StyleSheet.hairlineWidth },
+  ganttBar: { position: "absolute", height: 32, top: 16, borderRadius: MD3Shape.small, paddingHorizontal: 10, justifyContent: "center", zIndex: 2 },
+  ganttBarText: { color: "#FFFFFF", ...MD3Typography.labelSmall, fontWeight: "600" },
+  weekPlanHeader: { height: 64, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
   weekTimeLabel: { width: TIME_AXIS_WIDTH, alignItems: "center", justifyContent: "center" },
   weekPlanDayHeader: { width: WEEK_DAY_WIDTH, alignItems: "center", justifyContent: "center" },
-  allDayRow: { minHeight: 74, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
-  allDayLabel: { fontSize: 10, fontWeight: "800" },
-  allDayCell: { width: WEEK_DAY_WIDTH, minHeight: 74, borderLeftWidth: StyleSheet.hairlineWidth, padding: 4, gap: 3 },
-  miniTask: { minHeight: 24, borderRadius: 6, paddingHorizontal: 5, justifyContent: "center" },
-  miniTaskText: { color: "#FFFFFF", fontSize: 8, fontWeight: "700" },
-  moreText: { fontSize: 9, fontWeight: "700", textAlign: "center" },
+  allDayRow: { minHeight: 70, flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
+  allDayLabel: { ...MD3Typography.labelSmall, fontWeight: "600" },
+  allDayCell: { width: WEEK_DAY_WIDTH, minHeight: 70, borderLeftWidth: StyleSheet.hairlineWidth, padding: 4, gap: 3 },
+  miniTask: { minHeight: 24, borderRadius: MD3Shape.extraSmall, paddingHorizontal: 5, justifyContent: "center" },
+  miniTaskText: { color: "#FFFFFF", ...MD3Typography.labelSmall, fontSize: 9, fontWeight: "600" },
+  moreText: { ...MD3Typography.labelSmall, fontSize: 9, fontWeight: "600", textAlign: "center" },
   weekAxis: { width: TIME_AXIS_WIDTH, height: "100%", position: "relative" },
-  weekHour: { position: "absolute", right: 7, fontSize: 9, fontWeight: "600" },
+  weekHour: { position: "absolute", right: 7, ...MD3Typography.labelSmall, fontSize: 9 },
   weekDayColumn: { width: WEEK_DAY_WIDTH, height: "100%", borderLeftWidth: StyleSheet.hairlineWidth, position: "relative" },
-  weekPlanBlock: { position: "absolute", borderRadius: 7, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.74)", padding: 4, overflow: "hidden", zIndex: 2 },
-  weekPlanTitle: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", lineHeight: 11 },
-  weekPlanTime: { color: "rgba(255,255,255,0.88)", fontSize: 8, marginTop: 2 },
-  monthCard: { padding: 8, overflow: "hidden" },
+  weekPlanBlock: { position: "absolute", borderRadius: MD3Shape.extraSmall, padding: 4, overflow: "hidden", zIndex: 2 },
+  weekPlanTitle: { color: "#FFFFFF", fontSize: 9, fontWeight: "600", lineHeight: 11 },
+  weekPlanTime: { color: "rgba(255,255,255,0.88)", fontSize: 8, marginTop: 1 },
+  monthCard: { padding: 8, overflow: "hidden", borderRadius: MD3Shape.large },
   monthWeekdays: { flexDirection: "row", paddingBottom: 5 },
-  monthWeekday: { width: "14.2857%", textAlign: "center", fontSize: 11, fontWeight: "800" },
+  monthWeekday: { width: "14.2857%", textAlign: "center", ...MD3Typography.labelMedium, fontWeight: "600" },
   monthGrid: { flexDirection: "row", flexWrap: "wrap" },
   monthCell: { width: "14.2857%", minHeight: 65, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", paddingTop: 5 },
-  dateBadge: { minWidth: 27, height: 27, paddingHorizontal: 5, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  monthDate: { fontSize: 12, fontWeight: "800" },
-  monthDots: { minHeight: 10, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 2, marginTop: 5 },
+  dateBadge: { minWidth: 28, height: 28, paddingHorizontal: 5, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  monthDate: { ...MD3Typography.labelMedium, fontWeight: "600" },
+  monthDots: { minHeight: 10, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 2, marginTop: 4 },
   monthDot: { width: 5, height: 5, borderRadius: 3 },
-  monthMore: { fontSize: 8, fontWeight: "700", marginTop: 2 },
+  monthMore: { ...MD3Typography.labelSmall, fontSize: 8, fontWeight: "600", marginTop: 1 },
   formRow: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
 });

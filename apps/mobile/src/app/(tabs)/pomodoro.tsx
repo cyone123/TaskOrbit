@@ -1,10 +1,20 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createPausedTimer, type PomodoroLink, type Settings } from "@task-orbit/core";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppScreen, Card, Field, FormModal, IconButton, PageScroll, PrimaryButton } from "@/components/ui";
-import { useAppColors } from "@/constants/theme";
+import {
+  AppScreen,
+  Card,
+  Field,
+  FilledButton,
+  FormModal,
+  IconButton,
+  MD3Radio,
+  PageScroll,
+  TonalButton,
+} from "@/components/ui";
+import { MD3Shape, MD3Typography, useAppColors } from "@/constants/theme";
 import { PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
 const PHASE_LABEL = { focus: "专注", shortBreak: "短休息", longBreak: "长休息" } as const;
@@ -17,8 +27,16 @@ export default function PomodoroScreen() {
   const [taskId, setTaskId] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [resetFeedback, setResetFeedback] = useState(false);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(timer); }, []);
-  useEffect(() => { if (state.activeTimer?.taskId) setTaskId(state.activeTimer.taskId); }, [state.activeTimer?.taskId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (state.activeTimer?.taskId) setTaskId(state.activeTimer.taskId);
+  }, [state.activeTimer?.taskId]);
+
   useEffect(() => {
     if (!resetFeedback) return;
     const timeout = setTimeout(() => setResetFeedback(false), 1_600);
@@ -26,20 +44,66 @@ export default function PomodoroScreen() {
   }, [resetFeedback]);
 
   const timer = state.activeTimer ?? createPausedTimer(state.settings);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (timer.status === "running") {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.025,
+            duration: 1800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [timer.status, pulseAnim]);
+
   const remaining = timer.status === "running" && timer.endAt !== null ? Math.max(0, timer.endAt - now) : timer.remainingMs;
   const minutes = Math.floor(remaining / 60_000);
   const seconds = Math.floor((remaining % 60_000) / 1_000);
   const progress = 1 - remaining / timer.durationMs;
-  const availableTasks = useMemo(() => state.tasks.filter((task) => !task.done && state.projects.some((project) => project.id === task.projectId && !project.archived)), [state.projects, state.tasks]);
+  const availableTasks = useMemo(
+    () =>
+      state.tasks.filter(
+        (task) =>
+          !task.done &&
+          state.projects.some((project) => project.id === task.projectId && !project.archived),
+      ),
+    [state.projects, state.tasks],
+  );
   const linkedTask = state.tasks.find((task) => task.id === taskId);
-  const linkedProject = state.projects.find((project) => project.id === linkedTask?.projectId);
 
-  const link: PomodoroLink = linkedTask ? { projectId: linkedTask.projectId, taskId: linkedTask.id, dailyPlanId: null } : { projectId: null, taskId: null, dailyPlanId: null };
+  const link: PomodoroLink = linkedTask
+    ? { projectId: linkedTask.projectId, taskId: linkedTask.id, dailyPlanId: null }
+    : { projectId: null, taskId: null, dailyPlanId: null };
+
   const toggle = async () => {
     setResetFeedback(false);
-    if (timer.status === "running") { pausePomodoro(); return; }
+    if (timer.status === "running") {
+      pausePomodoro();
+      return;
+    }
     const scheduled = await startPomodoro(link);
-    if (!scheduled) Alert.alert("计时已开始", "当前环境未启用系统通知，请保持应用可见或在系统设置中允许通知。");
+    if (!scheduled) {
+      Alert.alert("计时已开始", "当前环境未启用系统通知，请保持应用可见或在系统设置中允许通知。");
+    }
   };
 
   const handleReset = () => {
@@ -53,46 +117,152 @@ export default function PomodoroScreen() {
     <AppScreen
       title="番茄钟"
       subtitle={`已完成 ${timer.focusCount} 轮专注`}
-      action={<IconButton icon="settings-outline" label="番茄钟设置" onPress={() => setSettingsOpen(true)} />}
+      action={<IconButton icon="settings-outline" label="番茄钟设置" onPress={() => setSettingsOpen(true)} variant="tonal" />}
     >
       <PageScroll>
-        <Card style={styles.timerCard}>
-          <View style={[styles.phaseBadge, { backgroundColor: timer.phase === "focus" ? "#B3261E1F" : "#386A201F" }]}>
-            <Ionicons name={timer.phase === "focus" ? "flash" : "cafe"} size={16} color={timer.phase === "focus" ? colors.danger : colors.success} />
-            <Text style={{ color: timer.phase === "focus" ? colors.danger : colors.success, fontWeight: "800", fontSize: 12 }}>{PHASE_LABEL[timer.phase]}</Text>
+        <Card variant="elevated" style={styles.timerCard}>
+          <View
+            style={[
+              styles.phaseBadge,
+              {
+                backgroundColor:
+                  timer.phase === "focus"
+                    ? colors.errorContainer
+                    : colors.secondaryContainer,
+              },
+            ]}
+          >
+            <Ionicons
+              name={timer.phase === "focus" ? "flash" : "cafe"}
+              size={16}
+              color={
+                timer.phase === "focus"
+                  ? colors.onErrorContainer
+                  : colors.onSecondaryContainer
+              }
+            />
+            <Text
+              style={{
+                color:
+                  timer.phase === "focus"
+                    ? colors.onErrorContainer
+                    : colors.onSecondaryContainer,
+                fontWeight: "600",
+                fontSize: 12,
+              }}
+            >
+              {PHASE_LABEL[timer.phase]}
+            </Text>
           </View>
-          <View style={[styles.ring, { borderColor: colors.surfaceVariant }]}>
-            <View style={[styles.progressArc, { borderColor: timer.phase === "focus" ? colors.danger : colors.success, opacity: Math.max(0.2, progress) }]} />
-            <Text style={[styles.timerText, { color: colors.text }]}>{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</Text>
-            <Text accessibilityLiveRegion="polite" style={[styles.timerStatus, { color: resetFeedback ? colors.primary : colors.textMuted }]}>{resetFeedback ? "已重置 · 准备开始" : timer.status === "running" ? "保持节奏" : timer.remainingMs < timer.durationMs ? "已暂停" : "准备开始"}</Text>
-          </View>
+          <Animated.View style={[styles.ring, { borderColor: colors.surfaceContainerHighest, transform: [{ scale: pulseAnim }] }]}>
+            <View
+              style={[
+                styles.progressArc,
+                {
+                  borderColor: timer.phase === "focus" ? colors.error : colors.success,
+                  opacity: Math.max(0.2, progress),
+                },
+              ]}
+            />
+            <Text style={[styles.timerText, { color: colors.onSurface }]}>
+              {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            </Text>
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[styles.timerStatus, { color: resetFeedback ? colors.primary : colors.onSurfaceVariant }]}
+            >
+              {resetFeedback
+                ? "已重置 · 准备开始"
+                : timer.status === "running"
+                ? "保持节奏"
+                : timer.remainingMs < timer.durationMs
+                ? "已暂停"
+                : "准备开始"}
+            </Text>
+          </Animated.View>
           <View style={styles.controls}>
-            <PrimaryButton label={timer.status === "running" ? "暂停" : "开始"} icon={timer.status === "running" ? "pause" : "play"} onPress={() => void toggle()} />
-            <Pressable accessibilityRole="button" style={[styles.roundButton, { backgroundColor: colors.surfaceVariant }]} onPress={skipPomodoro} accessibilityLabel="跳过阶段"><Ionicons name="play-skip-forward" size={21} color={colors.textMuted} /></Pressable>
-            <Pressable accessibilityRole="button" style={[styles.roundButton, { backgroundColor: resetFeedback ? colors.primarySoft : colors.surfaceVariant }]} onPress={handleReset} accessibilityLabel="重置"><Ionicons name="refresh" size={21} color={resetFeedback ? colors.primary : colors.textMuted} /></Pressable>
+            <FilledButton
+              label={timer.status === "running" ? "暂停" : "开始"}
+              icon={timer.status === "running" ? "pause" : "play"}
+              onPress={() => void toggle()}
+            />
+            <TonalButton
+              label="跳过"
+              icon="play-skip-forward"
+              onPress={skipPomodoro}
+            />
+            <IconButton
+              icon="refresh"
+              label="重置"
+              onPress={handleReset}
+              variant="tonal"
+            />
           </View>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>专注对象</Text>
-        <Card>
-          <Pressable disabled={timer.status === "running"} onPress={() => setTaskId("")} style={[styles.taskChoice, { borderBottomColor: colors.border }]}>
-            <Ionicons name={!linkedTask ? "radio-button-on" : "radio-button-off"} size={20} color={colors.primary} />
-            <View><Text style={[styles.choiceName, { color: colors.text }]}>自由专注</Text><Text style={[styles.choiceMeta, { color: colors.textMuted }]}>不关联具体任务</Text></View>
+        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>专注对象</Text>
+        <Card variant="elevated">
+          <Pressable
+            disabled={timer.status === "running"}
+            onPress={() => setTaskId("")}
+            style={[styles.taskChoice, { borderBottomColor: colors.outlineVariant }]}
+          >
+            <MD3Radio selected={!linkedTask} onPress={() => setTaskId("")} disabled={timer.status === "running"} />
+            <View style={styles.choiceCopy}>
+              <Text style={[styles.choiceName, { color: colors.onSurface }]}>自由专注</Text>
+              <Text style={[styles.choiceMeta, { color: colors.onSurfaceVariant }]}>不关联具体任务</Text>
+            </View>
           </Pressable>
           {availableTasks.map((task) => {
             const project = state.projects.find((item) => item.id === task.projectId);
             const selected = linkedTask?.id === task.id;
+            const projectAccent = PROJECT_COLOR_HEX[project?.color ?? ""] ?? colors.primary;
             return (
-              <Pressable key={task.id} disabled={timer.status === "running"} onPress={() => setTaskId(task.id)} style={[styles.taskChoice, { borderBottomColor: colors.border, opacity: timer.status === "running" && !selected ? 0.45 : 1 }]}>
-                <Ionicons name={selected ? "radio-button-on" : "radio-button-off"} size={20} color={PROJECT_COLOR_HEX[project?.color ?? ""] ?? colors.primary} />
-                <View style={styles.choiceCopy}><Text style={[styles.choiceName, { color: colors.text }]}>{task.name}</Text><Text style={[styles.choiceMeta, { color: colors.textMuted }]}>{project?.name ?? "项目"}</Text></View>
+              <Pressable
+                key={task.id}
+                disabled={timer.status === "running"}
+                onPress={() => setTaskId(task.id)}
+                style={[
+                  styles.taskChoice,
+                  {
+                    borderBottomColor: colors.outlineVariant,
+                    opacity: timer.status === "running" && !selected ? 0.45 : 1,
+                  },
+                ]}
+              >
+                <MD3Radio
+                  selected={selected}
+                  onPress={() => setTaskId(task.id)}
+                  disabled={timer.status === "running"}
+                  color={projectAccent}
+                />
+                <View style={styles.choiceCopy}>
+                  <Text style={[styles.choiceName, { color: colors.onSurface }]}>{task.name}</Text>
+                  <Text style={[styles.choiceMeta, { color: colors.onSurfaceVariant }]}>
+                    {project?.name ?? "项目"}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
-          {availableTasks.length === 0 ? <Text style={[styles.none, { color: colors.textMuted }]}>创建任务后，可在这里关联专注记录。</Text> : null}
+          {availableTasks.length === 0 ? (
+            <Text style={[styles.none, { color: colors.onSurfaceVariant }]}>
+              创建任务后，可在这里关联专注记录。
+            </Text>
+          ) : null}
         </Card>
-        <Card style={styles.notificationCard}><Ionicons name="notifications-outline" size={22} color={colors.primary} /><View style={styles.choiceCopy}><Text style={[styles.choiceName, { color: colors.text }]}>后台完成提醒</Text><Text style={[styles.choiceMeta, { color: colors.textMuted }]}>首次开始时请求系统通知权限；暂停或重置会自动撤销提醒。</Text></View></Card>
+
+        <Card variant="outlined" style={styles.notificationCard}>
+          <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+          <View style={styles.choiceCopy}>
+            <Text style={[styles.choiceName, { color: colors.onSurface }]}>后台完成提醒</Text>
+            <Text style={[styles.choiceMeta, { color: colors.onSurfaceVariant }]}>
+              首次开始时请求系统通知权限；暂停或重置会自动撤销提醒。
+            </Text>
+          </View>
+        </Card>
       </PageScroll>
+
       <PomodoroSettingsModal
         visible={settingsOpen}
         settings={state.settings}
@@ -108,7 +278,12 @@ export default function PomodoroScreen() {
   );
 }
 
-function PomodoroSettingsModal({ visible, settings, onClose, onSave }: {
+function PomodoroSettingsModal({
+  visible,
+  settings,
+  onClose,
+  onSave,
+}: {
   visible: boolean;
   settings: Settings;
   onClose(): void;
@@ -147,20 +322,76 @@ function PomodoroSettingsModal({ visible, settings, onClose, onSave }: {
 
   return (
     <FormModal visible={visible} title="番茄钟设置" onClose={onClose} onSubmit={submit} submitLabel="保存设置">
-      <Text style={[styles.settingsHint, { color: colors.textMuted }]}>保存后会清除当前计时进度，并按新时长开始下一轮。</Text>
+      <Text style={[styles.settingsHint, { color: colors.onSurfaceVariant }]}>
+        保存后会清除当前计时进度，并按新时长开始下一轮。
+      </Text>
       <Field label="专注时长（分钟）" value={focusMinutes} onChangeText={setFocusMinutes} keyboardType="number-pad" />
       <Field label="短休息时长（分钟）" value={shortBreakMinutes} onChangeText={setShortBreakMinutes} keyboardType="number-pad" />
       <Field label="长休息时长（分钟）" value={longBreakMinutes} onChangeText={setLongBreakMinutes} keyboardType="number-pad" />
       <Field label="长休息间隔（完成几轮专注后）" value={longBreakInterval} onChangeText={setLongBreakInterval} keyboardType="number-pad" />
-      {error ? <Text style={[styles.settingsError, { color: colors.danger }]}>{error}</Text> : null}
+      {error ? <Text style={[styles.settingsError, { color: colors.error }]}>{error}</Text> : null}
     </FormModal>
   );
 }
 
 const styles = StyleSheet.create({
-  timerCard: { alignItems: "center", paddingVertical: 24 }, phaseBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 6 },
-  ring: { width: 230, height: 230, borderRadius: 115, borderWidth: 10, marginVertical: 25, alignItems: "center", justifyContent: "center" }, progressArc: { position: "absolute", width: 230, height: 230, borderRadius: 115, borderWidth: 10, transform: [{ rotate: "45deg" }] }, timerText: { fontSize: 55, fontWeight: "300", fontVariant: ["tabular-nums"], letterSpacing: -2 }, timerStatus: { fontSize: 12, marginTop: 4 },
-  controls: { flexDirection: "row", alignItems: "center", gap: 10 }, roundButton: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" }, sectionTitle: { fontSize: 17, fontWeight: "800", marginTop: 5, marginLeft: 4 },
-  taskChoice: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 11, borderBottomWidth: StyleSheet.hairlineWidth }, choiceCopy: { flex: 1 }, choiceName: { fontSize: 14, fontWeight: "700" }, choiceMeta: { fontSize: 11, lineHeight: 16, marginTop: 3 }, none: { fontSize: 12, textAlign: "center", paddingVertical: 18 }, notificationCard: { flexDirection: "row", alignItems: "center", gap: 12 },
-  settingsHint: { fontSize: 13, lineHeight: 19 }, settingsError: { fontSize: 13, fontWeight: "600" },
+  timerCard: { alignItems: "center", paddingVertical: 24, borderRadius: MD3Shape.large },
+  phaseBadge: {
+    borderRadius: MD3Shape.small,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  ring: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 8,
+    marginVertical: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  progressArc: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 8,
+    transform: [{ rotate: "45deg" }],
+  },
+  timerText: {
+    ...MD3Typography.displaySmall,
+    fontSize: 50,
+    lineHeight: 58,
+    fontWeight: "300",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -1.5,
+  },
+  timerStatus: {
+    ...MD3Typography.bodySmall,
+    marginTop: 4,
+  },
+  controls: { flexDirection: "row", alignItems: "center", gap: 12 },
+  sectionTitle: {
+    ...MD3Typography.titleMedium,
+    fontWeight: "600",
+    marginTop: 8,
+    marginLeft: 4,
+  },
+  taskChoice: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  choiceCopy: { flex: 1 },
+  choiceName: { ...MD3Typography.titleSmall, fontWeight: "600" },
+  choiceMeta: { ...MD3Typography.bodySmall, lineHeight: 16, marginTop: 2 },
+  none: { ...MD3Typography.bodyMedium, textAlign: "center", paddingVertical: 18 },
+  notificationCard: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: MD3Shape.medium },
+  settingsHint: { ...MD3Typography.bodySmall, lineHeight: 18 },
+  settingsError: { ...MD3Typography.labelMedium, fontWeight: "600" },
 });

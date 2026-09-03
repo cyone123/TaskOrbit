@@ -13,8 +13,16 @@ import {
   View,
 } from "react-native";
 
-import { AppScreen, Card, EmptyState, IconButton, PageScroll } from "@/components/ui";
-import { useAppColors } from "@/constants/theme";
+import {
+  AppScreen,
+  AssistChip,
+  Card,
+  EmptyState,
+  IconButton,
+  MD3Checkbox,
+  PageScroll,
+} from "@/components/ui";
+import { MD3Shape, MD3Typography, useAppColors } from "@/constants/theme";
 import { useAppStore } from "@/store/app-store";
 
 export default function InboxScreen() {
@@ -51,8 +59,10 @@ export default function InboxScreen() {
     }
   };
 
+  const pendingCount = state.inboxItems.filter((item) => !item.done).length;
+
   return (
-    <AppScreen title="收件箱" subtitle={`${state.inboxItems.filter((item) => !item.done).length} 条待整理`}>
+    <AppScreen title="收件箱" subtitle={`${pendingCount} 条待整理`}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={0}
@@ -63,7 +73,7 @@ export default function InboxScreen() {
             style={[
               styles.composer,
               noteExpanded && styles.expandedComposer,
-              { backgroundColor: colors.surface, borderColor: colors.outline },
+              { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
             ]}
           >
             <Animated.View
@@ -74,7 +84,11 @@ export default function InboxScreen() {
               ]}
             />
             <Pressable onPress={toggleKind} accessibilityLabel="切换记录类型" style={styles.kindButton}>
-              <Ionicons name={kind === "todo" ? "checkbox-outline" : "document-text-outline"} size={22} color={colors.primary} />
+              <Ionicons
+                name={kind === "todo" ? "checkbox" : "document-text"}
+                size={22}
+                color={colors.primary}
+              />
             </Pressable>
             <TextInput
               ref={inputRef}
@@ -85,40 +99,75 @@ export default function InboxScreen() {
               onBlur={() => setInputFocused(false)}
               onSubmitEditing={kind === "todo" ? submit : undefined}
               placeholder={kind === "todo" ? "快速添加待办…" : "记录一条备忘…"}
-              placeholderTextColor={colors.tabInactive}
+              placeholderTextColor={colors.onSurfaceVariant}
               selectionColor={colors.primary}
               cursorColor={colors.primary}
               multiline={kind === "note"}
               scrollEnabled={noteExpanded}
               textAlignVertical={kind === "note" ? "top" : "center"}
-              style={[styles.input, noteExpanded && styles.expandedInput, { color: colors.text }]}
+              style={[styles.input, noteExpanded && styles.expandedInput, { color: colors.onSurface }]}
               returnKeyType={kind === "todo" ? "done" : "default"}
             />
-            <View style={noteExpanded && styles.submitDock}>
-              <IconButton icon="arrow-up" label="添加" onPress={submit} />
+            <View style={noteExpanded ? styles.submitDock : undefined}>
+              <IconButton icon="arrow-up" label="添加" onPress={submit} variant="filled" />
             </View>
           </View>
-          {!noteExpanded ? <Text style={[styles.hint, { color: colors.textMuted }]}>点击左侧图标切换待办 / 备忘</Text> : null}
+          {!noteExpanded ? (
+            <Text style={[styles.hint, { color: colors.onSurfaceVariant }]}>点击左侧图标切换待办 / 备忘</Text>
+          ) : null}
         </View>
+
         {!noteExpanded ? (
           <PageScroll>
-            {state.inboxItems.length === 0 ? <EmptyState icon="file-tray-outline" title="收件箱是空的" description="把脑海里的事先记下来，之后再慢慢整理。" /> : state.inboxItems.map((item) => (
-              <Card key={item.id} style={styles.itemCard}>
-                <Pressable
-                  disabled={item.kind === "note"}
-                  onPress={() => toggleInbox(item.id, !item.done)}
-                  accessibilityRole={item.kind === "todo" ? "checkbox" : undefined}
-                  style={styles.check}
-                >
-                  <Ionicons name={item.kind === "note" ? "document-text-outline" : item.done ? "checkmark-circle" : "ellipse-outline"} size={24} color={item.done ? colors.success : colors.primary} />
-                </Pressable>
-                <View style={styles.itemCopy}>
-                  <Text style={[styles.itemText, { color: colors.text, textDecorationLine: item.done ? "line-through" : "none", opacity: item.done ? 0.55 : 1 }]}>{item.content}</Text>
-                  <Text style={[styles.itemMeta, { color: colors.textMuted }]}>{item.kind === "note" ? "备忘" : item.done ? "已完成" : "待办"}</Text>
-                </View>
-                <IconButton icon="trash-outline" label="删除" onPress={() => removeInbox(item.id)} danger />
-              </Card>
-            ))}
+            {state.inboxItems.length === 0 ? (
+              <EmptyState
+                icon="file-tray-outline"
+                title="收件箱是空的"
+                description="把脑海里的事先记下来，之后再慢慢整理。"
+              />
+            ) : (
+              state.inboxItems.map((item) => (
+                <Card key={item.id} variant="elevated" style={styles.itemCard}>
+                  {item.kind === "todo" ? (
+                    <MD3Checkbox
+                      checked={item.done}
+                      onPress={() => toggleInbox(item.id, !item.done)}
+                    />
+                  ) : (
+                    <View style={styles.noteIconWrap}>
+                      <Ionicons name="document-text" size={20} color={colors.secondary} />
+                    </View>
+                  )}
+                  <View style={styles.itemCopy}>
+                    <Text
+                      style={[
+                        styles.itemText,
+                        {
+                          color: colors.onSurface,
+                          textDecorationLine: item.done ? "line-through" : "none",
+                          opacity: item.done ? 0.55 : 1,
+                        },
+                      ]}
+                    >
+                      {item.content}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <AssistChip
+                        label={item.kind === "note" ? "备忘" : item.done ? "已完成" : "待办"}
+                        color={item.done ? colors.success : undefined}
+                      />
+                    </View>
+                  </View>
+                  <IconButton
+                    icon="trash-outline"
+                    label="删除"
+                    onPress={() => removeInbox(item.id)}
+                    danger
+                    variant="standard"
+                  />
+                </Card>
+              ))
+            )}
           </PageScroll>
         ) : null}
       </KeyboardAvoidingView>
@@ -127,10 +176,83 @@ export default function InboxScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { flex: 1 }, composerWrap: { paddingHorizontal: 16, paddingBottom: 12 }, expandedComposerWrap: { flex: 1, paddingBottom: 0 },
-  composer: { minHeight: 58, borderWidth: 1, borderRadius: 18, paddingLeft: 16, paddingRight: 8, flexDirection: "row", alignItems: "center", gap: 10 }, composerFocusOutline: { ...StyleSheet.absoluteFill, pointerEvents: "none", borderWidth: 2, borderRadius: 18 },
-  expandedComposer: { flex: 1, alignItems: "flex-start", paddingTop: 14, paddingBottom: 8, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }, kindButton: { paddingVertical: 8 },
-  expandedComposerFocusOutline: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-  input: { flex: 1, fontSize: 15, minHeight: 56, paddingVertical: 0 }, expandedInput: { alignSelf: "stretch", minHeight: 0, paddingTop: 8 }, submitDock: { alignSelf: "flex-end" },
-  hint: { fontSize: 11, marginTop: 6, marginLeft: 4 }, itemCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12 }, check: { padding: 4 }, itemCopy: { flex: 1, gap: 4 }, itemText: { fontSize: 15, lineHeight: 21, fontWeight: "600" }, itemMeta: { fontSize: 11 },
+  content: { flex: 1 },
+  composerWrap: { paddingHorizontal: 16, paddingBottom: 10 },
+  expandedComposerWrap: { flex: 1, paddingBottom: 0 },
+  composer: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderRadius: MD3Shape.large,
+    paddingLeft: 12,
+    paddingRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  composerFocusOutline: {
+    ...StyleSheet.absoluteFill,
+    pointerEvents: "none",
+    borderWidth: 2,
+    borderRadius: MD3Shape.large,
+  },
+  expandedComposer: {
+    flex: 1,
+    alignItems: "flex-start",
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  kindButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  expandedComposerFocusOutline: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    minHeight: 52,
+    paddingVertical: 0,
+  },
+  expandedInput: {
+    alignSelf: "stretch",
+    minHeight: 0,
+    paddingTop: 8,
+  },
+  submitDock: { alignSelf: "flex-end" },
+  hint: {
+    ...MD3Typography.bodySmall,
+    fontSize: 11,
+    marginTop: 4,
+    marginLeft: 6,
+  },
+  itemCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: MD3Shape.medium,
+  },
+  noteIconWrap: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemCopy: { flex: 1, gap: 4 },
+  itemText: {
+    ...MD3Typography.bodyLarge,
+    fontWeight: "500",
+    lineHeight: 22,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
 });
