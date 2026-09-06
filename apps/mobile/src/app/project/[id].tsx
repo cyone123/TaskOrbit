@@ -35,7 +35,7 @@ import { MD3Shape, MD3Typography, useAppColors } from "@/constants/theme";
 import { calculateProjectMetrics } from "@/features/project-metrics";
 import { PRIORITY_LABEL, PROJECT_COLORS, PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
-type DetailSection = "tasks" | "plans" | "stats";
+type DetailSection = "tasks" | "stats";
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,6 +45,7 @@ export default function ProjectDetailScreen() {
   const { state } = store;
   const project = state.projects.find((item) => item.id === id);
   const [section, setSection] = useState<DetailSection>("tasks");
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [taskForm, setTaskForm] = useState<{ open: boolean; editing: Task | null }>({ open: false, editing: null });
   const [taskName, setTaskName] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -80,6 +81,14 @@ export default function ProjectDetailScreen() {
   const resetTaskForm = () => { setTaskForm({ open: false, editing: null }); setTaskName(""); setTaskDescription(""); setTaskStart(project.startDate); setTaskEnd(project.endDate); setPriority("medium"); };
   const openNewTask = () => { resetTaskForm(); setTaskStart(todayISO() < project.startDate ? project.startDate : todayISO()); setTaskEnd(project.endDate); setTaskForm({ open: true, editing: null }); };
   const openEditTask = (task: Task) => { setTaskName(task.name); setTaskDescription(task.description); setTaskStart(task.startDate); setTaskEnd(task.endDate); setPriority(task.priority); setTaskForm({ open: true, editing: task }); };
+  const toggleTaskExpand = (taskId: string) => {
+    setExpandedTasks((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
   const submitTask = () => {
     if (!taskName.trim() || !validDateRange(taskStart, taskEnd)) { Alert.alert("无法保存任务", "请填写名称，并确认日期为有效的 YYYY-MM-DD 范围。"); return; }
     const input = { name: taskName.trim(), description: taskDescription.trim(), startDate: taskStart, endDate: taskEnd, priority };
@@ -99,6 +108,7 @@ export default function ProjectDetailScreen() {
       store.updatePlan(planForm.editing.id, { projectId: project.id, taskId: planTaskId || null, name: planName.trim(), description: planDescription.trim(), date: planDate, startTime: planStart, endTime: planEnd, estimatedMinutes });
     } else {
       store.addPlans({ projectId: project.id, taskId: planTaskId || null, name: planName.trim(), description: planDescription.trim(), date: planDate, startTime: planStart, endTime: planEnd, estimatedMinutes, repeat, repeatCount: repeat === "none" ? 1 : count });
+      if (planTaskId) setExpandedTasks((prev) => new Set(prev).add(planTaskId));
     }
     resetPlanForm();
   };
@@ -130,18 +140,39 @@ export default function ProjectDetailScreen() {
         </Card>
 
         <SegmentedControl value={section} onChange={(value) => setSection(value as DetailSection)} options={[
-          { value: "tasks", label: `任务 ${metrics.taskTotal}`, icon: "checkmark-done-outline" },
-          { value: "plans", label: `计划 ${metrics.planTotal}`, icon: "calendar-outline" },
+          { value: "tasks", label: `任务与计划 ${metrics.taskTotal}`, icon: "checkmark-done-outline" },
           { value: "stats", label: "统计", icon: "analytics-outline" },
         ]} />
 
-        {section === "tasks" ? <TaskSection tasks={tasks} plans={plans} accent={accent} onAdd={openNewTask} onEdit={openEditTask} onAddPlan={(taskId) => { setSection("plans"); openNewPlan(taskId); }} onToggle={(task) => store.toggleTask(task.id, !task.done)} onDelete={(task) => confirmAction("删除任务", `确定删除「${task.name}」及关联的每日计划？`, () => store.removeTask(task.id))} /> : null}
-        {section === "plans" ? <PlanSection plans={plans} tasks={tasks} accent={accent} onAdd={() => openNewPlan()} onEdit={openEditPlan} onToggle={(plan) => store.togglePlan(plan.id, !plan.done)} onDelete={(plan) => confirmAction("删除计划", `确定删除「${plan.name}」？`, () => store.removePlan(plan.id))} /> : null}
+        {section === "tasks" ? (
+          <TaskSection
+            tasks={tasks}
+            plans={plans}
+            accent={accent}
+            expandedTasks={expandedTasks}
+            onToggleExpand={toggleTaskExpand}
+            onAdd={openNewTask}
+            onEdit={openEditTask}
+            onAddPlan={(taskId) => openNewPlan(taskId)}
+            onEditPlan={openEditPlan}
+            onDeletePlan={(plan) =>
+              confirmAction("删除计划", `确定删除计划「${plan.name}」？`, () =>
+                store.removePlan(plan.id),
+              )
+            }
+            onTogglePlan={(plan) => store.togglePlan(plan.id, !plan.done)}
+            onToggle={(task) => store.toggleTask(task.id, !task.done)}
+            onDelete={(task) =>
+              confirmAction("删除任务", `确定删除「${task.name}」及关联的每日计划？`, () =>
+                store.removeTask(task.id),
+              )
+            }
+          />
+        ) : null}
         {section === "stats" ? <StatsSection metrics={metrics} project={project} accent={accent} /> : null}
       </PageScroll>
 
       {section === "tasks" ? <FAB icon="add" label="添加任务" onPress={openNewTask} /> : null}
-      {section === "plans" ? <FAB icon="add" label="添加计划" onPress={() => openNewPlan()} /> : null}
 
       <FormModal visible={taskForm.open} title={taskForm.editing ? "编辑任务" : "添加任务"} onClose={resetTaskForm} onSubmit={submitTask} canSubmit={Boolean(taskName.trim())}>
         <Field label="任务名称" value={taskName} onChangeText={setTaskName} placeholder="例如：完成项目详情页" />
@@ -170,134 +201,214 @@ export default function ProjectDetailScreen() {
   );
 }
 
-function TaskSection({ tasks, plans, accent, onAdd, onEdit, onAddPlan, onToggle, onDelete }: {
-  tasks: Task[]; plans: DailyPlan[]; accent: string; onAdd(): void; onEdit(task: Task): void; onAddPlan(taskId: string): void; onToggle(task: Task): void; onDelete(task: Task): void;
+function TaskSection({
+  tasks,
+  plans,
+  accent,
+  expandedTasks,
+  onToggleExpand,
+  onAdd: _onAdd,
+  onEdit,
+  onAddPlan,
+  onEditPlan,
+  onDeletePlan,
+  onToggle,
+  onTogglePlan,
+  onDelete,
+}: {
+  tasks: Task[];
+  plans: DailyPlan[];
+  accent: string;
+  expandedTasks: Set<string>;
+  onToggleExpand(taskId: string): void;
+  onAdd(): void;
+  onEdit(task: Task): void;
+  onAddPlan(taskId: string): void;
+  onEditPlan(plan: DailyPlan): void;
+  onDeletePlan(plan: DailyPlan): void;
+  onToggle(task: Task): void;
+  onTogglePlan(plan: DailyPlan): void;
+  onDelete(task: Task): void;
 }) {
   const colors = useAppColors();
+  const standalonePlans = plans.filter((plan) => !plan.taskId);
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>任务</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>把项目拆成可执行的下一步</Text>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>任务与计划</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>
+            {tasks.length} 个任务 · {plans.length} 个计划
+          </Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="添加独立计划"
+          onPress={() => onAddPlan("")}
+          style={[styles.headerActionButton, { backgroundColor: colors.surfaceContainerHigh }]}
+        >
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+          <Text style={[styles.headerActionText, { color: colors.primary }]}>添加计划</Text>
+        </Pressable>
       </View>
-      {tasks.length === 0 ? (
-        <EmptyState icon="checkmark-done-outline" title="还没有任务" description="添加一个明确、可完成的下一步。" />
+
+      {tasks.length === 0 && standalonePlans.length === 0 ? (
+        <EmptyState icon="checkmark-done-outline" title="还没有任务或计划" description="添加一个明确、可完成的目标或日程。" />
       ) : (
         tasks.map((task) => {
           const taskPlans = plans.filter((plan) => plan.taskId === task.id);
+          const isExpanded = expandedTasks.has(task.id);
+          const donePlans = taskPlans.filter((plan) => plan.done).length;
           return (
-            <Card key={task.id} variant="elevated" style={styles.itemCard}>
-              <MD3Checkbox checked={task.done} onPress={() => onToggle(task)} color={accent} />
+            <Card key={task.id} variant="elevated" style={styles.taskCardWrapper}>
+              <View style={styles.taskCardMain}>
+                <MD3Checkbox checked={task.done} onPress={() => onToggle(task)} color={accent} />
+                <Pressable
+                  style={styles.itemCopy}
+                  onPress={() => {
+                    if (taskPlans.length > 0) onToggleExpand(task.id);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.itemName,
+                      {
+                        color: colors.onSurface,
+                        opacity: task.done ? 0.5 : 1,
+                        textDecorationLine: task.done ? "line-through" : "none",
+                      },
+                    ]}
+                  >
+                    {task.name}
+                  </Text>
+                  {task.description ? (
+                    <Text style={[styles.itemDescription, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+                      {task.description}
+                    </Text>
+                  ) : null}
+                  <View style={styles.metaRow}>
+                    <AssistChip
+                      label={`${PRIORITY_LABEL[task.priority]}优先级`}
+                      color={task.priority === "high" ? colors.error : undefined}
+                    />
+                    <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
+                      {relativeRangeLabel(task.startDate, task.endDate)}
+                    </Text>
+                    {taskPlans.length > 0 ? (
+                      <Text style={[styles.planBadgeText, { color: colors.primary }]}>
+                        {donePlans}/{taskPlans.length} 计划
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+                <View style={styles.rowActions}>
+                  <Pressable accessibilityLabel="为任务添加计划" onPress={() => onAddPlan(task.id)} style={styles.miniAction}>
+                    <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                  </Pressable>
+                  <Pressable accessibilityLabel="编辑任务" onPress={() => onEdit(task)} style={styles.miniAction}>
+                    <Ionicons name="create-outline" size={18} color={colors.onSurfaceVariant} />
+                  </Pressable>
+                  <Pressable accessibilityLabel="删除任务" onPress={() => onDelete(task)} style={styles.miniAction}>
+                    <Ionicons name="trash-outline" size={18} color={colors.error} />
+                  </Pressable>
+                  {taskPlans.length > 0 ? (
+                    <Pressable
+                      accessibilityLabel={isExpanded ? "收起计划" : "展开计划"}
+                      onPress={() => onToggleExpand(task.id)}
+                      style={styles.miniAction}
+                    >
+                      <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.onSurfaceVariant} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+
+              {isExpanded && taskPlans.length > 0 ? (
+                <View style={[styles.taskPlansContainer, { borderTopColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}>
+                  {taskPlans.map((plan) => (
+                    <View key={plan.id} style={styles.subPlanRow}>
+                      <MD3Checkbox checked={plan.done} onPress={() => onTogglePlan(plan)} color={accent} />
+                      <View style={styles.subPlanCopy}>
+                        <Text
+                          style={[
+                            styles.subPlanName,
+                            {
+                              color: colors.onSurface,
+                              opacity: plan.done ? 0.5 : 1,
+                              textDecorationLine: plan.done ? "line-through" : "none",
+                            },
+                          ]}
+                        >
+                          {plan.name}
+                        </Text>
+                        <Text style={[styles.subPlanMeta, { color: colors.onSurfaceVariant }]}>
+                          {formatDateFull(plan.date)} · {plan.startTime}–{plan.endTime}
+                          {plan.recurrence.frequency !== "none" ? ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}` : ""}
+                        </Text>
+                      </View>
+                      <View style={styles.rowActions}>
+                        <Pressable accessibilityLabel="编辑计划" onPress={() => onEditPlan(plan)} style={styles.miniAction}>
+                          <Ionicons name="create-outline" size={16} color={colors.onSurfaceVariant} />
+                        </Pressable>
+                        <Pressable accessibilityLabel="删除计划" onPress={() => onDeletePlan(plan)} style={styles.miniAction}>
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Card>
+          );
+        })
+      )}
+
+      {standalonePlans.length > 0 ? (
+        <View style={styles.standaloneSection}>
+          <View style={styles.subSectionHeader}>
+            <View style={styles.rowAlign}>
+              <Ionicons name="calendar" size={17} color={colors.primary} />
+              <Text style={[styles.subSectionTitle, { color: colors.onSurface }]}>独立计划（未关联任务）</Text>
+            </View>
+            <Text style={[styles.subSectionSubtitle, { color: colors.onSurfaceVariant }]}>
+              {standalonePlans.length} 个计划
+            </Text>
+          </View>
+          {standalonePlans.map((plan) => (
+            <Card key={plan.id} variant="elevated" style={styles.planCard}>
+              <View style={[styles.planRail, { backgroundColor: accent }]} />
+              <MD3Checkbox checked={plan.done} onPress={() => onTogglePlan(plan)} color={accent} />
               <View style={styles.itemCopy}>
                 <Text
                   style={[
                     styles.itemName,
                     {
                       color: colors.onSurface,
-                      opacity: task.done ? 0.5 : 1,
-                      textDecorationLine: task.done ? "line-through" : "none",
+                      opacity: plan.done ? 0.5 : 1,
+                      textDecorationLine: plan.done ? "line-through" : "none",
                     },
                   ]}
                 >
-                  {task.name}
+                  {plan.name}
                 </Text>
-                {task.description ? (
-                  <Text style={[styles.itemDescription, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
-                    {task.description}
-                  </Text>
-                ) : null}
-                <View style={styles.metaRow}>
-                  <AssistChip
-                    label={`${PRIORITY_LABEL[task.priority]}优先级`}
-                    color={task.priority === "high" ? colors.error : undefined}
-                  />
-                  <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
-                    {relativeRangeLabel(task.startDate, task.endDate)} · {taskPlans.length} 个计划
-                  </Text>
-                </View>
+                <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
+                  {formatDateFull(plan.date)} · {plan.startTime}–{plan.endTime}
+                  {plan.recurrence.frequency !== "none" ? ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}` : ""}
+                </Text>
               </View>
               <View style={styles.rowActions}>
-                <Pressable accessibilityLabel="为任务添加计划" onPress={() => onAddPlan(task.id)} style={styles.miniAction}>
-                  <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-                </Pressable>
-                <Pressable accessibilityLabel="编辑任务" onPress={() => onEdit(task)} style={styles.miniAction}>
+                <Pressable accessibilityLabel="编辑计划" onPress={() => onEditPlan(plan)} style={styles.miniAction}>
                   <Ionicons name="create-outline" size={18} color={colors.onSurfaceVariant} />
                 </Pressable>
-                <Pressable accessibilityLabel="删除任务" onPress={() => onDelete(task)} style={styles.miniAction}>
+                <Pressable accessibilityLabel="删除计划" onPress={() => onDeletePlan(plan)} style={styles.miniAction}>
                   <Ionicons name="trash-outline" size={18} color={colors.error} />
                 </Pressable>
               </View>
             </Card>
-          );
-        })
-      )}
-    </View>
-  );
-}
-
-function PlanSection({ plans, tasks, accent, onAdd, onEdit, onToggle, onDelete }: {
-  plans: DailyPlan[]; tasks: Task[]; accent: string; onAdd(): void; onEdit(plan: DailyPlan): void; onToggle(plan: DailyPlan): void; onDelete(plan: DailyPlan): void;
-}) {
-  const colors = useAppColors();
-  let lastDate = "";
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>每日计划</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.onSurfaceVariant }]}>
-            {plans.length} 个计划 · {plans.filter((plan) => plan.done).length} 个已完成
-          </Text>
+          ))}
         </View>
-      </View>
-      {plans.length === 0 ? (
-        <EmptyState icon="calendar-outline" title="还没有每日计划" description="安排一个具体的日期和时间段。" />
-      ) : (
-        plans.map((plan) => {
-          const showDate = plan.date !== lastDate;
-          lastDate = plan.date;
-          const task = tasks.find((item) => item.id === plan.taskId);
-          return (
-            <View key={plan.id}>
-              {showDate ? (
-                <Text style={[styles.dateHeading, { color: colors.onSurfaceVariant }]}>
-                  {formatDateFull(plan.date)}
-                </Text>
-              ) : null}
-              <Card variant="elevated" style={styles.planCard}>
-                <View style={[styles.planRail, { backgroundColor: accent }]} />
-                <MD3Checkbox checked={plan.done} onPress={() => onToggle(plan)} color={accent} />
-                <View style={styles.itemCopy}>
-                  <Text
-                    style={[
-                      styles.itemName,
-                      {
-                        color: colors.onSurface,
-                        opacity: plan.done ? 0.5 : 1,
-                        textDecorationLine: plan.done ? "line-through" : "none",
-                      },
-                    ]}
-                  >
-                    {plan.name}
-                  </Text>
-                  <Text style={[styles.itemMeta, { color: colors.onSurfaceVariant }]}>
-                    {plan.startTime}–{plan.endTime} · {task?.name ?? "独立计划"}
-                    {plan.recurrence.frequency !== "none" ? ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}` : ""}
-                  </Text>
-                </View>
-                <Pressable accessibilityLabel="编辑计划" onPress={() => onEdit(plan)} style={styles.miniAction}>
-                  <Ionicons name="create-outline" size={18} color={colors.onSurfaceVariant} />
-                </Pressable>
-                <Pressable accessibilityLabel="删除计划" onPress={() => onDelete(plan)} style={styles.miniAction}>
-                  <Ionicons name="trash-outline" size={18} color={colors.error} />
-                </Pressable>
-              </Card>
-            </View>
-          );
-        })
-      )}
+      ) : null}
     </View>
   );
 }
@@ -383,6 +494,28 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 4 },
   sectionTitle: { ...MD3Typography.titleMedium, fontWeight: "600" },
   sectionSubtitle: { ...MD3Typography.bodySmall, marginTop: 2 },
+  headerActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: MD3Shape.small,
+  },
+  headerActionText: { ...MD3Typography.labelMedium, fontWeight: "600" },
+  taskCardWrapper: { borderRadius: MD3Shape.medium, overflow: "hidden" },
+  taskCardMain: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
+  planBadgeText: { ...MD3Typography.labelSmall, fontWeight: "600" },
+  taskPlansContainer: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 4, paddingHorizontal: 12, gap: 4 },
+  subPlanRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  subPlanCopy: { flex: 1, minWidth: 0 },
+  subPlanName: { ...MD3Typography.bodyMedium, fontWeight: "500" },
+  subPlanMeta: { ...MD3Typography.labelSmall, marginTop: 2 },
+  standaloneSection: { gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(0,0,0,0.08)" },
+  subSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginHorizontal: 4, marginBottom: 4 },
+  rowAlign: { flexDirection: "row", alignItems: "center", gap: 6 },
+  subSectionTitle: { ...MD3Typography.titleSmall, fontWeight: "600" },
+  subSectionSubtitle: { ...MD3Typography.bodySmall },
   itemCard: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: MD3Shape.medium },
   checkButton: { width: 38, height: 40, alignItems: "center", justifyContent: "center" },
   itemCopy: { flex: 1, minWidth: 0 },

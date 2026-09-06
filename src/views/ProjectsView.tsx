@@ -55,8 +55,7 @@ const PRIORITY_LABEL: Record<Priority, string> = {
 
 const PROJECT_TABS = [
   { key: "overview", label: "概览" },
-  { key: "tasks", label: "任务" },
-  { key: "plans", label: "计划" },
+  { key: "tasks", label: "任务与计划" },
   { key: "stats", label: "统计" },
   { key: "notes", label: "笔记" },
 ] as const;
@@ -186,6 +185,9 @@ export function ProjectsView() {
       .filter((plan) => plan.projectId === selectedProject.id)
       .sort((a, b) => `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`));
   }, [selectedProject, state.dailyPlans]);
+  const standalonePlans = useMemo(() => {
+    return projectPlans.filter((plan) => !plan.taskId);
+  }, [projectPlans]);
   const todayPlans = projectPlans.filter((plan) => plan.date === planDate);
   const planDayTitle = planDate === todayISO() ? "今日计划" : "当天计划";
   const doneTasks = projectTasks.filter((task) => task.done).length;
@@ -223,10 +225,13 @@ export function ProjectsView() {
       projectId,
       taskId,
       lockProject: true,
-      lockTask: true,
+      lockTask: Boolean(taskId),
       defaultDate: date,
       editing: null,
     });
+    if (taskId) {
+      setExpandedTasks((previous) => new Set(previous).add(taskId));
+    }
   };
 
   const askArchiveProject = (project: Project) => {
@@ -298,40 +303,40 @@ export function ProjectsView() {
         <div className="project-plan-row__copy">
           <div className="body-md project-plan-row__name">{plan.name}</div>
           <div className="body-sm muted project-plan-row__meta">
-            {task?.name ?? "独立计划"}
+            {formatDate(plan.date)}
             {plan.recurrence.frequency !== "none" && ` · ${dailyPlanRepeatLabel(plan.recurrence.frequency)}`}
+            {!compact && task && ` · ${task.name}`}
           </div>
         </div>
         <span className="chip chip--small project-time-chip">
           {plan.startTime} - {plan.endTime}
         </span>
-        {!compact && (
-          <div className="project-row-actions">
-            <IconButton
-              aria-label="编辑计划"
-              title="编辑计划"
-              onClick={() => setPlanForm({
-                open: true,
-                projectId: plan.projectId,
-                taskId: plan.taskId,
-                lockProject: true,
-                lockTask: true,
-                editing: plan,
-              })}
-            >
-              <Icon name="edit" size={18} />
-            </IconButton>
-            <IconButton aria-label="删除计划" title="删除计划" onClick={() => askDeletePlan(plan)}>
-              <Icon name="delete" size={18} />
-            </IconButton>
-          </div>
-        )}
+        <div className="project-row-actions">
+          <IconButton
+            aria-label="编辑计划"
+            title="编辑计划"
+            onClick={() => setPlanForm({
+              open: true,
+              projectId: plan.projectId,
+              taskId: plan.taskId,
+              lockProject: true,
+              lockTask: Boolean(plan.taskId),
+              editing: plan,
+            })}
+          >
+            <Icon name="edit" size={18} />
+          </IconButton>
+          <IconButton aria-label="删除计划" title="删除计划" onClick={() => askDeletePlan(plan)}>
+            <Icon name="delete" size={18} />
+          </IconButton>
+        </div>
       </div>
     );
   };
 
   const renderTask = (task: Task) => {
     const taskPlans = plansOfTask.get(task.id) ?? [];
+    const doneCount = taskPlans.filter((plan) => plan.done).length;
     const expanded = expandedTasks.has(task.id);
     const taskStatus = statusLabel(task.startDate, task.endDate);
     return (
@@ -352,6 +357,12 @@ export function ProjectsView() {
             <span className="body-md project-task-row__name">{task.name}</span>
             {task.description && <span className="body-sm muted project-task-row__description">{task.description}</span>}
           </div>
+          {taskPlans.length > 0 && (
+            <span className="chip chip--small project-plan-count-chip" title={`关联 ${taskPlans.length} 个计划，已完成 ${doneCount} 个`}>
+              <Icon name="calendar_today" size={13} />
+              <span>{doneCount}/{taskPlans.length}</span>
+            </span>
+          )}
           <span className="chip chip--small project-status-chip" style={{ color: taskStatus.color }}>
             {taskStatus.text}
           </span>
@@ -404,19 +415,26 @@ export function ProjectsView() {
   const renderTaskSection = (showAll = true) => (
     <section className="project-panel" id="project-tasks">
       <SectionHeader
-        title="任务"
-        subtitle="把项目拆成可执行的下一步"
+        title={showAll ? "任务与计划" : "任务"}
+        subtitle={showAll ? "拆解执行步骤与每日日程" : "把项目拆成可执行的下一步"}
         badge={<Badge value={projectTasks.length} variant="primary" />}
         actions={
-          <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
-            <Icon name="add" size={18} slot="icon" /> 添加任务
-          </TextButton>
+          <div className="row gap-8">
+            <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
+              <Icon name="add" size={18} slot="icon" /> 添加任务
+            </TextButton>
+            {showAll && (
+              <TextButton onClick={() => selectedProject && openNewPlan(selectedProject.id, null)}>
+                <Icon name="calendar_add_on" size={18} slot="icon" /> 添加独立计划
+              </TextButton>
+            )}
+          </div>
         }
       />
-      {projectTasks.length === 0 ? (
+      {projectTasks.length === 0 && (!showAll || standalonePlans.length === 0) ? (
         <div className="project-empty-row">
           <Icon name="checklist" size={24} />
-          <span>还没有任务，先添加一个可执行的目标吧。</span>
+          <span>还没有任务或计划，先添加一个目标吧。</span>
         </div>
       ) : (
         <div className="project-task-list">
@@ -426,6 +444,22 @@ export function ProjectsView() {
               查看全部 {projectTasks.length} 个任务 <Icon name="arrow_forward" size={17} />
             </button>
           )}
+        </div>
+      )}
+      {showAll && standalonePlans.length > 0 && (
+        <div className="project-standalone-plans-section">
+          <div className="project-standalone-plans-header">
+            <div className="row gap-8">
+              <span className="project-heading-icon project-heading-icon--primary">
+                <Icon name="event_note" size={18} />
+              </span>
+              <span className="title-sm">独立计划（未关联任务）</span>
+            </div>
+            <span className="body-sm muted">{standalonePlans.length} 个计划</span>
+          </div>
+          <div className="project-plan-list">
+            {standalonePlans.map((plan) => renderPlanRow(plan, false))}
+          </div>
         </div>
       )}
     </section>
@@ -446,7 +480,7 @@ export function ProjectsView() {
           <Icon name="add" size={20} />
         </IconButton>
       </div>
-      <button type="button" className="project-date-picker" onClick={() => setActiveTab("plans")}>
+      <button type="button" className="project-date-picker" onClick={() => setActiveTab("tasks")}>
         <Icon name="chevron_right" size={18} />
         <span>{formatDateFull(planDate)}</span>
       </button>
@@ -479,7 +513,7 @@ export function ProjectsView() {
         )}
       </div>
       {todayPlans.length > 3 && (
-        <button type="button" className="project-card-link" onClick={() => setActiveTab("plans")}>
+        <button type="button" className="project-card-link" onClick={() => setActiveTab("tasks")}>
           查看{planDayTitle}全部计划 <Icon name="arrow_forward" size={17} />
         </button>
       )}
@@ -552,29 +586,9 @@ export function ProjectsView() {
     </section>
   );
 
-  const renderPlanTab = () => (
-    <section className="project-panel project-all-plans-card">
-      <SectionHeader
-        title="每日计划"
-        subtitle={`${projectPlans.length} 个计划 · ${donePlans} 个已完成`}
-        actions={
-          <TextButton onClick={() => selectedProject && openNewPlan(selectedProject.id)}>
-            <Icon name="add" size={18} slot="icon" /> 添加计划
-          </TextButton>
-        }
-      />
-      {projectPlans.length === 0 ? (
-        <div className="project-empty-row"><Icon name="calendar_add_on" size={24} /><span>还没有每日计划。</span></div>
-      ) : (
-        <div className="project-plan-list">{projectPlans.map((plan) => <div key={plan.id} className="project-plan-group"><div className="project-plan-group__date">{formatDateFull(plan.date)}</div>{renderPlanRow(plan)}</div>)}</div>
-      )}
-    </section>
-  );
-
   const renderMainContent = () => {
     if (!selectedProject) return null;
     if (activeTab === "tasks") return renderTaskSection();
-    if (activeTab === "plans") return renderPlanTab();
     if (activeTab === "stats") return renderStatsTab();
     if (activeTab === "notes") return <ProjectNotesPanel project={selectedProject} state={state} />;
     return (
@@ -597,7 +611,7 @@ export function ProjectsView() {
                 subtitle={<>{planDate === todayISO() ? "今日计划" : `${formatDate(planDate)}计划`} {todayPlans.length} 个</>}
                 icon="event_available"
                 colorVariant="info"
-                onClick={() => setActiveTab("plans")}
+                onClick={() => setActiveTab("tasks")}
               />
               <StatCard
                 title="整体进度"
@@ -809,6 +823,10 @@ export function ProjectsView() {
             } else {
               store.addDailyPlan(input);
               show(input.repeat === "none" ? "计划已添加" : `已添加 ${input.repeatCount} 个计划`);
+            }
+            const targetTaskId = input.taskId;
+            if (targetTaskId) {
+              setExpandedTasks((prev) => new Set(prev).add(targetTaskId));
             }
             setPlanDate(input.date);
             setPlanForm((current) => ({ ...current, open: false }));
