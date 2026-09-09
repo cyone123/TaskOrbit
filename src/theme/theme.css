@@ -5116,6 +5116,12 @@ md-filled-card.inbox-list-card {
   line-height: 1.5;
 }
 
+.inbox-item--note .inbox-item__content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .inbox-item__meta {
   color: var(--md-on-surface-variant);
   font-size: 11px;
@@ -5170,6 +5176,31 @@ md-filled-card.inbox-list-card {
 
 .inbox-empty-cta {
   margin-top: var(--sys-space-4);
+}
+
+.inbox-edit-dialog--note {
+  width: min(720px, calc(100vw - 48px));
+  max-width: min(720px, calc(100vw - 48px));
+  min-height: min(480px, calc(100vh - 80px));
+}
+
+.inbox-edit-dialog--note .material-dialog__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.inbox-edit-dialog__form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.inbox-edit-dialog--note .inbox-edit-dialog__form {
+  flex: 1;
+}
+
+.inbox-edit-dialog--note md-outlined-text-field {
+  flex: 1;
 }
 
 @media (max-width: 900px) {

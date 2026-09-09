@@ -36,6 +36,11 @@ function formatItemDate(timestamp: number): string {
   return date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 }
 
+export function getFirstLine(content: string): string {
+  const line = content.split(/\r?\n/).find((l) => l.trim().length > 0);
+  return (line ?? content.split(/\r?\n/)[0] ?? "").trim();
+}
+
 function InboxItemRow({
   item,
   leaving = false,
@@ -50,8 +55,11 @@ function InboxItemRow({
   onDelete: () => void;
 }) {
   const isTodo = item.kind === "todo";
+  const displayContent = isTodo ? item.content : (getFirstLine(item.content) || item.content);
   return (
-    <div className={`inbox-item ${item.done ? "is-done" : ""} ${leaving ? "is-leaving" : ""}`}>
+    <div
+      className={`inbox-item ${isTodo ? "inbox-item--todo" : "inbox-item--note"} ${item.done ? "is-done" : ""} ${leaving ? "is-leaving" : ""}`}
+    >
       {isTodo ? (
         <Checkbox
           className="inbox-item__checkbox"
@@ -68,9 +76,14 @@ function InboxItemRow({
         type="button"
         className="inbox-item__body"
         onClick={onEdit}
-        aria-label={`编辑${isTodo ? "待办" : "备忘"}：${item.content}`}
+        aria-label={`编辑${isTodo ? "待办" : "备忘"}：${displayContent}`}
       >
-        <span className="inbox-item__content">{item.content}</span>
+        <span
+          className="inbox-item__content"
+          title={!isTodo ? item.content : undefined}
+        >
+          {displayContent}
+        </span>
         <span className="inbox-item__meta">
           {isTodo ? "待办" : "备忘"} · {formatItemDate(item.updatedAt)}
         </span>
@@ -102,10 +115,12 @@ function InboxEditDialog({
 
   if (!item) return null;
 
+  const isNote = item.kind === "note";
+
   const save = () => {
     const nextContent = content.trim();
     if (!nextContent) {
-      setError(item.kind === "todo" ? "请写下待办内容" : "请写下备忘内容");
+      setError(isNote ? "请写下备忘内容" : "请写下待办内容");
       return;
     }
     onSave(nextContent);
@@ -115,7 +130,8 @@ function InboxEditDialog({
     <Dialog
       open
       onClose={onClose}
-      title={item.kind === "todo" ? "编辑待办" : "编辑备忘"}
+      title={isNote ? "编辑备忘" : "编辑待办"}
+      className={isNote ? "inbox-edit-dialog inbox-edit-dialog--note" : "inbox-edit-dialog"}
       actions={
         <>
           <TextButton onClick={onClose}>取消</TextButton>
@@ -123,18 +139,33 @@ function InboxEditDialog({
         </>
       }
     >
-      <OutlinedTextField
-        label={item.kind === "todo" ? "待办内容" : "备忘内容"}
-        type={item.kind === "note" ? "textarea" : "text"}
-        rows={item.kind === "note" ? 5 : undefined}
-        value={content}
-        onInput={(event) => {
-          setContent(eventValue(event));
-          setError("");
+      <form
+        className="inbox-edit-dialog__form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save();
         }}
-        autoFocus
-      />
-      {error && <p className="error-text body-sm mt-8">{error}</p>}
+        onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            save();
+          }
+        }}
+      >
+        <OutlinedTextField
+          className="inbox-edit-dialog__field"
+          label={isNote ? "备忘内容" : "待办内容"}
+          type={isNote ? "textarea" : "text"}
+          rows={isNote ? 12 : undefined}
+          value={content}
+          onInput={(event) => {
+            setContent(eventValue(event));
+            setError("");
+          }}
+          autoFocus
+        />
+        {error && <p className="error-text body-sm mt-8">{error}</p>}
+      </form>
     </Dialog>
   );
 }
@@ -378,7 +409,7 @@ export function InboxView() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title={deleteTarget?.kind === "todo" ? "删除待办" : "删除备忘"}
-        message={`确定删除「${deleteTarget?.content ?? "这条内容"}」吗？`}
+        message={`确定删除「${(deleteTarget ? (deleteTarget.kind === "note" ? getFirstLine(deleteTarget.content) : deleteTarget.content) : "") || "这条内容"}」吗？`}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
