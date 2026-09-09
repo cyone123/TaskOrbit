@@ -15,6 +15,7 @@ import {
   MaterialDialog,
   Ripple,
   TextButton,
+  type MdDialog,
 } from "./material";
 
 /* -------------------------------------------------------------------------- */
@@ -299,17 +300,219 @@ export interface DialogProps {
   actions?: ReactNode;
   icon?: string;
   wide?: boolean;
+  compact?: boolean;
+  className?: string;
 }
 
-export function Dialog({ open, onClose, title, children, actions, icon, wide }: DialogProps) {
+/**
+ * Determines whether a mouse/pointer event occurred inside the dialog's visual card.
+ */
+export function isEventInsideDialogElement(
+  dialogEl: HTMLElement | null,
+  e: { clientX: number; clientY: number; composedPath?: () => EventTarget[] },
+): boolean {
+  if (!dialogEl) return false;
+
+  const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+  const container = (dialogEl.shadowRoot?.querySelector(".container") ||
+    dialogEl.shadowRoot?.querySelector("dialog")) as HTMLElement | null;
+
+  if (container && path.includes(container)) {
+    return true;
+  }
+
+  for (const item of path) {
+    const isNode =
+      typeof Node !== "undefined"
+        ? item instanceof Node
+        : Boolean(item && typeof item === "object");
+    if (
+      item !== dialogEl &&
+      isNode &&
+      typeof dialogEl.contains === "function" &&
+      dialogEl.contains(item as Node)
+    ) {
+      return true;
+    }
+  }
+
+  if (container) {
+    const rect = container.getBoundingClientRect();
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether a cancel event should be allowed to close the dialog.
+ * For pointer interactions, closing is only allowed if BOTH pointerdown
+ * and pointerup occurred outside the dialog card (a genuine outside click).
+ * For non-pointer interactions (e.g. keyboard Escape), closing is allowed.
+ */
+export function shouldAllowDialogCancel(params: {
+  isPointerInteraction: boolean;
+  pointerDownStartedOutside: boolean;
+  pointerUpEndedOutside: boolean;
+}): boolean {
+  if (params.isPointerInteraction) {
+    return params.pointerDownStartedOutside && params.pointerUpEndedOutside;
+  }
+  return true;
+}
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+  actions,
+  icon,
+  wide,
+  compact,
+  className,
+}: DialogProps) {
+  const dialogRef = useRef<MdDialog | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const pointerDownStartedInsideRef = useRef(false);
+  const pointerDownStartedOutsideRef = useRef(false);
+  const pointerUpEndedOutsideRef = useRef(false);
+  const isPointerInteractionRef = useRef(false);
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+
+      isPointerInteractionRef.current = true;
+      const inside = isEventInsideDialogElement(dialogRef.current, e);
+      if (inside) {
+        pointerDownStartedInsideRef.current = true;
+        pointerDownStartedOutsideRef.current = false;
+        if (dialogRef.current) {
+          (dialogRef.current as unknown as { nextClickIsFromContent: boolean }).nextClickIsFromContent = true;
+        }
+      } else {
+        pointerDownStartedInsideRef.current = false;
+        pointerDownStartedOutsideRef.current = true;
+      }
+      pointerUpEndedOutsideRef.current = false;
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+
+      const inside = isEventInsideDialogElement(dialogRef.current, e);
+      pointerUpEndedOutsideRef.current = !inside;
+
+      if (pointerDownStartedInsideRef.current) {
+        if (dialogRef.current) {
+          (dialogRef.current as unknown as { nextClickIsFromContent: boolean }).nextClickIsFromContent = true;
+        }
+      }
+
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+      }
+      resetTimerRef.current = window.setTimeout(() => {
+        pointerDownStartedInsideRef.current = false;
+        pointerDownStartedOutsideRef.current = false;
+        pointerUpEndedOutsideRef.current = false;
+        isPointerInteractionRef.current = false;
+        resetTimerRef.current = null;
+      }, 60);
+    };
+
+    const handlePointerCancel = () => {
+      pointerDownStartedInsideRef.current = false;
+      pointerDownStartedOutsideRef.current = false;
+      pointerUpEndedOutsideRef.current = false;
+      isPointerInteractionRef.current = false;
+    };
+
+    const handleBlur = () => {
+      pointerDownStartedInsideRef.current = false;
+      pointerDownStartedOutsideRef.current = false;
+      pointerUpEndedOutsideRef.current = false;
+      isPointerInteractionRef.current = false;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        isPointerInteractionRef.current = false;
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("pointercancel", handlePointerCancel, true);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("pointercancel", handlePointerCancel, true);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = null;
+      }
+    };
+  }, [open]);
+
+  const handleCancel = (e: Event) => {
+    const shouldAllow = shouldAllowDialogCancel({
+      isPointerInteraction: isPointerInteractionRef.current,
+      pointerDownStartedOutside: pointerDownStartedOutsideRef.current,
+      pointerUpEndedOutside: pointerUpEndedOutsideRef.current,
+    });
+
+    if (!shouldAllow) {
+      e.preventDefault();
+      return;
+    }
+
+    onCloseRef.current();
+  };
+
   if (!open) return null;
+
+  const dialogClass = [
+    "material-dialog",
+    wide ? "material-dialog--wide" : "",
+    compact ? "material-dialog--compact" : "",
+    className || "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return createPortal(
     <div className="dialog-layer">
       <MaterialDialog
+        ref={dialogRef}
         open={open}
-        className={`material-dialog ${wide ? "material-dialog--wide" : ""}`}
-        onCancel={onClose}
+        className={dialogClass}
+        onCancel={handleCancel}
       >
         {icon && <Icon slot="icon" name={icon} size={24} />}
         <div slot="headline">{title}</div>
@@ -353,6 +556,7 @@ export function ConfirmDialog({
       open={open}
       onClose={onCancel}
       title={title}
+      compact
       icon={icon || (danger ? "warning" : undefined)}
       actions={
         <>

@@ -146,6 +146,8 @@ export const MaterialBadge = createComponent({
   elementClass: MdBadge,
 });
 
+export type { MdDialog };
+
 export const MaterialDialog = createComponent({
   react: React,
   tagName: "md-dialog",

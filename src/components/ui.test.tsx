@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Badge, ExtendedFab, SearchBar, SectionHeader, StatCard } from "./ui";
+import {
+  Badge,
+  ExtendedFab,
+  SearchBar,
+  SectionHeader,
+  StatCard,
+  isEventInsideDialogElement,
+  shouldAllowDialogCancel,
+} from "./ui";
 
 describe("MD3 Base Components", () => {
   it("renders ExtendedFab with proper classes and label", () => {
@@ -64,5 +72,130 @@ describe("MD3 Base Components", () => {
     expect(html).toContain("项目概览");
     expect(html).toContain("今日关键数据");
     expect(html).toContain("badge");
+  });
+
+  describe("Dialog outside-click protection", () => {
+    it("recognizes pointer event inside dialog via bounding rect", () => {
+      const mockContainer = {
+        getBoundingClientRect: () => ({
+          left: 100,
+          right: 500,
+          top: 100,
+          bottom: 400,
+          width: 400,
+          height: 300,
+        }),
+      };
+      const mockDialogEl = {
+        shadowRoot: {
+          querySelector: (selector: string) =>
+            selector === ".container" ? mockContainer : null,
+        },
+        contains: () => false,
+      } as unknown as HTMLElement;
+
+      // Inside coordinates
+      expect(
+        isEventInsideDialogElement(mockDialogEl, {
+          clientX: 200,
+          clientY: 200,
+        }),
+      ).toBe(true);
+
+      // Outside coordinates
+      expect(
+        isEventInsideDialogElement(mockDialogEl, {
+          clientX: 50,
+          clientY: 50,
+        }),
+      ).toBe(false);
+    });
+
+    it("recognizes pointer event inside dialog via composedPath", () => {
+      const mockContainer = {
+        getBoundingClientRect: () => ({
+          left: 100,
+          right: 500,
+          top: 100,
+          bottom: 400,
+          width: 400,
+          height: 300,
+        }),
+      };
+      class MockNode {}
+      const slottedContent = new MockNode() as unknown as Node;
+      const mockDialogEl = {
+        shadowRoot: {
+          querySelector: (selector: string) =>
+            selector === ".container" ? mockContainer : null,
+        },
+        contains: (target: unknown) => target === slottedContent,
+      } as unknown as HTMLElement;
+
+      // Event with slotted content in path
+      expect(
+        isEventInsideDialogElement(mockDialogEl, {
+          clientX: 0,
+          clientY: 0,
+          composedPath: () => [slottedContent as unknown as EventTarget, mockDialogEl],
+        }),
+      ).toBe(true);
+
+      // Event with container in path
+      expect(
+        isEventInsideDialogElement(mockDialogEl, {
+          clientX: 0,
+          clientY: 0,
+          composedPath: () => [mockContainer as unknown as EventTarget],
+        }),
+      ).toBe(true);
+
+      // Event with only external backdrop element in path
+      expect(
+        isEventInsideDialogElement(mockDialogEl, {
+          clientX: 50,
+          clientY: 50,
+          composedPath: () => [{} as EventTarget],
+        }),
+      ).toBe(false);
+    });
+
+    it("shouldAllowDialogCancel prevents closing when mouse drag starts inside and ends outside", () => {
+      // User started selecting text inside the dialog and released mouse outside
+      const result = shouldAllowDialogCancel({
+        isPointerInteraction: true,
+        pointerDownStartedOutside: false,
+        pointerUpEndedOutside: true,
+      });
+      expect(result).toBe(false);
+    });
+
+    it("shouldAllowDialogCancel allows closing on genuine outside click", () => {
+      // User clicked on the backdrop (both pointerdown and pointerup outside)
+      const result = shouldAllowDialogCancel({
+        isPointerInteraction: true,
+        pointerDownStartedOutside: true,
+        pointerUpEndedOutside: true,
+      });
+      expect(result).toBe(true);
+    });
+
+    it("shouldAllowDialogCancel prevents closing when click starts outside and ends inside", () => {
+      const result = shouldAllowDialogCancel({
+        isPointerInteraction: true,
+        pointerDownStartedOutside: true,
+        pointerUpEndedOutside: false,
+      });
+      expect(result).toBe(false);
+    });
+
+    it("shouldAllowDialogCancel allows closing on non-pointer interactions like keyboard Escape", () => {
+      const result = shouldAllowDialogCancel({
+        isPointerInteraction: false,
+        pointerDownStartedOutside: false,
+        pointerUpEndedOutside: false,
+      });
+      expect(result).toBe(true);
+    });
   });
 });

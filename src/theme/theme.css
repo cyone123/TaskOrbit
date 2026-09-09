@@ -1009,10 +1009,6 @@ md-icon-button {
   --md-filled-button-hover-icon-color: var(--md-on-error);
 }
 
-.material-dialog--wide {
-  max-width: min(760px, calc(100% - 48px));
-}
-
 /* md-dialog's scrim is a sibling of the showModal() panel, so it stays in
    normal stacking — this layer lifts it above app chrome (top bar, fab).
    Below the snackbar (200) so toasts still surface over dialogs. */
@@ -1167,6 +1163,19 @@ md-dialog {
 .material-dialog {
   --md-dialog-container-shape: var(--shape-xl);
   --md-dialog-container-color: var(--md-surface-container-high);
+  width: min(540px, calc(100vw - 48px));
+  max-width: min(560px, calc(100vw - 48px));
+  max-height: min(880px, calc(100vh - 48px));
+}
+
+.material-dialog--compact {
+  width: min(400px, calc(100vw - 48px));
+  max-width: min(400px, calc(100vw - 48px));
+}
+
+.material-dialog--wide {
+  width: min(760px, calc(100vw - 48px));
+  max-width: min(760px, calc(100vw - 48px));
 }
 
 .material-dialog [slot="headline"] {
