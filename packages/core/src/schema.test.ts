@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyState, parsePersistedState } from "./schema";
+import { STATE_VERSION } from "./version";
 
 describe("persisted state schema", () => {
   it("starts with an empty state", () => {
     const state = createEmptyState();
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.projects).toHaveLength(0);
     expect(state.tasks).toHaveLength(0);
     expect(state.dailyPlans).toHaveLength(0);
@@ -53,7 +54,7 @@ describe("persisted state schema", () => {
       },
     });
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.projects[0].archivedAt).toBeNull();
     expect(state.pomodoroSessions[0].projectNameSnapshot).toBe("项目一");
   });
@@ -94,7 +95,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.activeTimer).toBeNull();
   });
 
@@ -123,7 +124,7 @@ describe("persisted state schema", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.dailyPlans[0].recurrence).toEqual({
       frequency: "none",
       count: 1,
@@ -168,14 +169,31 @@ describe("persisted state schema", () => {
       vaultSettings: {},
     });
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.inboxItems).toEqual([]);
+  });
+
+  it("migrates v6 data with default webdav settings", () => {
+    const state = parsePersistedState({
+      version: 6,
+      projects: [],
+      tasks: [],
+      dailyPlans: [],
+      inboxItems: [],
+      pomodoroSessions: [],
+      settings: {},
+      vaultSettings: {},
+    });
+
+    expect(state.version).toBe(STATE_VERSION);
+    expect(state.webDavSettings.enabled).toBe(false);
+    expect(state.webDavSettings.serverUrl).toBe("");
   });
 
   it("rejects completed notes", () => {
     expect(() =>
       parsePersistedState({
-        version: 6,
+        version: STATE_VERSION,
         projects: [],
         tasks: [],
         dailyPlans: [],

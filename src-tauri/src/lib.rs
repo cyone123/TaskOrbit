@@ -1,5 +1,6 @@
 mod state;
 mod vault;
+mod webdav;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +16,7 @@ pub fn run() {
             vault::delete_note,
             vault::create_vault,
             vault::open_note_in_obsidian,
+            webdav::webdav_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

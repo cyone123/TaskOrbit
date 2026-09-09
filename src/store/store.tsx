@@ -41,7 +41,12 @@ import {
   updateTaskState,
   updateTimerLink,
   updateVaultSettingsState,
+  updateWebDavSettingsState,
   validateAppState,
+  SyncCoordinator,
+  recordTombstone,
+  pruneTombstones,
+  WebDavClient,
   type DailyPlanInput,
   type DailyPlanPatch,
   type InboxItemInput,
@@ -61,6 +66,11 @@ import {
   type Settings,
   type Task,
   type VaultSettings,
+  type WebDavSettings,
+  type Tombstone,
+  type SyncStatus,
+  type SyncResult,
+  type WebDavConnectionTestResult,
 } from "@task-orbit/core";
 import {
   clearPersistedState,
@@ -69,6 +79,7 @@ import {
   type PersistedLoadResult,
 } from "./persistence";
 import { createDefaultState } from "./seed";
+import { desktopHttpTransport } from "./webdav-transport";
 
 export { STATE_VERSION } from "@task-orbit/core";
 export type {
@@ -81,6 +92,10 @@ export type {
   ProjectPatch,
   TaskInput,
   TaskPatch,
+  WebDavSettings,
+  SyncStatus,
+  SyncResult,
+  WebDavConnectionTestResult,
 } from "@task-orbit/core";
 
 export type StoreStatus = "loading" | "ready" | "error";
@@ -93,6 +108,12 @@ export interface StoreApi {
   loadError: string | null;
   persistenceError: string | null;
   timerRecoveryWarning: string | null;
+  syncStatus: SyncStatus;
+  lastSyncAt: number | null;
+  syncErrorMessage: string | null;
+  syncNow: () => Promise<SyncResult>;
+  testWebDavConnection: (settings?: WebDavSettings) => Promise<WebDavConnectionTestResult>;
+  updateWebDavSettings: (patch: Partial<WebDavSettings>) => void;
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
@@ -147,6 +168,38 @@ function reconcileAppState(
   };
 }
 
+const LS_TOMBSTONES_KEY = "task-orbit-tombstones";
+const LS_LAST_REMOTE_ETAG_KEY = "task-orbit-webdav-etag";
+const LS_LAST_SYNC_AT_KEY = "task-orbit-webdav-last-sync";
+const LS_DEVICE_ID_KEY = "task-orbit-device-id";
+
+function getDeviceId(): string {
+  if (typeof window === "undefined") return "node_runtime";
+  let id = localStorage.getItem(LS_DEVICE_ID_KEY);
+  if (!id) {
+    id = uid("dev_");
+    localStorage.setItem(LS_DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function loadLocalTombstones(): Tombstone[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LS_TOMBSTONES_KEY);
+    return raw ? pruneTombstones(JSON.parse(raw) as Tombstone[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalTombstones(tombstones: Tombstone[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LS_TOMBSTONES_KEY, JSON.stringify(tombstones));
+  } catch {}
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(() => createDefaultState());
   const [status, setStatus] = useState<StoreStatus>("loading");
@@ -154,6 +207,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [timerRecoveryWarning, setTimerRecoveryWarning] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(LS_LAST_SYNC_AT_KEY);
+    return raw ? Number(raw) : null;
+  });
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
   const readyRef = useRef(false);
@@ -163,6 +223,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const saveTimerRef = useRef<number | undefined>(undefined);
   const skipNextStatePersistRef = useRef(false);
+  const localDirtyRef = useRef(false);
+  const tombstonesRef = useRef<Tombstone[]>(loadLocalTombstones());
+  const autoSyncDebounceTimerRef = useRef<number | undefined>(undefined);
   stateRef.current = state;
 
   const enqueuePersist = useCallback((snapshot: AppState): Promise<void> => {
@@ -293,18 +356,150 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [status, reconcileTimerState]);
 
-  const mutate = useCallback((fn: (state: AppState) => AppState) => {
-    setState((previous) => {
-      try {
-        const next = validateAppState(fn(previous));
-        stateRef.current = next;
-        return next;
-      } catch (error) {
-        console.error("rejected invalid state mutation", error);
-        return previous;
+  const coordinatorRef = useRef<SyncCoordinator | null>(null);
+
+  const syncNow = useCallback(async (): Promise<SyncResult> => {
+    if (!coordinatorRef.current) {
+      return { success: false, message: "同步未就绪", hasChanges: false };
+    }
+    setSyncStatus("syncing");
+    setSyncErrorMessage(null);
+    try {
+      const res = await coordinatorRef.current.sync();
+      if (res.success) {
+        setSyncStatus("success");
+      } else {
+        setSyncStatus("error");
+        setSyncErrorMessage(res.message ?? "同步失败");
       }
-    });
+      return res;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSyncStatus("error");
+      setSyncErrorMessage(msg);
+      return { success: false, message: msg, hasChanges: false };
+    }
   }, []);
+
+  if (!coordinatorRef.current) {
+    coordinatorRef.current = new SyncCoordinator({
+      deviceId: getDeviceId(),
+      transport: desktopHttpTransport,
+      getState: () => stateRef.current,
+      getTombstones: () => tombstonesRef.current,
+      getLastRemoteEtag: () => {
+        if (typeof window === "undefined") return null;
+        return localStorage.getItem(LS_LAST_REMOTE_ETAG_KEY);
+      },
+      isLocalDirty: () => localDirtyRef.current,
+      onStateMerged: async (mergedState, mergedTombstones) => {
+        tombstonesRef.current = mergedTombstones;
+        saveLocalTombstones(mergedTombstones);
+        skipNextStatePersistRef.current = true;
+        stateRef.current = mergedState;
+        setState(mergedState);
+        await enqueuePersist(mergedState);
+      },
+      onSyncSuccess: async (etag, timestamp) => {
+        localDirtyRef.current = false;
+        if (etag && typeof window !== "undefined") {
+          localStorage.setItem(LS_LAST_REMOTE_ETAG_KEY, etag);
+        }
+        if (typeof window !== "undefined") {
+          localStorage.setItem(LS_LAST_SYNC_AT_KEY, String(timestamp));
+        }
+        setLastSyncAt(timestamp);
+      },
+    });
+  }
+
+  const triggerAutoSyncDebounced = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (autoSyncDebounceTimerRef.current !== undefined) {
+      window.clearTimeout(autoSyncDebounceTimerRef.current);
+    }
+    autoSyncDebounceTimerRef.current = window.setTimeout(() => {
+      autoSyncDebounceTimerRef.current = undefined;
+      const s = stateRef.current.webDavSettings;
+      if (s.enabled && s.autoSync && s.serverUrl.trim()) {
+        void syncNow();
+      }
+    }, 10_000);
+  }, [syncNow]);
+
+  const addTombstone = useCallback(
+    (id: string, type: "project" | "task" | "dailyPlan" | "inboxItem") => {
+      const next = recordTombstone(tombstonesRef.current, id, type);
+      tombstonesRef.current = next;
+      saveLocalTombstones(next);
+      localDirtyRef.current = true;
+      triggerAutoSyncDebounced();
+    },
+    [triggerAutoSyncDebounced],
+  );
+
+  const testWebDavConnection = useCallback(
+    async (settingsOverride?: WebDavSettings): Promise<WebDavConnectionTestResult> => {
+      const s = settingsOverride ?? stateRef.current.webDavSettings;
+      const client = new WebDavClient(s, desktopHttpTransport);
+      return client.testConnection();
+    },
+    [],
+  );
+
+  // Background auto-sync on ready
+  useEffect(() => {
+    if (status !== "ready") return;
+    const s = stateRef.current.webDavSettings;
+    if (s.enabled && s.autoSync && s.serverUrl.trim()) {
+      void syncNow();
+    }
+  }, [status, syncNow]);
+
+  // Periodic background auto-sync
+  useEffect(() => {
+    if (status !== "ready") return;
+    const s = state.webDavSettings;
+    if (!s.enabled || !s.autoSync || !s.serverUrl.trim()) return;
+
+    const intervalMs = Math.max(1, s.syncIntervalMinutes) * 60_000;
+    const timer = setInterval(() => {
+      void syncNow();
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [
+    status,
+    state.webDavSettings.enabled,
+    state.webDavSettings.autoSync,
+    state.webDavSettings.syncIntervalMinutes,
+    state.webDavSettings.serverUrl,
+    syncNow,
+  ]);
+
+  const mutate = useCallback(
+    (fn: (state: AppState) => AppState) => {
+      setState((previous) => {
+        try {
+          const next = validateAppState(fn(previous));
+          stateRef.current = next;
+          localDirtyRef.current = true;
+          triggerAutoSyncDebounced();
+          return next;
+        } catch (error) {
+          console.error("rejected invalid state mutation", error);
+          return previous;
+        }
+      });
+    },
+    [triggerAutoSyncDebounced],
+  );
+
+  const updateWebDavSettings = useCallback<StoreApi["updateWebDavSettings"]>(
+    (patch) => {
+      mutate((state) => updateWebDavSettingsState(state, patch));
+    },
+    [mutate],
+  );
 
   const addProject = useCallback<StoreApi["addProject"]>((input) => {
     const project = createProject(input);
@@ -324,9 +519,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => restoreProjectState(state, id));
   }, [mutate]);
 
-  const deleteProject = useCallback<StoreApi["deleteProject"]>((id) => {
-    mutate((state) => deleteProjectState(state, id));
-  }, [mutate]);
+  const deleteProject = useCallback<StoreApi["deleteProject"]>(
+    (id) => {
+      addTombstone(id, "project");
+      mutate((state) => deleteProjectState(state, id));
+    },
+    [mutate, addTombstone],
+  );
 
   const addTask = useCallback<StoreApi["addTask"]>((input) => {
     const task = createTask(input);
@@ -338,9 +537,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => updateTaskState(state, id, patch));
   }, [mutate]);
 
-  const deleteTask = useCallback<StoreApi["deleteTask"]>((id) => {
-    mutate((state) => deleteTaskState(state, id));
-  }, [mutate]);
+  const deleteTask = useCallback<StoreApi["deleteTask"]>(
+    (id) => {
+      addTombstone(id, "task");
+      mutate((state) => deleteTaskState(state, id));
+    },
+    [mutate, addTombstone],
+  );
 
   const addInboxItem = useCallback<StoreApi["addInboxItem"]>((input) => {
     const item = createInboxItem(input);
@@ -352,9 +555,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => updateInboxItemState(state, id, patch));
   }, [mutate]);
 
-  const deleteInboxItem = useCallback<StoreApi["deleteInboxItem"]>((id) => {
-    mutate((state) => deleteInboxItemState(state, id));
-  }, [mutate]);
+  const deleteInboxItem = useCallback<StoreApi["deleteInboxItem"]>(
+    (id) => {
+      addTombstone(id, "inboxItem");
+      mutate((state) => deleteInboxItemState(state, id));
+    },
+    [mutate, addTombstone],
+  );
 
   const addDailyPlan = useCallback<StoreApi["addDailyPlan"]>((input) => {
     const plans = createDailyPlans(input);
@@ -366,9 +573,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => updateDailyPlanState(state, id, patch));
   }, [mutate]);
 
-  const deleteDailyPlan = useCallback<StoreApi["deleteDailyPlan"]>((id) => {
-    mutate((state) => deleteDailyPlanState(state, id));
-  }, [mutate]);
+  const deleteDailyPlan = useCallback<StoreApi["deleteDailyPlan"]>(
+    (id) => {
+      addTombstone(id, "dailyPlan");
+      mutate((state) => deleteDailyPlanState(state, id));
+    },
+    [mutate, addTombstone],
+  );
 
   const addPomodoroSession = useCallback<StoreApi["addPomodoroSession"]>((input) => {
     const session: PomodoroSession = {
@@ -504,6 +715,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         loadError,
         persistenceError,
         timerRecoveryWarning,
+        syncStatus,
+        lastSyncAt,
+        syncErrorMessage,
+        syncNow,
+        testWebDavConnection,
+        updateWebDavSettings,
         retryLoad,
         addProject,
         updateProject,

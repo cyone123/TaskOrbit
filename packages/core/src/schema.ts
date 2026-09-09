@@ -2,7 +2,11 @@ import { z } from "zod";
 import type { AppState } from "./types";
 import { migratePersistedState } from "./migrations";
 import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
-import { DEFAULT_SETTINGS, DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_VAULT_SETTINGS,
+  DEFAULT_WEBDAV_SETTINGS,
+} from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
 export { STATE_VERSION } from "./version";
@@ -246,6 +250,20 @@ const vaultSettingsSchema = z.object({
   openWithObsidian: z.boolean().default(DEFAULT_VAULT_SETTINGS.openWithObsidian),
 });
 
+export const webDavSettingsSchema = z.object({
+  enabled: z.boolean().default(DEFAULT_WEBDAV_SETTINGS.enabled),
+  serverUrl: z.string().trim().default(DEFAULT_WEBDAV_SETTINGS.serverUrl),
+  username: z.string().trim().default(DEFAULT_WEBDAV_SETTINGS.username),
+  password: z.string().default(DEFAULT_WEBDAV_SETTINGS.password),
+  remoteDir: z.string().trim().default(DEFAULT_WEBDAV_SETTINGS.remoteDir),
+  autoSync: z.boolean().default(DEFAULT_WEBDAV_SETTINGS.autoSync),
+  syncIntervalMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .default(DEFAULT_WEBDAV_SETTINGS.syncIntervalMinutes),
+});
+
 export const appStateSchema = z.object({
   version: z.literal(STATE_VERSION),
   projects: z.array(projectSchema),
@@ -256,6 +274,7 @@ export const appStateSchema = z.object({
   settings: settingsSchema,
   vaultSettings: vaultSettingsSchema,
   activeTimer: activeTimerSchema.nullable(),
+  webDavSettings: webDavSettingsSchema,
 });
 
 const persistedEnvelopeSchema = z
@@ -269,6 +288,7 @@ const persistedEnvelopeSchema = z
     settings: z.unknown().optional(),
     vaultSettings: z.unknown().optional(),
     activeTimer: z.unknown().optional(),
+    webDavSettings: z.unknown().optional(),
   })
   .passthrough();
 
@@ -283,6 +303,7 @@ export function createEmptyState(): AppState {
     settings: { ...DEFAULT_SETTINGS },
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     activeTimer: null,
+    webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
   };
 }
 
@@ -312,6 +333,7 @@ export function parsePersistedState(raw: unknown): AppState {
     settings: envelope.data.settings ?? {},
     vaultSettings: envelope.data.vaultSettings ?? {},
     activeTimer: envelope.data.activeTimer ?? null,
+    webDavSettings: envelope.data.webDavSettings ?? {},
   });
   const parsed = appStateSchema.safeParse(migrated);
   if (!parsed.success) {

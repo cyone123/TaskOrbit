@@ -1,2 +1,2 @@
 /** Persisted data schema version. Increment this when the JSON shape changes. */
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;

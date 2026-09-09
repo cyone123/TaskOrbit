@@ -3,17 +3,97 @@ import { File, Paths } from "expo-file-system";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { useMemo, useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
-import { AppScreen, Card, ChoiceRow, FilledButton, IconButton, PageScroll, TonalButton } from "@/components/ui";
+import { AppScreen, Card, ChoiceRow, Field, FilledButton, FormModal, IconButton, PageScroll, TonalButton } from "@/components/ui";
 import { MD3Shape, MD3Typography, useAppColors, useAppTheme } from "@/constants/theme";
 import { PROJECT_COLOR_HEX, useAppStore } from "@/store/app-store";
 
 export default function StatsScreen() {
   const colors = useAppColors();
   const { preference } = useAppTheme();
-  const { state, exportSnapshot, importSnapshot, updateTheme } = useAppStore();
+  const {
+    state,
+    exportSnapshot,
+    importSnapshot,
+    updateTheme,
+    syncStatus,
+    lastSyncAt,
+    syncErrorMessage,
+    syncNow,
+    testWebDavConnection,
+    updateWebDavSettings,
+  } = useAppStore();
   const [busy, setBusy] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const webDav = state.webDavSettings;
+  const [serverUrl, setServerUrl] = useState(webDav.serverUrl);
+  const [username, setUsername] = useState(webDav.username);
+  const [password, setPassword] = useState(webDav.password);
+  const [remoteDir, setRemoteDir] = useState(webDav.remoteDir);
+  const [enabled, setEnabled] = useState(webDav.enabled);
+  const [autoSync, setAutoSync] = useState(webDav.autoSync);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const openSettingsModal = () => {
+    setServerUrl(webDav.serverUrl);
+    setUsername(webDav.username);
+    setPassword(webDav.password);
+    setRemoteDir(webDav.remoteDir);
+    setEnabled(webDav.enabled);
+    setAutoSync(webDav.autoSync);
+    setModalOpen(true);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const res = await testWebDavConnection({
+        ...webDav,
+        serverUrl,
+        username,
+        password,
+        remoteDir,
+        enabled,
+        autoSync,
+      });
+      Alert.alert(res.success ? "测试成功" : "测试失败", res.message);
+    } catch (e) {
+      Alert.alert("测试异常", e instanceof Error ? e.message : String(e));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSaveSettings = () => {
+    updateWebDavSettings({
+      serverUrl,
+      username,
+      password,
+      remoteDir,
+      enabled,
+      autoSync,
+    });
+    setModalOpen(false);
+    Alert.alert("已保存", "WebDAV 配置已更新");
+  };
+
+  const handleSyncPress = async () => {
+    setSyncing(true);
+    try {
+      const res = await syncNow();
+      if (res.success) {
+        Alert.alert("同步完成", res.hasChanges ? "已与云端完成双向合并" : "数据已是最新");
+      } else {
+        Alert.alert("同步未完成", res.message ?? "未知原因");
+      }
+    } catch (e) {
+      Alert.alert("同步失败", e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncing(false);
+    }
+  };
   const focusSessions = state.pomodoroSessions.filter((session) => session.kind === "focus");
   const totalMinutes = focusSessions.reduce((sum, session) => sum + session.minutes, 0);
   const today = new Date();
@@ -219,12 +299,113 @@ export default function StatsScreen() {
           </View>
         </Card>
 
+        <Card variant="elevated" style={styles.dataCard}>
+          <View style={[styles.dataIcon, { backgroundColor: colors.secondaryContainer }]}>
+            <Ionicons name="cloud-done-outline" size={24} color={colors.onSecondaryContainer} />
+          </View>
+          <View style={styles.dataCopy}>
+            <Text style={[styles.dataTitle, { color: colors.onSurface }]}>WebDAV 云同步</Text>
+            <Text style={[styles.dataDescription, { color: colors.onSurfaceVariant }]}>
+              {webDav.enabled
+                ? `状态：${syncStatus === "syncing" ? "正在同步…" : lastSyncAt ? `已同步 (${formatLastSyncTime(lastSyncAt)})` : "等待首次同步"}${syncErrorMessage ? `\n异常：${syncErrorMessage}` : ""}`
+                : "未启用。可配置自建或公共 WebDAV 服务器进行跨设备双向同步。"}
+            </Text>
+          </View>
+          <View style={styles.dataActions}>
+            <View style={styles.flex}>
+              <TonalButton
+                label={syncing ? "同步中…" : "立即同步"}
+                icon="sync-outline"
+                onPress={() => void handleSyncPress()}
+                disabled={syncing || !webDav.serverUrl.trim()}
+              />
+            </View>
+            <View style={styles.flex}>
+              <TonalButton
+                label="设置"
+                icon="settings-outline"
+                onPress={openSettingsModal}
+                disabled={syncing}
+              />
+            </View>
+          </View>
+        </Card>
+
         <Text style={[styles.vaultNote, { color: colors.onSurfaceVariant }]}>
           Obsidian Vault 集成按计划暂缓，移动端不会读取或修改 Vault 路径。
         </Text>
       </PageScroll>
+
+      <FormModal
+        visible={modalOpen}
+        title="WebDAV 云同步设置"
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleSaveSettings}
+        submitLabel="保存配置"
+      >
+        <View style={styles.switchRow}>
+          <Text style={[styles.switchLabel, { color: colors.onSurface }]}>启用 WebDAV 同步</Text>
+          <Switch value={enabled} onValueChange={setEnabled} />
+        </View>
+
+        <Field
+          label="服务器地址"
+          placeholder="https://dav.example.com/webdav/"
+          value={serverUrl}
+          onChangeText={setServerUrl}
+          autoCapitalize="none"
+        />
+
+        <Field
+          label="用户名"
+          placeholder="WebDAV 账户"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+        />
+
+        <Field
+          label="密码 / 应用令牌"
+          placeholder="WebDAV 密码"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <Field
+          label="远端目录"
+          placeholder="/taskorbit"
+          value={remoteDir}
+          onChangeText={setRemoteDir}
+          autoCapitalize="none"
+        />
+
+        <View style={styles.switchRow}>
+          <Text style={[styles.switchLabel, { color: colors.onSurface }]}>自动静默同步（启动 / 切前台）</Text>
+          <Switch value={autoSync} onValueChange={setAutoSync} />
+        </View>
+
+        <View style={{ marginTop: 8 }}>
+          <TonalButton
+            label={testing ? "测试中…" : "测试连接"}
+            icon="checkmark-circle-outline"
+            onPress={() => void handleTestConnection()}
+            disabled={testing || !serverUrl.trim()}
+          />
+        </View>
+      </FormModal>
     </AppScreen>
   );
+}
+
+function formatLastSyncTime(timestamp: number | null): string {
+  if (!timestamp) return "从未同步";
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMin = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (diffMin < 1) return "刚刚";
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function formatHours(minutes: number): string {
@@ -275,4 +456,14 @@ const styles = StyleSheet.create({
   dataActions: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
   vaultNote: { ...MD3Typography.bodySmall, fontSize: 11, lineHeight: 16, textAlign: "center", paddingHorizontal: 16, marginTop: 8 },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    ...MD3Typography.bodyMedium,
+    fontWeight: "500",
+  },
 });

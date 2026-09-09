@@ -56,7 +56,7 @@ export function AppScreen({
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}>
         <View style={styles.topAppBar}>
-          {leading}
+          {leading as any}
           <View style={styles.topAppBarCopy}>
             <Text style={[styles.appBarTitle, { color: colors.onSurface }]} numberOfLines={1}>
               {title}
@@ -67,7 +67,7 @@ export function AppScreen({
               </Text>
             ) : null}
           </View>
-          {action}
+          {action as any}
           <IconButton
             icon={preference === "dark" ? "moon" : preference === "light" ? "sunny" : "contrast"}
             label={`切换主题，当前：${preference === "system" ? "跟随系统" : preference === "light" ? "浅色" : "深色"}`}
@@ -95,7 +95,7 @@ export function AppScreen({
 export function PageScroll({ children }: PropsWithChildren) {
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      {children}
+      {children as any}
     </ScrollView>
   );
 }
@@ -221,12 +221,12 @@ export function Card({
   if (onPress) {
     return (
       <AnimatedPressable onPress={onPress} scaleTo={0.98} style={[styles.card, variantStyle, style]}>
-        {children}
+        {children as any}
       </AnimatedPressable>
     );
   }
 
-  return <View style={[styles.card, variantStyle, style]}>{children}</View>;
+  return <View style={[styles.card, variantStyle, style]}>{children as any}</View>;
 }
 
 /* ==========================================================================
@@ -919,7 +919,7 @@ export function FormModal({
               contentContainerStyle={styles.form}
               keyboardShouldPersistTaps="handled"
             >
-              {children}
+              {children as any}
             </ScrollView>
             <View style={styles.modalFooter}>
               <FilledButton label={submitLabel} onPress={onSubmit} disabled={!canSubmit} />
@@ -942,6 +942,8 @@ export function Field({
   placeholder,
   multiline,
   keyboardType,
+  secureTextEntry,
+  autoCapitalize,
 }: {
   label: string;
   value: string;
@@ -949,6 +951,8 @@ export function Field({
   placeholder?: string;
   multiline?: boolean;
   keyboardType?: "default" | "number-pad";
+  secureTextEntry?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
 }) {
   const colors = useAppColors();
   const [focused, setFocused] = useState(false);
@@ -1005,6 +1009,8 @@ export function Field({
           cursorColor={colors.primary}
           multiline={multiline}
           keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize}
           style={[styles.fieldInput, multiline && styles.multilineInput, { color: colors.onSurface }]}
         />
       </View>

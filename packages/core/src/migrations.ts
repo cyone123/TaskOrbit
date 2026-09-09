@@ -1,4 +1,8 @@
-import { DEFAULT_SETTINGS, DEFAULT_VAULT_SETTINGS } from "./schemaDefaults";
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_VAULT_SETTINGS,
+  DEFAULT_WEBDAV_SETTINGS,
+} from "./schemaDefaults";
 import { STATE_VERSION } from "./version";
 
 type JsonRecord = Record<string, unknown>;
@@ -120,8 +124,17 @@ function migrateV4ToV5(input: JsonRecord): JsonRecord {
 function migrateV5ToV6(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 6,
     inboxItems: asArray(input.inboxItems),
+  };
+}
+
+/** v7 adds WebDAV synchronization settings. */
+function migrateV6ToV7(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS, ...asRecord(input.webDavSettings) },
   };
 }
 
@@ -143,6 +156,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 3) migrated = migrateV3ToV4(migrated);
   if (version <= 4) migrated = migrateV4ToV5(migrated);
   if (version <= 5) migrated = migrateV5ToV6(migrated);
+  if (version <= 6) migrated = migrateV6ToV7(migrated);
 
   return migrated;
 }

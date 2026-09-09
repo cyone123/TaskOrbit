@@ -30,6 +30,7 @@ function parseJsonString(raw: string): unknown {
 /** Serialize stable user data; an in-flight timer is intentionally excluded. */
 export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()): string {
   const { rootPath: _rootPath, vaultName: _vaultName, ...portableVaultSettings } = state.vaultSettings;
+  const { password: _password, ...portableWebDavSettings } = state.webDavSettings;
   const envelope: TaskOrbitExportEnvelope = {
     format: EXPORT_FORMAT,
     formatVersion: EXPORT_FORMAT_VERSION,
@@ -42,6 +43,11 @@ export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()
         enabled: false,
         rootPath: null,
         vaultName: null,
+      },
+      webDavSettings: {
+        ...portableWebDavSettings,
+        enabled: false,
+        password: "",
       },
     },
   };

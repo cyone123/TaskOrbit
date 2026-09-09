@@ -12,6 +12,7 @@ import type {
   Task,
   Settings,
   VaultSettings,
+  WebDavSettings,
 } from "./types";
 import { uid } from "./id";
 import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
@@ -495,4 +496,11 @@ export function updateVaultSettingsState(
   patch: Partial<VaultSettings>,
 ): AppState {
   return { ...state, vaultSettings: { ...state.vaultSettings, ...patch } };
+}
+
+export function updateWebDavSettingsState(
+  state: AppState,
+  patch: Partial<WebDavSettings>,
+): AppState {
+  return { ...state, webDavSettings: { ...state.webDavSettings, ...patch } };
 }

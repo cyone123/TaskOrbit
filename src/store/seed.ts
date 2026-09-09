@@ -1,5 +1,6 @@
 import {
   DEFAULT_VAULT_SETTINGS,
+  DEFAULT_WEBDAV_SETTINGS,
   STATE_VERSION,
   addDays,
   createEmptyState,
@@ -233,6 +234,7 @@ export function createDemoState(): AppState {
     pomodoroSessions: sessions,
     activeTimer: null,
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
+    webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
     settings: {
       theme: "system",
       focusMinutes: 25,

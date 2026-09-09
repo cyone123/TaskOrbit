@@ -4,11 +4,21 @@ import {
   parseImportSnapshot,
   serializeExportSnapshot,
 } from "./transfer";
+import { STATE_VERSION } from "./version";
 
 describe("snapshot transfer", () => {
   it("exports an envelope without the active timer and imports it back", () => {
     const state = {
       ...createEmptyState(),
+      webDavSettings: {
+        enabled: true,
+        serverUrl: "https://dav.test",
+        username: "admin",
+        password: "secretpassword",
+        remoteDir: "/taskorbit",
+        autoSync: true,
+        syncIntervalMinutes: 15,
+      },
       activeTimer: {
         projectId: null,
         taskId: null,
@@ -28,8 +38,10 @@ describe("snapshot transfer", () => {
     expect(exported.exportedAt).toBe(123);
     expect(exported.state.activeTimer).toBeNull();
     expect(exported.state.vaultSettings.rootPath).toBeNull();
+    expect(exported.state.webDavSettings.password).toBe("");
+    expect(exported.state.webDavSettings.enabled).toBe(false);
     expect(parseImportSnapshot(exported)).toMatchObject({
-      version: 6,
+      version: STATE_VERSION,
       activeTimer: null,
     });
   });
@@ -44,7 +56,7 @@ describe("snapshot transfer", () => {
       settings: {},
     });
 
-    expect(state.version).toBe(6);
+    expect(state.version).toBe(STATE_VERSION);
     expect(state.activeTimer).toBeNull();
   });
 

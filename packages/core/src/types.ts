@@ -118,6 +118,24 @@ export interface VaultSettings {
   openWithObsidian: boolean;
 }
 
+export interface WebDavSettings {
+  enabled: boolean;
+  serverUrl: string;
+  username: string;
+  password: string;
+  remoteDir: string;
+  autoSync: boolean;
+  syncIntervalMinutes: number;
+}
+
+export type EntityType = "project" | "task" | "dailyPlan" | "inboxItem";
+
+export interface Tombstone {
+  id: string;
+  type: EntityType;
+  deletedAt: number;
+}
+
 export interface AppState {
   version: number;
   projects: Project[];
@@ -128,6 +146,7 @@ export interface AppState {
   settings: Settings;
   vaultSettings: VaultSettings;
   activeTimer: ActiveTimer | null;
+  webDavSettings: WebDavSettings;
 }
 
 // ---- Small helper types -----------------------------------------------------

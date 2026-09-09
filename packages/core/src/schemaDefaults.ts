@@ -1,4 +1,4 @@
-import type { Settings, VaultSettings } from "./types";
+import type { Settings, VaultSettings, WebDavSettings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -15,4 +15,14 @@ export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
   notesFolder: "Task Orbit/Notes",
   autoReload: true,
   openWithObsidian: true,
+};
+
+export const DEFAULT_WEBDAV_SETTINGS: WebDavSettings = {
+  enabled: false,
+  serverUrl: "",
+  username: "",
+  password: "",
+  remoteDir: "/taskorbit",
+  autoSync: true,
+  syncIntervalMinutes: 15,
 };
