@@ -13,7 +13,9 @@ import {
   formatDateFull,
   isToday,
   isWeekend,
+  layoutMonthWeekTasks,
   layoutPlanColumns,
+  monthGridDays,
   monthLabel,
   parseISODate,
   startOfWeek,
@@ -47,16 +49,11 @@ const WEEK_DETAIL_END_HOUR = 24;
 
 type CalendarMode = "month" | "week" | "day";
 type WeekViewMode = "gantt" | "detail";
+type MonthViewFilter = "all" | "tasks" | "plans";
 
 interface BarRange {
   startIdx: number;
   endIdx: number;
-}
-
-function monthGridDays(anchor: Date): Date[] {
-  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const gridStart = startOfWeek(monthStart);
-  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
 }
 
 export function CalendarView() {
@@ -66,6 +63,7 @@ export function CalendarView() {
 
   const [mode, setMode] = useState<CalendarMode>("week");
   const [weekView, setWeekView] = useState<WeekViewMode>("gantt");
+  const [monthFilter, setMonthFilter] = useState<MonthViewFilter>("all");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -129,6 +127,27 @@ export function CalendarView() {
       });
   }, [state.tasks, anchor, projectById]);
 
+  const tasksInMonth = useMemo(() => {
+    const gridStart = monthDays[0];
+    const gridEnd = monthDays[monthDays.length - 1];
+    return state.tasks.filter(
+      (task) =>
+        parseISODate(task.endDate) >= gridStart &&
+        parseISODate(task.startDate) <= gridEnd,
+    );
+  }, [monthDays, state.tasks]);
+
+  const plansInMonthCount = useMemo(() => {
+    const gridStartISO = toISODate(monthDays[0]);
+    const gridEndISO = toISODate(monthDays[monthDays.length - 1]);
+    return state.dailyPlans.filter(
+      (plan) => plan.date >= gridStartISO && plan.date <= gridEndISO,
+    ).length;
+  }, [monthDays, state.dailyPlans]);
+
+  const showTasks = monthFilter === "all" || monthFilter === "tasks";
+  const showDailyPlans = monthFilter === "all" || monthFilter === "plans";
+
   const plansOfDay = useMemo(() => {
     return state.dailyPlans
       .filter((plan) => plan.date === selectedISO)
@@ -161,27 +180,13 @@ export function CalendarView() {
     [plansOfDay],
   );
 
-  const monthTasksByDate = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    const gridStart = monthDays[0];
-    const gridEnd = monthDays[monthDays.length - 1];
-
-    state.tasks
-      .filter(
-        (task) =>
-          parseISODate(task.endDate) >= gridStart &&
-          parseISODate(task.startDate) <= gridEnd,
-      )
-      .forEach((task) => {
-        const start = parseISODate(task.startDate) < gridStart
-          ? gridStart
-          : parseISODate(task.startDate);
-        const date = toISODate(start);
-        map.set(date, [...(map.get(date) ?? []), task]);
-      });
-
-    return map;
-  }, [monthDays, state.tasks]);
+  const monthWeeks = useMemo(() => {
+    const weeks: Date[][] = [];
+    for (let i = 0; i < monthDays.length; i += 7) {
+      weeks.push(monthDays.slice(i, i + 7));
+    }
+    return weeks;
+  }, [monthDays]);
 
   useEffect(() => {
     if (mode === "day") {
@@ -341,6 +346,41 @@ export function CalendarView() {
       )}
 
       {mode === "month" && (
+        <div className="calendar-subtoolbar">
+          <span className="label-lg muted">
+            {monthFilter === "tasks"
+              ? `本月 ${tasksInMonth.length} 个任务`
+              : monthFilter === "plans"
+                ? `本月 ${plansInMonthCount} 项计划`
+                : `本月 ${tasksInMonth.length} 个任务 · ${plansInMonthCount} 项计划`}
+          </span>
+          <OutlinedSegmentedButtonSet className="segmented-control calendar-submode-switcher">
+            <OutlinedSegmentedButton
+              label="全部"
+              selected={monthFilter === "all"}
+              onClick={() => setMonthFilter("all")}
+            >
+              <Icon name="grid_view" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+            <OutlinedSegmentedButton
+              label="任务"
+              selected={monthFilter === "tasks"}
+              onClick={() => setMonthFilter("tasks")}
+            >
+              <Icon name="timeline" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+            <OutlinedSegmentedButton
+              label="每日计划"
+              selected={monthFilter === "plans"}
+              onClick={() => setMonthFilter("plans")}
+            >
+              <Icon name="calendar_view_day" size={16} slot="icon" />
+            </OutlinedSegmentedButton>
+          </OutlinedSegmentedButtonSet>
+        </div>
+      )}
+
+      {mode === "month" && (
         <div className="month-calendar">
           <div className="month-calendar__weekdays">
             {days.map((day) => (
@@ -349,83 +389,163 @@ export function CalendarView() {
               </div>
             ))}
           </div>
-          <div className="month-calendar__grid">
-            {monthDays.map((day) => {
-              const iso = toISODate(day);
-              const dayPlans = state.dailyPlans
-                .filter((plan) => plan.date === iso)
-                .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-              const dayTasks = monthTasksByDate.get(iso) ?? [];
-              const events = [
-                ...dayTasks.map((task) => ({ type: "task" as const, item: task })),
-                ...dayPlans.map((plan) => ({ type: "plan" as const, item: plan })),
-              ];
-              const visibleEvents = events.slice(0, 4);
-              const hiddenCount = events.length - visibleEvents.length;
-              const inCurrentMonth = day.getMonth() === monthStart.getMonth();
+          <div className="month-calendar__weeks">
+            {monthWeeks.map((week, weekIdx) => {
+              const weekSegments = layoutMonthWeekTasks(state.tasks, week);
+              const maxTrack = weekSegments.reduce((m, s) => Math.max(m, s.trackIndex), -1);
+              const trackCount = maxTrack + 1;
 
               return (
-                <div
-                  key={iso}
-                  className={`month-calendar__cell ${inCurrentMonth ? "" : "outside"} ${isToday(iso) ? "today" : ""} ${isWeekend(day) ? "weekend" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="month-calendar__date"
-                    onClick={() => {
-                      setAnchor(day);
-                      setMode("day");
-                    }}
-                    aria-label={`查看${formatDateFull(iso)}`}
-                  >
-                    {day.getDate()}
-                  </button>
-                  <div className="month-calendar__events">
-                    {visibleEvents.map((event) => {
-                      if (event.type === "task") {
-                        const task = event.item;
-                        return (
-                          <button
-                            key={`task-${task.id}`}
-                            type="button"
-                            className="month-event month-event--task"
-                            style={eventVars(task.projectId)}
-                            onClick={() => openTaskEditor(task)}
-                            title={`${task.name} · ${task.startDate} ~ ${task.endDate}`}
-                          >
-                            <span className="month-event__dot" />
-                            <span className="ellipsis">{task.name}</span>
-                          </button>
-                        );
-                      }
-
-                      const plan = event.item;
+                <div key={`week-${weekIdx}`} className="month-calendar__week-row">
+                  {/* Background Day Cells */}
+                  <div className="month-calendar__week-bg">
+                    {week.map((day) => {
+                      const iso = toISODate(day);
+                      const inCurrentMonth = day.getMonth() === monthStart.getMonth();
                       return (
-                        <button
-                          key={`plan-${plan.id}`}
-                          type="button"
-                          className="month-event month-event--plan"
-                          style={eventVars(plan.projectId)}
-                          onClick={() => openPlanEditor(plan)}
-                          title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
-                        >
-                          <span className="ellipsis">{plan.name}</span>
-                          <span className="month-event__time">· {plan.startTime}</span>
-                        </button>
+                        <div
+                          key={iso}
+                          className={`month-calendar__cell-bg ${inCurrentMonth ? "" : "outside"} ${isToday(iso) ? "today" : ""} ${isWeekend(day) ? "weekend" : ""}`}
+                        />
                       );
                     })}
-                    {hiddenCount > 0 && (
-                      <button
-                        type="button"
-                        className="month-calendar__more"
-                        onClick={() => {
-                          setAnchor(day);
-                          setMode("day");
+                  </div>
+
+                  {/* Foreground Content */}
+                  <div className="month-calendar__week-content">
+                    {/* Day Headers (Dates) */}
+                    <div className="month-calendar__week-headers">
+                      {week.map((day) => {
+                        const iso = toISODate(day);
+                        const inCurrentMonth = day.getMonth() === monthStart.getMonth();
+                        return (
+                          <div key={iso} className="month-calendar__day-header">
+                            <button
+                              type="button"
+                              className={`month-calendar__date ${inCurrentMonth ? "" : "outside"} ${isToday(iso) ? "today" : ""}`}
+                              onClick={() => {
+                                setAnchor(day);
+                                setMode("day");
+                              }}
+                              aria-label={`查看${formatDateFull(iso)}`}
+                            >
+                              {day.getDate()}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Multi-day Task Bars */}
+                    {showTasks && weekSegments.length > 0 && (
+                      <div
+                        className="month-calendar__task-tracks"
+                        style={{
+                          gridTemplateRows: `repeat(${trackCount}, 22px)`,
                         }}
                       >
-                        还有 {hiddenCount} 项
-                      </button>
+                        {weekSegments.map((segment) => {
+                          const { task, startCol, endCol, isStart, isEnd, trackIndex } = segment;
+                          const project = projectById.get(task.projectId);
+                          const spanCols = endCol - startCol + 1;
+                          return (
+                            <button
+                              key={`task-seg-${task.id}-${weekIdx}`}
+                              type="button"
+                              className={`month-task-bar ${task.done ? "month-task-bar--done" : ""} ${!isStart ? "month-task-bar--cont-left" : ""} ${!isEnd ? "month-task-bar--cont-right" : ""}`}
+                              style={{
+                                gridColumn: `${startCol + 1} / ${endCol + 2}`,
+                                gridRow: trackIndex + 1,
+                                ...eventVars(task.projectId),
+                              }}
+                              onClick={() => openTaskEditor(task)}
+                              title={`${task.name} · ${task.startDate} ~ ${task.endDate}${project ? ` · ${project.name}` : ""}`}
+                            >
+                              {!isStart && (
+                                <span className="month-task-bar__arrow" aria-hidden="true">
+                                  ◀
+                                </span>
+                              )}
+                              <span
+                                className="month-task-bar__dot"
+                                style={{ backgroundColor: colorForProject(task.projectId) }}
+                              />
+                              <span className="month-task-bar__name ellipsis">{task.name}</span>
+                              {spanCols >= 2 && project && (
+                                <span className="month-task-bar__project ellipsis">
+                                  {project.name}
+                                </span>
+                              )}
+                              {!isEnd && (
+                                <span className="month-task-bar__arrow" aria-hidden="true">
+                                  ▶
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
+
+                    {/* Daily Plans Grid */}
+                    <div className="month-calendar__week-plans">
+                      {week.map((day, colIdx) => {
+                        const iso = toISODate(day);
+                        const dayPlans = showDailyPlans
+                          ? state.dailyPlans
+                              .filter((plan) => plan.date === iso)
+                              .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+                          : [];
+
+                        const tasksInCol = showTasks
+                          ? weekSegments.filter(
+                              (s) => s.startCol <= colIdx && s.endCol >= colIdx,
+                            ).length
+                          : 0;
+                        const maxPlans = Math.max(1, 4 - tasksInCol);
+                        const visiblePlans = dayPlans.slice(0, maxPlans);
+                        const hiddenPlansCount = dayPlans.length - visiblePlans.length;
+
+                        return (
+                          <div
+                            key={iso}
+                            className="month-calendar__day-col"
+                            onClick={(e) => {
+                              if (e.target === e.currentTarget) {
+                                setAnchor(day);
+                                setMode("day");
+                              }
+                            }}
+                          >
+                            {visiblePlans.map((plan) => (
+                              <button
+                                key={`plan-${plan.id}`}
+                                type="button"
+                                className="month-event month-event--plan"
+                                style={eventVars(plan.projectId)}
+                                onClick={() => openPlanEditor(plan)}
+                                title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
+                              >
+                                <span className="ellipsis">{plan.name}</span>
+                                <span className="month-event__time">· {plan.startTime}</span>
+                              </button>
+                            ))}
+                            {hiddenPlansCount > 0 && (
+                              <button
+                                type="button"
+                                className="month-calendar__more"
+                                onClick={() => {
+                                  setAnchor(day);
+                                  setMode("day");
+                                }}
+                              >
+                                还有 {hiddenPlansCount} 项
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );

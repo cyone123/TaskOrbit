@@ -11,8 +11,10 @@ import {
   isTimeRangeValid,
   isToday,
   isWeekend,
+  layoutMonthWeekTasks,
   layoutPlanColumns,
   minutesToTime,
+  monthGridDays,
   monthLabel,
   parseISODate,
   relativeRangeLabel,
@@ -151,6 +153,133 @@ describe("date helpers", () => {
     ]);
     expect(contiguous.get("c1")).toEqual({ column: 0, columnCount: 1 });
     expect(contiguous.get("c2")).toEqual({ column: 0, columnCount: 1 });
+  });
+
+  it("generates a 42-day month grid starting on Monday", () => {
+    const days = monthGridDays(new Date(2026, 8, 15)); // Sep 2026
+    expect(days.length).toBe(42);
+    // Sep 1, 2026 is a Tuesday. The Monday start should be Aug 31, 2026.
+    expect(toISODate(days[0])).toBe("2026-08-31");
+    expect(toISODate(days[41])).toBe("2026-10-11");
+  });
+
+  it("handles layoutMonthWeekTasks with various span and overlap scenarios", () => {
+    // Week: 2026-09-07 (Mon) to 2026-09-13 (Sun)
+    const week = weekDays(new Date(2026, 8, 7));
+    expect(toISODate(week[0])).toBe("2026-09-07");
+    expect(toISODate(week[6])).toBe("2026-09-13");
+
+    // Helper task creator
+    const makeTask = (id: string, start: string, end: string) => ({
+      id,
+      name: `Task ${id}`,
+      description: "",
+      projectId: "p1",
+      startDate: start,
+      endDate: end,
+      done: false,
+      priority: "medium" as const,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    // 1. Empty tasks or invalid week
+    expect(layoutMonthWeekTasks([], week)).toEqual([]);
+    expect(layoutMonthWeekTasks([makeTask("1", "2026-09-07", "2026-09-08")], [])).toEqual([]);
+
+    // 2. Task strictly outside the week
+    const outsideTasks = [
+      makeTask("out-before", "2026-09-01", "2026-09-06"),
+      makeTask("out-after", "2026-09-14", "2026-09-20"),
+    ];
+    expect(layoutMonthWeekTasks(outsideTasks, week)).toEqual([]);
+
+    // 3. Single-day task
+    const singleDay = layoutMonthWeekTasks(
+      [makeTask("single", "2026-09-09", "2026-09-09")],
+      week,
+    );
+    expect(singleDay).toHaveLength(1);
+    expect(singleDay[0]).toMatchObject({
+      startCol: 2, // Wednesday = col 2
+      endCol: 2,
+      isStart: true,
+      isEnd: true,
+      trackIndex: 0,
+    });
+
+    // 4. Spanning from previous week into this week
+    const fromPast = layoutMonthWeekTasks(
+      [makeTask("past", "2026-09-01", "2026-09-08")], // ends on Tuesday
+      week,
+    );
+    expect(fromPast[0]).toMatchObject({
+      startCol: 0,
+      endCol: 1, // Mon=0, Tue=1
+      isStart: false,
+      isEnd: true,
+      trackIndex: 0,
+    });
+
+    // 5. Spanning from this week into next week
+    const toFuture = layoutMonthWeekTasks(
+      [makeTask("future", "2026-09-11", "2026-09-18")], // starts Friday (col 4)
+      week,
+    );
+    expect(toFuture[0]).toMatchObject({
+      startCol: 4,
+      endCol: 6,
+      isStart: true,
+      isEnd: false,
+      trackIndex: 0,
+    });
+
+    // 6. Spanning across the entire week
+    const wholeWeek = layoutMonthWeekTasks(
+      [makeTask("all", "2026-09-01", "2026-09-20")],
+      week,
+    );
+    expect(wholeWeek[0]).toMatchObject({
+      startCol: 0,
+      endCol: 6,
+      isStart: false,
+      isEnd: false,
+      trackIndex: 0,
+    });
+
+    // 7. Non-overlapping tasks share the same track (track 0)
+    // Task A: Mon-Wed (col 0-2), Task B: Thu-Sun (col 3-6)
+    const nonOverlapping = layoutMonthWeekTasks(
+      [
+        makeTask("a", "2026-09-07", "2026-09-09"),
+        makeTask("b", "2026-09-10", "2026-09-13"),
+      ],
+      week,
+    );
+    expect(nonOverlapping).toHaveLength(2);
+    expect(nonOverlapping[0].trackIndex).toBe(0);
+    expect(nonOverlapping[1].trackIndex).toBe(0);
+
+    // 8. Overlapping tasks assigned to different tracks
+    // Task A: Mon-Wed (col 0-2)
+    // Task B: Tue-Thu (col 1-3) -> overlaps with A on Tue/Wed, goes to track 1
+    // Task C: Thu-Fri (col 3-4) -> col 3 overlaps with B, but free on track 0!
+    const overlapping = layoutMonthWeekTasks(
+      [
+        makeTask("a", "2026-09-07", "2026-09-09"),
+        makeTask("b", "2026-09-08", "2026-09-10"),
+        makeTask("c", "2026-09-10", "2026-09-11"),
+      ],
+      week,
+    );
+    const segA = overlapping.find((s) => s.task.id === "a")!;
+    const segB = overlapping.find((s) => s.task.id === "b")!;
+    const segC = overlapping.find((s) => s.task.id === "c")!;
+
+    expect(segA.trackIndex).toBe(0);
+    expect(segB.trackIndex).toBe(1);
+    // Track 0 was freed after Wednesday (col 2), so Task C (starting col 3) reuses track 0
+    expect(segC.trackIndex).toBe(0);
   });
 });
 

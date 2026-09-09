@@ -1,6 +1,8 @@
 // Date helpers. All functions operate on local time to avoid timezone drift
 // with YYYY-MM-DD strings.
 
+import type { Task } from "./types";
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKDAY_CN = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -191,3 +193,123 @@ export function layoutPlanColumns<T extends { id: string; startTime: string; end
 
   return layouts;
 }
+
+/** 42-day Monday-first month grid (6 weeks) for a given anchor date. */
+export function monthGridDays(anchor: Date): Date[] {
+  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const gridStart = startOfWeek(monthStart);
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
+
+export interface MonthWeekTaskSegment {
+  task: Task;
+  startCol: number; // 0..6 (Mon=0, Sun=6)
+  endCol: number; // 0..6 (Mon=0, Sun=6)
+  isStart: boolean; // whether the task starts within this week
+  isEnd: boolean; // whether the task ends within this week
+  trackIndex: number; // 0-based vertical track index
+}
+
+/**
+ * Lays out tasks that overlap a 7-day week (Monday to Sunday) into horizontal
+ * non-overlapping tracks.
+ */
+export function layoutMonthWeekTasks(
+  tasks: Task[],
+  week: Date[],
+): MonthWeekTaskSegment[] {
+  if (tasks.length === 0 || week.length !== 7) return [];
+
+  const weekStartISO = toISODate(week[0]);
+  const weekEndISO = toISODate(week[6]);
+
+  // Find all tasks overlapping this week
+  const rawSegments: Omit<MonthWeekTaskSegment, "trackIndex">[] = [];
+
+  for (const task of tasks) {
+    const rawStart = task.startDate <= task.endDate ? task.startDate : task.endDate;
+    const rawEnd = task.startDate <= task.endDate ? task.endDate : task.startDate;
+
+    if (rawEnd < weekStartISO || rawStart > weekEndISO) {
+      continue;
+    }
+
+    const segStartISO = rawStart < weekStartISO ? weekStartISO : rawStart;
+    const segEndISO = rawEnd > weekEndISO ? weekEndISO : rawEnd;
+
+    const startCol = Math.max(
+      0,
+      Math.min(
+        6,
+        Math.round(
+          (parseISODate(segStartISO).getTime() - parseISODate(weekStartISO).getTime()) /
+            DAY_MS,
+        ),
+      ),
+    );
+    const endCol = Math.max(
+      startCol,
+      Math.min(
+        6,
+        Math.round(
+          (parseISODate(segEndISO).getTime() - parseISODate(weekStartISO).getTime()) /
+            DAY_MS,
+        ),
+      ),
+    );
+
+    const isStart = rawStart >= weekStartISO;
+    const isEnd = rawEnd <= weekEndISO;
+
+    rawSegments.push({
+      task,
+      startCol,
+      endCol,
+      isStart,
+      isEnd,
+    });
+  }
+
+  // Sort segments:
+  // 1. Earlier startCol first
+  // 2. Longer span (endCol - startCol) first (anchors longer bars on lower tracks)
+  // 3. Earlier task.startDate first
+  // 4. Stable by task.id
+  rawSegments.sort((a, b) => {
+    if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+    const spanA = a.endCol - a.startCol;
+    const spanB = b.endCol - b.startCol;
+    if (spanA !== spanB) return spanB - spanA;
+    if (a.task.startDate !== b.task.startDate) {
+      return a.task.startDate.localeCompare(b.task.startDate);
+    }
+    return a.task.id.localeCompare(b.task.id);
+  });
+
+  // Greedy track allocation (interval scheduling)
+  const trackEnds: number[] = [];
+  const segments: MonthWeekTaskSegment[] = [];
+
+  for (const seg of rawSegments) {
+    let assignedTrack = -1;
+    for (let t = 0; t < trackEnds.length; t++) {
+      if (trackEnds[t] < seg.startCol) {
+        assignedTrack = t;
+        trackEnds[t] = seg.endCol;
+        break;
+      }
+    }
+    if (assignedTrack === -1) {
+      assignedTrack = trackEnds.length;
+      trackEnds.push(seg.endCol);
+    }
+
+    segments.push({
+      ...seg,
+      trackIndex: assignedTrack,
+    });
+  }
+
+  return segments;
+}
+

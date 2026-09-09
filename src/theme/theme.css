@@ -426,6 +426,7 @@ a {
 .bar-chart__bar:focus-visible,
 .month-calendar__date:focus-visible,
 .month-event:focus-visible,
+.month-task-bar:focus-visible,
 .gantt-dayhead:focus-visible,
 .gantt-bar:focus-visible,
 .gantt-gutter--task:focus-visible,
@@ -1852,6 +1853,163 @@ md-dialog {
   margin-top: 4px;
 }
 
+.month-calendar__weeks {
+  display: flex;
+  flex-direction: column;
+}
+
+.month-calendar__week-row {
+  position: relative;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+}
+
+.month-calendar__week-row + .month-calendar__week-row {
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.month-calendar__week-bg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  pointer-events: none;
+}
+
+.month-calendar__cell-bg {
+  min-width: 0;
+  height: 100%;
+  border-left: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-low);
+}
+
+.month-calendar__cell-bg:first-child {
+  border-left: none;
+}
+
+.month-calendar__cell-bg.weekend {
+  background: color-mix(in srgb, var(--md-on-surface) 2%, var(--md-surface-container-low));
+}
+
+.month-calendar__cell-bg.outside {
+  background: var(--md-surface-container);
+}
+
+.month-calendar__week-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 6px 0 6px;
+}
+
+.month-calendar__week-headers {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding-bottom: 2px;
+}
+
+.month-calendar__day-header {
+  padding: 0 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.month-calendar__task-tracks {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 3px;
+  padding: 2px 0 3px;
+}
+
+.month-task-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 22px;
+  margin: 0 3px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--shape-xs);
+  background: var(--event-container);
+  color: var(--event-on);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--event-color, currentColor) 35%, transparent);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 22px;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.month-task-bar--cont-left {
+  margin-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 4px;
+}
+
+.month-task-bar--cont-right {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 4px;
+}
+
+.month-task-bar--done {
+  opacity: 0.6;
+}
+
+.month-task-bar--done .month-task-bar__name {
+  text-decoration: line-through;
+}
+
+.month-task-bar__dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.month-task-bar__arrow {
+  font-size: 9px;
+  opacity: 0.7;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.month-task-bar__name {
+  font-weight: 600;
+}
+
+.month-task-bar__project {
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 400;
+  margin-left: auto;
+}
+
+.month-calendar__week-plans {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  flex: 1;
+  padding-top: 2px;
+}
+
+.month-calendar__day-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 6px;
+  min-width: 0;
+}
+
+
 /* ---------------------------------------------------------------------------
    Tonal event chips — every calendar event reads a raw project hex from
    --event-color (set inline) and derives container/on-container pairs, so
@@ -1859,6 +2017,7 @@ md-dialog {
    project colors.
    ------------------------------------------------------------------------- */
 .month-event,
+.month-task-bar,
 .week-detail__task,
 .week-detail__plan,
 .timeline__block,
@@ -1872,6 +2031,7 @@ md-dialog {
 }
 
 [data-theme="dark"] .month-event,
+[data-theme="dark"] .month-task-bar,
 [data-theme="dark"] .week-detail__task,
 [data-theme="dark"] .week-detail__plan,
 [data-theme="dark"] .timeline__block,
@@ -1886,6 +2046,7 @@ md-dialog {
 
 /* Unified MD3 state layer: an on-container overlay shared by all event chips. */
 .month-event::after,
+.month-task-bar::after,
 .week-detail__task::after,
 .week-detail__plan::after,
 .timeline__block::after,
@@ -1901,6 +2062,7 @@ md-dialog {
 }
 
 .month-event:hover::after,
+.month-task-bar:hover::after,
 .week-detail__task:hover::after,
 .week-detail__plan:hover::after,
 .timeline__block:hover::after,
@@ -2200,7 +2362,8 @@ md-dialog {
     align-items: start;
   }
 
-  .month-calendar__cell {
+  .month-calendar__cell,
+  .month-calendar__week-row {
     min-height: 108px;
     padding: 6px;
   }
