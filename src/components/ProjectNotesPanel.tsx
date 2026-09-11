@@ -32,7 +32,7 @@ import {
   type ProjectNoteSummary,
 } from "../store/vault";
 import { useStore } from "../store/store";
-import { renderMarkdown } from "../utils/markdown";
+import { LiveMarkdownEditor } from "./LiveMarkdownEditor";
 
 interface ProjectNotesPanelProps {
   project: Project;
@@ -123,6 +123,7 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [editorMode, setEditorMode] = useState<"live" | "source">("live");
   const [setupOpen, setSetupOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [associationOpen, setAssociationOpen] = useState(false);
@@ -447,7 +448,6 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
     );
   }
 
-  const previewHtml = draft ? renderMarkdown(draft.markdown) : "";
   const linkCount = (draft?.taskIds.length ?? 0) + (draft?.dailyPlanIds.length ?? 0);
 
   return (
@@ -537,6 +537,13 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
                   {saving ? "正在保存…" : dirty ? "未保存更改" : `已保存 · ${noteDate(note.updatedAt)}`}
                 </div>
                 <div className="project-notes-editor-actions">
+                  <IconButton
+                    aria-label={editorMode === "live" ? "切换为源码模式" : "切换为实时预览"}
+                    title={editorMode === "live" ? "切换为源码模式" : "切换为实时预览"}
+                    onClick={() => setEditorMode((m) => (m === "live" ? "source" : "live"))}
+                  >
+                    <Icon name={editorMode === "live" ? "visibility" : "code"} size={19} />
+                  </IconButton>
                   <IconButton aria-label={draft.pinned ? "取消置顶" : "置顶笔记"} title={draft.pinned ? "取消置顶" : "置顶笔记"} onClick={() => updateDraft({ pinned: !draft.pinned })}>
                     <Icon name="push_pin" size={19} />
                   </IconButton>
@@ -558,15 +565,18 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
                 aria-label="笔记标题"
                 placeholder="笔记标题"
               />
-              <textarea
-                className="project-notes-markdown-editor"
+              <LiveMarkdownEditor
                 value={draft.markdown}
-                onChange={(event) => updateDraft({ markdown: event.target.value })}
-                aria-label="Markdown 编辑区"
-                spellCheck={false}
+                onChange={(markdown) => updateDraft({ markdown })}
+                mode={editorMode}
+                placeholder="输入 Markdown 笔记内容…（光标所在行自动展开源码）"
+                className="project-notes-live-editor"
               />
               <div className="project-notes-editor-footer">
-                <span className="body-sm muted">Markdown · YAML Properties 自动维护</span>
+                <span className="body-sm muted">
+                  {editorMode === "live" ? "实时预览模式 · " : "源码模式 · "}
+                  Markdown · YAML Properties 自动维护
+                </span>
                 <button type="button" className="project-notes-link-summary" onClick={() => setAssociationOpen(true)}>
                   <Icon name="link" size={16} /> {linkCount ? `${linkCount} 个关联` : "未关联任务或计划"}
                 </button>
@@ -574,11 +584,6 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
             </>
           )}
         </section>
-
-        <aside className="project-notes-preview">
-          <div className="project-notes-preview-heading"><span className="title-sm">预览</span><span className="body-sm muted">Obsidian Markdown</span></div>
-          {draft ? <div className="project-notes-markdown-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} /> : <div className="project-notes-preview-empty">编辑内容将在这里预览</div>}
-        </aside>
       </div>
 
       <VaultSettingsDialog

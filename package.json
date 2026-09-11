@@ -16,14 +16,20 @@
     "generate:tokens": "node scripts/generate-theme-tokens.mjs"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.11.0",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.4",
+    "@codemirror/view": "^6.43.11",
     "@lit/react": "^1.0.8",
     "@material/web": "^2.5.0",
     "@task-orbit/core": "workspace:*",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.1.0",
+    "codemirror": "^6.0.2",
+    "expo": "~57.0.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "expo": "~57.0.14",
     "react-native": "0.86.2"
   },
   "devDependencies": {

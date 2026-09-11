@@ -1,4 +1,4 @@
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -13,8 +13,13 @@ function safeHref(value: string): string | null {
   return null;
 }
 
-function inlineMarkdown(value: string): string {
+export function inlineMarkdown(value: string): string {
   let html = escapeHtml(value);
+  // Obsidian wikilinks: [[Target|Label]] or [[Target]]
+  html = html.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target: string, label?: string) => {
+    const displayText = escapeHtml((label ?? target).trim());
+    return `<span class="markdown-wiki-link" data-wiki-target="${escapeHtml(target.trim())}">${displayText}</span>`;
+  });
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt: string, source: string) => {
     const href = safeHref(source);
     return href ? `<img src="${href}" alt="${alt}" />` : alt;
@@ -23,6 +28,7 @@ function inlineMarkdown(value: string): string {
     const href = safeHref(source);
     return href ? `<a href="${href}" target="_blank" rel="noreferrer">${label}</a>` : label;
   });
+  html = html.replace(/~~([^~]+)~~/g, "<del>$1</del>");
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/__([^_]+)__/g, "<strong>$1</strong>");
@@ -139,3 +145,64 @@ export function renderMarkdown(markdown: string): string {
   closeList();
   return output.join("");
 }
+
+/**
+ * Render a single Markdown line for the Live Preview widget.
+ * Uses purely inline <span> elements so line-height is completely uniform with wrapped text,
+ * and CodeMirror's height oracle accurately measures lines.
+ */
+export function renderMarkdownLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  // Heading (# to ######)
+  const heading = /^(#{1,6})\s+(.+)$/.exec(trimmed);
+  if (heading) {
+    const level = heading[1].length;
+    return `<span class="md-header md-h${level}">${inlineMarkdown(heading[2])}</span>`;
+  }
+
+  // Horizontal rule (---, ***, ___)
+  if (/^(---+|\*\*\*+|___+)$/.test(trimmed)) {
+    return `<span class="md-hr"></span>`;
+  }
+
+  // Blockquote (> text)
+  const quote = /^>\s?(.*)$/.exec(trimmed);
+  if (quote) {
+    return `<span class="md-blockquote">${inlineMarkdown(quote[1])}</span>`;
+  }
+
+  // Task list item: - [ ] or - [x] or * [ ] or + [ ]
+  const task = /^([-*+])\s+\[([ xX])\]\s+(.*)$/.exec(trimmed);
+  if (task) {
+    const checked = task[2].toLowerCase() === "x";
+    return `<span class="md-task ${checked ? "is-checked" : ""}"><span class="md-task-box ${checked ? "is-checked" : ""}" data-task-box="true">${checked ? "✓" : ""}</span><span class="md-task-label">${inlineMarkdown(task[3])}</span></span>`;
+  }
+
+  // Unordered list item: - or * or +
+  const unordered = /^([-*+])\s+(.*)$/.exec(trimmed);
+  if (unordered) {
+    return `<span class="md-list-item"><span class="md-list-bullet">•</span> <span class="md-list-content">${inlineMarkdown(unordered[2])}</span></span>`;
+  }
+
+  // Ordered list item: 1. or 1)
+  const ordered = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);
+  if (ordered) {
+    return `<span class="md-list-item"><span class="md-list-number">${ordered[1]}.</span> <span class="md-list-content">${inlineMarkdown(ordered[2])}</span></span>`;
+  }
+
+  // Regular line: inline markdown directly
+  return `<span class="md-text">${inlineMarkdown(line)}</span>`;
+}
+
+/**
+ * Render a fenced code block into HTML.
+ */
+export function renderCodeBlock(code: string, language = ""): string {
+  const langClass = language.trim() ? ` class="language-${escapeHtml(language.trim())}"` : "";
+  return `<pre class="markdown-pre"><code${langClass}>${escapeHtml(code)}</code></pre>`;
+}
+

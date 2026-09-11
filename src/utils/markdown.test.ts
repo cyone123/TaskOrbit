@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderMarkdown } from "./markdown";
+import { inlineMarkdown, renderCodeBlock, renderMarkdown, renderMarkdownLine } from "./markdown";
 
 describe("markdown preview", () => {
   it("renders the supported Markdown blocks", () => {
@@ -17,4 +17,28 @@ describe("markdown preview", () => {
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("href=\"javascript:");
   });
+
+  it("supports Obsidian wikilinks and strikethrough", () => {
+    const html = inlineMarkdown("参考 [[项目计划|计划链接]] 与 ~~已废弃内容~~");
+    expect(html).toContain("markdown-wiki-link");
+    expect(html).toContain("data-wiki-target=\"项目计划\"");
+    expect(html).toContain("计划链接");
+    expect(html).toContain("<del>已废弃内容</del>");
+  });
+
+  it("renders single lines with renderMarkdownLine", () => {
+    expect(renderMarkdownLine("## 二级标题")).toContain("<span class=\"md-header md-h2\">二级标题</span>");
+    expect(renderMarkdownLine("- [ ] 待办项")).toContain("md-task");
+    expect(renderMarkdownLine("- [x] 已完成")).toContain("is-checked");
+    expect(renderMarkdownLine("> 引用段落")).toContain("<span class=\"md-blockquote\">引用段落</span>");
+    expect(renderMarkdownLine("---")).toContain("<span class=\"md-hr\"></span>");
+    expect(renderMarkdownLine("")).toBe("");
+  });
+
+  it("renders fenced code blocks with renderCodeBlock", () => {
+    const code = renderCodeBlock("const a = 1;\nconsole.log(a);", "typescript");
+    expect(code).toContain("language-typescript");
+    expect(code).toContain("const a = 1;");
+  });
 });
+
