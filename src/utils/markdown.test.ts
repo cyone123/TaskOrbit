@@ -40,5 +40,27 @@ describe("markdown preview", () => {
     expect(code).toContain("language-typescript");
     expect(code).toContain("const a = 1;");
   });
+
+  it("renders Markdown tables with alignments, inline styles and escaped pipes", () => {
+    const tableMd = [
+      "| 姓名 | 年龄 | 角色 | 备注 |",
+      "| :--- | :---: | ---: | --- |",
+      "| 张三 | **25** | `工程师` | 前端 \\| 全栈 |",
+      "| 李四 | 30 | 设计师 | UI/UX |",
+    ].join("\n");
+
+    const html = renderMarkdown(tableMd);
+    expect(html).toContain('<div class="md-table-wrapper"><table class="md-table">');
+    expect(html).toContain("<thead><tr>");
+    expect(html).toContain('<th style="text-align: left">姓名</th>');
+    expect(html).toContain('<th style="text-align: center">年龄</th>');
+    expect(html).toContain('<th style="text-align: right">角色</th>');
+    expect(html).toContain("<th>备注</th>");
+    expect(html).toContain("<tbody><tr>");
+    expect(html).toContain("<strong>25</strong>");
+    expect(html).toContain("<code>工程师</code>");
+    expect(html).toContain("前端 | 全栈");
+    expect(html).toContain("设计师");
+  });
 });
 

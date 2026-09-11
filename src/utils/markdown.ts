@@ -49,6 +49,7 @@ export function renderMarkdown(markdown: string): string {
   let codeLines: string[] = [];
   let listType: "ul" | "ol" | null = null;
   let paragraph: string[] = [];
+  let tableLines: string[] = [];
 
   const closeList = () => {
     if (listType) {
@@ -60,6 +61,12 @@ export function renderMarkdown(markdown: string): string {
     if (paragraph.length > 0) {
       output.push(`<p>${paragraph.map(inlineMarkdown).join("<br />")}</p>`);
       paragraph = [];
+    }
+  };
+  const flushTable = () => {
+    if (tableLines.length > 0) {
+      output.push(renderTable(tableLines));
+      tableLines = [];
     }
   };
   const flushCode = () => {
@@ -74,6 +81,7 @@ export function renderMarkdown(markdown: string): string {
     if (line.trimStart().startsWith("```")) {
       flushParagraph();
       closeList();
+      flushTable();
       if (inCode) {
         flushCode();
         inCode = false;
@@ -92,8 +100,19 @@ export function renderMarkdown(markdown: string): string {
     if (!trimmed) {
       flushParagraph();
       closeList();
+      flushTable();
       continue;
     }
+
+    // Markdown Table row (| ... |)
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      flushParagraph();
+      closeList();
+      tableLines.push(line);
+      continue;
+    }
+    flushTable();
+
     const heading = /^(#{1,6})\s+(.+)$/.exec(trimmed);
     if (heading) {
       flushParagraph();
@@ -141,6 +160,7 @@ export function renderMarkdown(markdown: string): string {
   }
 
   if (inCode) flushCode();
+  flushTable();
   flushParagraph();
   closeList();
   return output.join("");
@@ -205,4 +225,104 @@ export function renderCodeBlock(code: string, language = ""): string {
   const langClass = language.trim() ? ` class="language-${escapeHtml(language.trim())}"` : "";
   return `<pre class="markdown-pre"><code${langClass}>${escapeHtml(code)}</code></pre>`;
 }
+
+/**
+ * Render GFM Markdown table rows into a semantic MD3 HTML table.
+ * Handles header, cell alignments (:---, :---:, ---:), and inline formatting.
+ */
+export function renderTable(rows: string[]): string {
+  if (rows.length === 0) return "";
+
+  const parseRow = (row: string): string[] | null => {
+    const trimmed = row.trim();
+    if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return null;
+    const inner = trimmed.slice(1, -1);
+    const cells: string[] = [];
+    let current = "";
+    let escaped = false;
+    for (let i = 0; i < inner.length; i++) {
+      const char = inner[i];
+      if (char === "\\" && !escaped) {
+        escaped = true;
+        current += char;
+      } else if (char === "|" && !escaped) {
+        cells.push(current.trim());
+        current = "";
+      } else {
+        escaped = false;
+        current += char;
+      }
+    }
+    cells.push(current.trim());
+    return cells.map((cell) => cell.replace(/\\\|/g, "|"));
+  };
+
+  const isSeparator = (row: string): boolean => {
+    const trimmed = row.trim();
+    return /^\|[-:\s|]+\|$/.test(trimmed) && trimmed.includes("-");
+  };
+
+  let headerRow: string[] | null = null;
+  let alignments: Array<"left" | "center" | "right" | null> = [];
+  const bodyRows: string[][] = [];
+  let separatorFound = false;
+
+  for (const row of rows) {
+    if (isSeparator(row)) {
+      separatorFound = true;
+      const cells = parseRow(row);
+      if (cells) {
+        alignments = cells.map((cell) => {
+          const left = cell.startsWith(":");
+          const right = cell.endsWith(":");
+          if (left && right) return "center";
+          if (right) return "right";
+          if (left) return "left";
+          return null;
+        });
+      }
+      continue;
+    }
+
+    const cells = parseRow(row);
+    if (!cells) continue;
+
+    if (!separatorFound && !headerRow) {
+      headerRow = cells;
+    } else {
+      bodyRows.push(cells);
+    }
+  }
+
+  if (!headerRow) return "";
+
+  let html = '<div class="md-table-wrapper"><table class="md-table">';
+
+  // Thead
+  html += "<thead><tr>";
+  for (let i = 0; i < headerRow.length; i++) {
+    const align = alignments[i] ? ` style="text-align: ${alignments[i]}"` : "";
+    html += `<th${align}>${inlineMarkdown(headerRow[i])}</th>`;
+  }
+  html += "</tr></thead>";
+
+  // Tbody
+  if (bodyRows.length > 0) {
+    html += "<tbody>";
+    for (const row of bodyRows) {
+      html += "<tr>";
+      for (let i = 0; i < headerRow.length; i++) {
+        const cell = row[i] ?? "";
+        const align = alignments[i] ? ` style="text-align: ${alignments[i]}"` : "";
+        html += `<td${align}>${inlineMarkdown(cell)}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody>";
+  }
+
+  html += "</table></div>";
+  return html;
+}
+
 

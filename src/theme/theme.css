@@ -4812,6 +4812,88 @@ body.is-calendar-dragging--resize {
   color: var(--md-on-surface-variant);
 }
 
+/* Markdown Tables (MD3) */
+.md-table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-sm, 8px);
+  background: var(--md-surface-container-low);
+  max-width: 100%;
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  line-height: 1.6;
+  color: var(--md-on-surface);
+  text-align: left;
+}
+
+.md-table th {
+  padding: 8px 14px;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  font-weight: 600;
+  border-bottom: 1.5px solid var(--md-outline-variant);
+  white-space: nowrap;
+}
+
+.md-table td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface);
+}
+
+.md-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.md-table tbody tr:hover {
+  background: color-mix(in srgb, var(--md-primary) 6%, transparent);
+}
+
+/* Live Preview Table rendering */
+.cm-table-preview {
+  display: block;
+  user-select: text;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.cm-table-preview .md-table-wrapper {
+  margin: 4px 0;
+}
+
+.cm-table-preview .md-table th {
+  user-select: none;
+}
+
+/* Focused table raw markdown lines */
+.cm-line.cm-table-line {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--md-on-surface);
+  background: color-mix(in srgb, var(--md-surface-container) 40%, transparent);
+}
+
+.cm-line.cm-table-line-focused {
+  background: color-mix(in srgb, var(--md-primary-container) 35%, transparent);
+}
+
+/* Hidden line: completely collapses line height and hides contents */
+.cm-line.cm-hidden-line {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  line-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
 .project-notes-editor-footer {
   display: flex;
   align-items: center;
