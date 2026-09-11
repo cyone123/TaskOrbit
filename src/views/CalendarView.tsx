@@ -39,6 +39,11 @@ import {
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import {
+  type PlanDragMode,
+  computeDraggedPlanTimes,
+  computeTargetDayFromX,
+} from "../utils/calendarDrag";
 
 const HOUR_HEIGHT = 44;
 const DAY_START_HOUR = 6;
@@ -54,6 +59,20 @@ type MonthViewFilter = "all" | "tasks" | "plans";
 interface BarRange {
   startIdx: number;
   endIdx: number;
+}
+
+interface CalendarDragState {
+  plan: DailyPlan;
+  mode: PlanDragMode;
+  view: "day" | "week";
+  startX: number;
+  startY: number;
+  startScrollTop: number;
+  targetDate: string;
+  targetDayIndex: number;
+  startTime: string;
+  endTime: string;
+  hasMoved: boolean;
 }
 
 export function CalendarView() {
@@ -94,6 +113,19 @@ export function CalendarView() {
     message: string;
     onConfirm: () => void;
   }>({ open: false, title: "", message: "", onConfirm: () => {} });
+
+  const [dragPreview, setDragPreview] = useState<CalendarDragState | null>(null);
+  const dragStateRef = useRef<CalendarDragState | null>(null);
+  const justDraggedRef = useRef(false);
+  const weekColumnsRef = useRef<HTMLDivElement>(null);
+  const timelineColRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove("is-calendar-dragging");
+      document.body.classList.remove("is-calendar-dragging--resize");
+    };
+  }, []);
 
   const days = useMemo(() => weekDays(anchor), [anchor]);
   const selectedISO = toISODate(anchor);
@@ -265,6 +297,155 @@ export function CalendarView() {
         show("计划已删除");
       },
     });
+
+  const startDrag = (
+    e: React.PointerEvent,
+    plan: DailyPlan,
+    dragMode: PlanDragMode,
+    view: "day" | "week",
+    dayIndex = 0,
+  ) => {
+    if (e.button !== 0) return;
+    if (dragStateRef.current) return;
+
+    const scrollContainer = contentRef.current?.parentElement;
+    const initialScrollTop = scrollContainer?.scrollTop ?? 0;
+
+    const initialDragState: CalendarDragState = {
+      plan,
+      mode: dragMode,
+      view,
+      startX: e.clientX,
+      startY: e.clientY,
+      startScrollTop: initialScrollTop,
+      targetDate: plan.date,
+      targetDayIndex: dayIndex,
+      startTime: plan.startTime,
+      endTime: plan.endTime,
+      hasMoved: false,
+    };
+
+    dragStateRef.current = initialDragState;
+
+    const handlePointerMove = (ev: PointerEvent) => {
+      const current = dragStateRef.current;
+      if (!current) return;
+
+      const deltaX = ev.clientX - current.startX;
+      const currentScroll = scrollContainer?.scrollTop ?? 0;
+      const deltaY = ev.clientY - current.startY + (currentScroll - current.startScrollTop);
+
+      if (!current.hasMoved) {
+        if (Math.hypot(deltaX, ev.clientY - current.startY) < 4) {
+          return;
+        }
+        current.hasMoved = true;
+        document.body.classList.add("is-calendar-dragging");
+        if (current.mode !== "move") {
+          document.body.classList.add("is-calendar-dragging--resize");
+        }
+      }
+
+      const startHour = current.view === "day" ? DAY_START_HOUR : WEEK_DETAIL_START_HOUR;
+      const endHour = current.view === "day" ? DAY_END_HOUR : WEEK_DETAIL_END_HOUR;
+
+      const computed = computeDraggedPlanTimes({
+        mode: current.mode,
+        origStartTime: current.plan.startTime,
+        origEndTime: current.plan.endTime,
+        deltaY,
+        hourHeight: HOUR_HEIGHT,
+        minHour: startHour,
+        maxHour: endHour,
+      });
+
+      let targetDate = current.plan.date;
+      let targetDayIndex = current.targetDayIndex;
+
+      if (current.view === "week" && weekColumnsRef.current) {
+        const target = computeTargetDayFromX(
+          ev.clientX,
+          weekColumnsRef.current.getBoundingClientRect(),
+          days,
+        );
+        targetDate = target.targetDate;
+        targetDayIndex = target.dayIndex;
+      }
+
+      const nextState: CalendarDragState = {
+        ...current,
+        hasMoved: true,
+        targetDate,
+        targetDayIndex,
+        startTime: computed.startTime,
+        endTime: computed.endTime,
+      };
+
+      dragStateRef.current = nextState;
+      setDragPreview({ ...nextState });
+    };
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.classList.remove("is-calendar-dragging");
+      document.body.classList.remove("is-calendar-dragging--resize");
+    };
+
+    const handlePointerUp = () => {
+      const finalState = dragStateRef.current;
+      cleanup();
+      dragStateRef.current = null;
+      setDragPreview(null);
+
+      if (finalState && finalState.hasMoved) {
+        justDraggedRef.current = true;
+        window.setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 120);
+
+        const changed =
+          finalState.targetDate !== finalState.plan.date ||
+          finalState.startTime !== finalState.plan.startTime ||
+          finalState.endTime !== finalState.plan.endTime;
+
+        if (changed) {
+          store.updateDailyPlan(finalState.plan.id, {
+            date: finalState.targetDate,
+            startTime: finalState.startTime,
+            endTime: finalState.endTime,
+          });
+          const dateNotice =
+            finalState.view === "week" && finalState.targetDate !== finalState.plan.date
+              ? `${formatDate(finalState.targetDate)} `
+              : "";
+          show(`计划时间已更新：${dateNotice}${finalState.startTime} - ${finalState.endTime}`);
+        }
+      }
+    };
+
+    const handlePointerCancel = () => {
+      cleanup();
+      dragStateRef.current = null;
+      setDragPreview(null);
+    };
+
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        cleanup();
+        dragStateRef.current = null;
+        setDragPreview(null);
+        show("已取消调整时间");
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+    window.addEventListener("keydown", handleKeyDown);
+  };
 
   const heading =
     mode === "month"
@@ -711,44 +892,112 @@ export function CalendarView() {
                   },
                 )}
               </div>
-              <div className="week-detail__day-columns">
-                {days.map((day, dayIndex) => (
-                  <div className="week-detail__day-column" key={toISODate(day)}>
-                    {plansOfWeek[dayIndex].map((plan) => {
-                      const start = timeToMinutes(plan.startTime);
-                      const end = timeToMinutes(plan.endTime);
-                      const visibleStart = Math.max(start, WEEK_DETAIL_START_HOUR * 60);
-                      const visibleEnd = Math.min(end, WEEK_DETAIL_END_HOUR * 60);
-                      const layout = layoutsOfWeek[dayIndex].get(plan.id) ?? {
-                        column: 0,
-                        columnCount: 1,
-                      };
-                      const top = ((visibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
-                      const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
-                      if (visibleEnd <= visibleStart) return null;
-                      return (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          className="week-detail__plan"
-                          style={{
-                            top,
-                            height,
-                            left: `calc(${(layout.column / layout.columnCount) * 100}% + 3px)`,
-                            width: `calc(${(100 / layout.columnCount)}% - 6px)`,
-                            opacity: plan.done ? 0.58 : 1,
-                            ...eventVars(plan.projectId),
-                          }}
-                          onClick={() => openPlanEditor(plan)}
-                          title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
-                        >
-                          <strong>{plan.name}</strong>
-                          <span>{plan.startTime} - {plan.endTime}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
+              <div ref={weekColumnsRef} className="week-detail__day-columns">
+                {days.map((day, dayIndex) => {
+                  const isTargetColumn =
+                    dragPreview?.view === "week" &&
+                    dragPreview.hasMoved &&
+                    dragPreview.targetDayIndex === dayIndex;
+
+                  return (
+                    <div
+                      className={`week-detail__day-column ${isTargetColumn ? "is-drag-target" : ""}`}
+                      key={toISODate(day)}
+                    >
+                      {plansOfWeek[dayIndex].map((plan) => {
+                        const start = timeToMinutes(plan.startTime);
+                        const end = timeToMinutes(plan.endTime);
+                        const visibleStart = Math.max(start, WEEK_DETAIL_START_HOUR * 60);
+                        const visibleEnd = Math.min(end, WEEK_DETAIL_END_HOUR * 60);
+                        const layout = layoutsOfWeek[dayIndex].get(plan.id) ?? {
+                          column: 0,
+                          columnCount: 1,
+                        };
+                        const top = ((visibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                        const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
+                        if (visibleEnd <= visibleStart) return null;
+
+                        const isThisDragging =
+                          dragPreview?.hasMoved && dragPreview.plan.id === plan.id;
+
+                        return (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            className={`week-detail__plan ${isThisDragging ? "is-dragging" : ""}`}
+                            style={{
+                              top,
+                              height,
+                              left: `calc(${(layout.column / layout.columnCount) * 100}% + 3px)`,
+                              width: `calc(${(100 / layout.columnCount)}% - 6px)`,
+                              opacity: plan.done ? 0.58 : 1,
+                              ...eventVars(plan.projectId),
+                            }}
+                            onPointerDown={(e) => startDrag(e, plan, "move", "week", dayIndex)}
+                            onClick={() => {
+                              if (justDraggedRef.current) return;
+                              openPlanEditor(plan);
+                            }}
+                            title={`${plan.name} · ${plan.startTime} - ${plan.endTime}（按住拖拽移动时间）`}
+                          >
+                            <div
+                              className="plan-resize-handle plan-resize-handle--top"
+                              title="拖动调整开始时间"
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                startDrag(e, plan, "resize-top", "week", dayIndex);
+                              }}
+                            />
+                            <strong>{plan.name}</strong>
+                            <span>{plan.startTime} - {plan.endTime}</span>
+                            <div
+                              className="plan-resize-handle plan-resize-handle--bottom"
+                              title="拖动调整结束时间"
+                              onPointerDown={(e) => {
+                                e.stopPropagation();
+                                startDrag(e, plan, "resize-bottom", "week", dayIndex);
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+
+                      {isTargetColumn && dragPreview && (
+                        (() => {
+                          const pStart = timeToMinutes(dragPreview.startTime);
+                          const pEnd = timeToMinutes(dragPreview.endTime);
+                          const pVisibleStart = Math.max(pStart, WEEK_DETAIL_START_HOUR * 60);
+                          const pVisibleEnd = Math.min(pEnd, WEEK_DETAIL_END_HOUR * 60);
+                          const pTop = ((pVisibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                          const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
+
+                          return (
+                            <div
+                              className="plan-drag-preview"
+                              style={{
+                                top: pTop,
+                                height: pHeight,
+                                left: 3,
+                                right: 3,
+                                ...eventVars(dragPreview.plan.projectId),
+                              }}
+                            >
+                              <div className="plan-drag-preview__time">
+                                <Icon name="schedule" size={12} />
+                                {dragPreview.targetDate !== dragPreview.plan.date
+                                  ? `${weekdayCN(days[dayIndex])} ${dragPreview.startTime} - ${dragPreview.endTime}`
+                                  : `${dragPreview.startTime} - ${dragPreview.endTime}`}
+                              </div>
+                              <div className="plan-drag-preview__name">
+                                {dragPreview.plan.name}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -773,6 +1022,7 @@ export function CalendarView() {
                 })}
               </div>
               <div
+                ref={timelineColRef}
                 className="timeline__col"
                 style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
               >
@@ -803,11 +1053,16 @@ export function CalendarView() {
                   const top = ((visibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
                   const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                   const project = plan.projectId ? projectById.get(plan.projectId) : null;
+                  const isThisDragging =
+                    dragPreview?.view === "day" &&
+                    dragPreview.hasMoved &&
+                    dragPreview.plan.id === plan.id;
+
                   return (
                     <button
                       key={plan.id}
                       type="button"
-                      className="timeline__block"
+                      className={`timeline__block ${isThisDragging ? "is-dragging" : ""}`}
                       style={{
                         top,
                         height,
@@ -816,9 +1071,21 @@ export function CalendarView() {
                         opacity: plan.done ? 0.55 : 1,
                         ...eventVars(plan.projectId),
                       }}
-                      onClick={() => openPlanEditor(plan)}
-                      title={`${plan.name} · ${plan.startTime} - ${plan.endTime}`}
+                      onPointerDown={(e) => startDrag(e, plan, "move", "day", 0)}
+                      onClick={() => {
+                        if (justDraggedRef.current) return;
+                        openPlanEditor(plan);
+                      }}
+                      title={`${plan.name} · ${plan.startTime} - ${plan.endTime}（按住拖拽移动时间）`}
                     >
+                      <div
+                        className="plan-resize-handle plan-resize-handle--top"
+                        title="拖动调整开始时间"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          startDrag(e, plan, "resize-top", "day", 0);
+                        }}
+                      />
                       <strong className={`body-sm ${plan.done ? "text-done" : ""}`}>
                         {plan.name}
                       </strong>
@@ -826,9 +1093,49 @@ export function CalendarView() {
                         {plan.startTime} - {plan.endTime}
                         {project ? ` · ${project.name}` : " · 独立"}
                       </span>
+                      <div
+                        className="plan-resize-handle plan-resize-handle--bottom"
+                        title="拖动调整结束时间"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          startDrag(e, plan, "resize-bottom", "day", 0);
+                        }}
+                      />
                     </button>
                   );
                 })}
+
+                {dragPreview?.view === "day" && dragPreview.hasMoved && (
+                  (() => {
+                    const pStart = timeToMinutes(dragPreview.startTime);
+                    const pEnd = timeToMinutes(dragPreview.endTime);
+                    const pVisibleStart = Math.max(pStart, DAY_START_HOUR * 60);
+                    const pVisibleEnd = Math.min(pEnd, DAY_END_HOUR * 60);
+                    const pTop = ((pVisibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                    const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
+
+                    return (
+                      <div
+                        className="plan-drag-preview"
+                        style={{
+                          top: pTop,
+                          height: pHeight,
+                          left: 4,
+                          right: 4,
+                          ...eventVars(dragPreview.plan.projectId),
+                        }}
+                      >
+                        <div className="plan-drag-preview__time">
+                          <Icon name="schedule" size={12} />
+                          {dragPreview.startTime} - {dragPreview.endTime}
+                        </div>
+                        <div className="plan-drag-preview__name">
+                          {dragPreview.plan.name}
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             </div>
           </section>

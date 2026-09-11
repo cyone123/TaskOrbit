@@ -2288,7 +2288,11 @@ md-dialog {
   font-size: 11px;
   line-height: 1.25;
   text-align: left;
-  cursor: pointer;
+  cursor: grab;
+}
+
+.week-detail__day-column.is-drag-target {
+  background-color: color-mix(in srgb, var(--md-primary) 8%, transparent);
 }
 
 .week-detail__plan strong,
@@ -2518,7 +2522,7 @@ md-dialog {
   border-radius: var(--shape-sm);
   padding: 4px 8px;
   overflow: hidden;
-  cursor: pointer;
+  cursor: grab;
   background: var(--event-container);
   color: var(--event-on);
   box-shadow: var(--elev-1);
@@ -2529,6 +2533,106 @@ md-dialog {
   box-sizing: border-box;
   transition: transform var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
               box-shadow var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.timeline__block:active,
+.week-detail__plan:active {
+  cursor: grabbing;
+}
+
+.timeline__block.is-dragging,
+.week-detail__plan.is-dragging {
+  opacity: 0.32 !important;
+  outline: 1.5px dashed var(--event-color, var(--md-outline));
+  box-shadow: none;
+}
+
+/* Resize handles on top and bottom edges */
+.plan-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  z-index: 3;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.plan-resize-handle--top {
+  top: 0;
+}
+
+.plan-resize-handle--bottom {
+  bottom: 0;
+}
+
+.plan-resize-handle::after {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.timeline__block:hover .plan-resize-handle::after,
+.week-detail__plan:hover .plan-resize-handle::after {
+  opacity: 0.4;
+}
+
+.plan-resize-handle:hover::after {
+  opacity: 0.95 !important;
+}
+
+/* Real-time dragging preview ghost */
+.plan-drag-preview {
+  position: absolute;
+  z-index: 10;
+  border-radius: var(--shape-sm);
+  box-shadow: var(--elev-3);
+  overflow: hidden;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  background: var(--event-container);
+  color: var(--event-on);
+  border: 1.5px solid var(--event-color, var(--md-primary));
+  pointer-events: none;
+}
+
+.plan-drag-preview__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.plan-drag-preview__name {
+  font-size: 11px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.92;
+  margin-top: 2px;
+}
+
+body.is-calendar-dragging {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
+body.is-calendar-dragging--resize {
+  user-select: none !important;
+  cursor: ns-resize !important;
 }
 
 .timeline__block strong {
