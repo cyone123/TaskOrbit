@@ -297,8 +297,10 @@ export function DailyPlanForm({
   const [date, setDate] = useState(initial?.date ?? defaultDate ?? todayISO());
   const [startTime, setStartTime] = useState(initial?.startTime ?? "09:00");
   const [endTime, setEndTime] = useState(initial?.endTime ?? "10:00");
-  const [repeat, setRepeat] = useState<DailyPlanRepeat>("none");
-  const [repeatCount, setRepeatCount] = useState("2");
+  const [repeat, setRepeat] = useState<DailyPlanRepeat>(initial?.recurrence.frequency ?? "none");
+  const [repeatCount, setRepeatCount] = useState(
+    String(initial?.recurrence.count && initial.recurrence.count > 1 ? initial.recurrence.count : "2"),
+  );
   const [error, setError] = useState("");
 
   const tasksOfProject = useMemo(
@@ -365,40 +367,38 @@ export function DailyPlanForm({
         />
       </div>
 
-      {!initial && (
-        <>
-          <div className="field__row">
-            <div className="field">
-              <OutlinedSelect
-                label="重复"
-                value={repeat}
-                onChange={(event) => setRepeat(eventValue(event) as DailyPlanRepeat)}
-                menuPositioning="fixed"
-              >
-                {(["none", "daily", "weekly", "monthly"] as DailyPlanRepeat[]).map((value) => (
-                  <SelectOption key={value} value={value} selected={repeat === value}>
-                    <span slot="headline">{dailyPlanRepeatLabel(value)}</span>
-                  </SelectOption>
-                ))}
-              </OutlinedSelect>
-            </div>
-            {repeat !== "none" && (
-              <div className="field">
-                <OutlinedTextField
-                  label="重复次数（含首次）"
-                  type="number"
-                  value={repeatCount}
-                  onInput={(event) => setRepeatCount(eventValue(event))}
-                />
-              </div>
-            )}
+      <div className="field__row">
+        <div className="field">
+          <OutlinedSelect
+            label="重复"
+            value={repeat}
+            onChange={(event) => setRepeat(eventValue(event) as DailyPlanRepeat)}
+            menuPositioning="fixed"
+          >
+            {(["none", "daily", "weekly", "monthly"] as DailyPlanRepeat[]).map((value) => (
+              <SelectOption key={value} value={value} selected={repeat === value}>
+                <span slot="headline">{dailyPlanRepeatLabel(value)}</span>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
+        </div>
+        {repeat !== "none" && (
+          <div className="field">
+            <OutlinedTextField
+              label="重复次数（含首次）"
+              type="number"
+              value={repeatCount}
+              onInput={(event) => setRepeatCount(eventValue(event))}
+            />
           </div>
-          {repeat !== "none" && (
-            <p className="body-sm muted mt-8">
-              将从 {date} 开始创建 {repeatCount || "0"} 个{dailyPlanRepeatLabel(repeat)}计划实例。
-            </p>
-          )}
-        </>
+        )}
+      </div>
+      {repeat !== "none" && (
+        <p className="body-sm muted mt-8">
+          {initial
+            ? `将从 ${date} 开始按 ${repeatCount || "0"} 个${dailyPlanRepeatLabel(repeat)}计划实例配置。`
+            : `将从 ${date} 开始创建 ${repeatCount || "0"} 个${dailyPlanRepeatLabel(repeat)}计划实例。`}
+        </p>
       )}
 
       <div className="field__row">

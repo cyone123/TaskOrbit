@@ -569,9 +569,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return plans[0];
   }, [mutate]);
 
-  const updateDailyPlan = useCallback<StoreApi["updateDailyPlan"]>((id, patch) => {
-    mutate((state) => updateDailyPlanState(state, id, patch));
-  }, [mutate]);
+  const updateDailyPlan = useCallback<StoreApi["updateDailyPlan"]>(
+    (id, patch) => {
+      mutate((state) => {
+        const prevPlanIds = new Set(state.dailyPlans.map((p) => p.id));
+        const nextState = updateDailyPlanState(state, id, patch);
+        for (const planId of prevPlanIds) {
+          if (!nextState.dailyPlans.some((p) => p.id === planId)) {
+            addTombstone(planId, "dailyPlan");
+          }
+        }
+        return nextState;
+      });
+    },
+    [mutate, addTombstone],
+  );
 
   const deleteDailyPlan = useCallback<StoreApi["deleteDailyPlan"]>(
     (id) => {

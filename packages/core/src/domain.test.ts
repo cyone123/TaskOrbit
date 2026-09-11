@@ -13,9 +13,10 @@ import {
   createTask,
   deleteInboxItemState,
   deleteProjectState,
+  updateDailyPlanState,
   updateInboxItemState,
 } from "./domain";
-import { createEmptyState } from "./schema";
+import { createEmptyState, validateAppState } from "./schema";
 
 function fixtureState() {
   const project = createProject({
@@ -150,5 +151,206 @@ describe("domain commands", () => {
     const edited = updateInboxItemState(withItems, note.id, { content: "  更新后的想法  " }, 13);
     expect(edited.inboxItems.find((item) => item.id === note.id)?.content).toBe("更新后的想法");
     expect(deleteInboxItemState(edited, todo.id).inboxItems).toHaveLength(1);
+  });
+
+  describe("edit daily plan recurrence", () => {
+    it("converts a single plan to a repeating series", () => {
+      const { state, plan } = fixtureState();
+      expect(plan.recurrence.frequency).toBe("none");
+
+      const next = updateDailyPlanState(
+        state,
+        plan.id,
+        {
+          name: "更新后的每日计划",
+          repeat: "daily",
+          repeatCount: 3,
+        },
+        20,
+      );
+
+      validateAppState(next);
+      const updatedSeries = next.dailyPlans.filter(
+        (p) => p.recurrence.seriesId && p.name === "更新后的每日计划",
+      );
+      expect(updatedSeries).toHaveLength(3);
+      expect(updatedSeries.map((p) => p.date).sort()).toEqual([
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19",
+      ]);
+      const target = next.dailyPlans.find((p) => p.id === plan.id);
+      expect(target?.recurrence).toMatchObject({
+        frequency: "daily",
+        count: 3,
+        occurrence: 1,
+      });
+      expect(target?.name).toBe("更新后的每日计划");
+    });
+
+    it("increases repeat count for an existing series", () => {
+      const { state, project, task } = fixtureState();
+      const plans = createDailyPlans({
+        projectId: project.id,
+        taskId: task.id,
+        name: "系列计划",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+        repeat: "daily",
+        repeatCount: 3,
+      });
+      const withPlans = appendDailyPlans(state, plans);
+
+      const firstPlan = plans[0];
+      const updated = updateDailyPlanState(
+        withPlans,
+        firstPlan.id,
+        {
+          repeat: "daily",
+          repeatCount: 5,
+        },
+        30,
+      );
+
+      validateAppState(updated);
+      const series = updated.dailyPlans.filter(
+        (p) => p.recurrence.seriesId === firstPlan.recurrence.seriesId,
+      );
+      expect(series).toHaveLength(5);
+      expect(series.every((p) => p.recurrence.count === 5)).toBe(true);
+      expect(series.map((p) => p.recurrence.occurrence).sort((a, b) => a - b)).toEqual([
+        1, 2, 3, 4, 5,
+      ]);
+    });
+
+    it("decreases repeat count and cleans up unworked occurrences", () => {
+      const { state, project, task } = fixtureState();
+      const plans = createDailyPlans({
+        projectId: project.id,
+        taskId: task.id,
+        name: "系列计划",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+        repeat: "daily",
+        repeatCount: 4,
+      });
+      const withPlans = appendDailyPlans(state, plans);
+      const firstPlan = plans[0];
+
+      const updated = updateDailyPlanState(
+        withPlans,
+        firstPlan.id,
+        {
+          repeat: "daily",
+          repeatCount: 2,
+        },
+        30,
+      );
+
+      validateAppState(updated);
+      const series = updated.dailyPlans.filter(
+        (p) => p.recurrence.seriesId === firstPlan.recurrence.seriesId,
+      );
+      expect(series).toHaveLength(2);
+      expect(series.every((p) => p.recurrence.count === 2)).toBe(true);
+      expect(series.map((p) => p.recurrence.occurrence).sort((a, b) => a - b)).toEqual([1, 2]);
+    });
+
+    it("cancels repeat and preserves completed occurrences as standalone plans", () => {
+      const { state, project, task } = fixtureState();
+      const plans = createDailyPlans({
+        projectId: project.id,
+        taskId: task.id,
+        name: "系列计划",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+        repeat: "daily",
+        repeatCount: 3,
+      });
+      // Mark occurrence 2 as done
+      plans[1].done = true;
+      const withPlans = appendDailyPlans(state, plans);
+      const firstPlan = plans[0];
+
+      const updated = updateDailyPlanState(
+        withPlans,
+        firstPlan.id,
+        {
+          repeat: "none",
+          repeatCount: 1,
+        },
+        40,
+      );
+
+      validateAppState(updated);
+      // Occurrence 1 updated to none
+      const p1 = updated.dailyPlans.find((p) => p.id === firstPlan.id);
+      expect(p1?.recurrence).toEqual({
+        frequency: "none",
+        count: 1,
+        seriesId: null,
+        occurrence: 1,
+      });
+
+      // Occurrence 2 was done, so it is preserved detached
+      const p2 = updated.dailyPlans.find((p) => p.id === plans[1].id);
+      expect(p2).toBeDefined();
+      expect(p2?.done).toBe(true);
+      expect(p2?.recurrence.frequency).toBe("none");
+
+      // Occurrence 3 was unworked, so it was removed
+      const p3 = updated.dailyPlans.find((p) => p.id === plans[2].id);
+      expect(p3).toBeUndefined();
+    });
+
+    it("changes repeat frequency and creates new dates", () => {
+      const { state, project, task } = fixtureState();
+      const plans = createDailyPlans({
+        projectId: project.id,
+        taskId: task.id,
+        name: "系列计划",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+        repeat: "daily",
+        repeatCount: 3,
+      });
+      const withPlans = appendDailyPlans(state, plans);
+      const firstPlan = plans[0];
+
+      const updated = updateDailyPlanState(
+        withPlans,
+        firstPlan.id,
+        {
+          repeat: "weekly",
+          repeatCount: 3,
+        },
+        50,
+      );
+
+      validateAppState(updated);
+      const target = updated.dailyPlans.find((p) => p.id === firstPlan.id);
+      expect(target?.recurrence.frequency).toBe("weekly");
+      const series = updated.dailyPlans.filter(
+        (p) => p.recurrence.seriesId === target?.recurrence.seriesId,
+      );
+      expect(series).toHaveLength(3);
+      expect(series.map((p) => p.date).sort()).toEqual([
+        "2026-08-17",
+        "2026-08-24",
+        "2026-08-31",
+      ]);
+    });
   });
 });

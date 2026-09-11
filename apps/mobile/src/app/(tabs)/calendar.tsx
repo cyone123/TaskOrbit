@@ -154,8 +154,8 @@ export default function CalendarScreen() {
     setEndTime(plan.endTime);
     setProjectId(plan.projectId ?? "");
     setTaskId(plan.taskId ?? "");
-    setRepeat("none");
-    setRepeatCount("4");
+    setRepeat(plan.recurrence.frequency);
+    setRepeatCount(String(plan.recurrence.count > 1 ? plan.recurrence.count : 4));
     setPlanForm({ visible: true, editing: plan });
   };
 
@@ -170,7 +170,7 @@ export default function CalendarScreen() {
       return;
     }
     const count = Number.parseInt(repeatCount, 10);
-    if (!planForm.editing && repeat !== "none" && (!Number.isFinite(count) || count < 2 || count > 365)) {
+    if (repeat !== "none" && (!Number.isFinite(count) || count < 2 || count > 365)) {
       Alert.alert("重复次数无效", "重复次数需要在 2 到 365 之间。");
       return;
     }
@@ -183,9 +183,11 @@ export default function CalendarScreen() {
       startTime,
       endTime,
       estimatedMinutes: Math.max(1, timeToMinutes(endTime) - timeToMinutes(startTime)),
+      repeat,
+      repeatCount: repeat === "none" ? 1 : count,
     };
     if (planForm.editing) updatePlan(planForm.editing.id, input);
-    else addPlans({ ...input, repeat, repeatCount: repeat === "none" ? 1 : count });
+    else addPlans(input);
     setAnchor(parseISODate(planDate));
     resetForm();
   };
@@ -320,10 +322,25 @@ export default function CalendarScreen() {
         {projectId && formTasks.length > 0 ? (
           <ChoiceRow label="任务（可选）" value={taskId} onChange={setTaskId} options={[{ value: "", label: "不关联任务" }, ...formTasks.map((task) => ({ value: task.id, label: task.name }))]} />
         ) : null}
-        {!planForm.editing ? (
-          <ChoiceRow label="重复" value={repeat} onChange={(value) => setRepeat(value as DailyPlanRepeat)} options={[{ value: "none", label: "不重复" }, { value: "daily", label: "每天" }, { value: "weekly", label: "每周" }, { value: "monthly", label: "每月" }]} />
+        <ChoiceRow
+          label="重复"
+          value={repeat}
+          onChange={(value) => setRepeat(value as DailyPlanRepeat)}
+          options={[
+            { value: "none", label: "不重复" },
+            { value: "daily", label: "每天" },
+            { value: "weekly", label: "每周" },
+            { value: "monthly", label: "每月" },
+          ]}
+        />
+        {repeat !== "none" ? (
+          <Field
+            label="次数（2-365）"
+            value={repeatCount}
+            onChangeText={setRepeatCount}
+            keyboardType="number-pad"
+          />
         ) : null}
-        {!planForm.editing && repeat !== "none" ? <Field label="次数（2-365）" value={repeatCount} onChangeText={setRepeatCount} keyboardType="number-pad" /> : null}
       </FormModal>
       <FAB icon="add" label="添加计划" onPress={() => openNewPlan()} />
     </AppScreen>

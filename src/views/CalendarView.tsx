@@ -1250,9 +1250,8 @@ export function CalendarView() {
           defaultDate={planForm.defaultDate}
           onCancel={() => setPlanForm((current) => ({ ...current, open: false }))}
           onSubmit={(input) => {
-            const { repeat: _repeat, repeatCount: _repeatCount, ...planPatch } = input;
             if (planForm.editing) {
-              store.updateDailyPlan(planForm.editing.id, planPatch);
+              store.updateDailyPlan(planForm.editing.id, input);
               show("计划已更新");
             } else {
               store.addDailyPlan(input);

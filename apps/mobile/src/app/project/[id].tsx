@@ -98,16 +98,44 @@ export default function ProjectDetailScreen() {
 
   const resetPlanForm = () => { setPlanForm({ open: false, editing: null }); setPlanName(""); setPlanDescription(""); setPlanDate(todayISO()); setPlanStart("09:00"); setPlanEnd("10:00"); setPlanTaskId(""); setRepeat("none"); setRepeatCount("4"); };
   const openNewPlan = (taskId = "") => { resetPlanForm(); setPlanTaskId(taskId); setPlanForm({ open: true, editing: null }); };
-  const openEditPlan = (plan: DailyPlan) => { setPlanName(plan.name); setPlanDescription(plan.description); setPlanDate(plan.date); setPlanStart(plan.startTime); setPlanEnd(plan.endTime); setPlanTaskId(plan.taskId ?? ""); setPlanForm({ open: true, editing: plan }); };
+  const openEditPlan = (plan: DailyPlan) => {
+    setPlanName(plan.name);
+    setPlanDescription(plan.description);
+    setPlanDate(plan.date);
+    setPlanStart(plan.startTime);
+    setPlanEnd(plan.endTime);
+    setPlanTaskId(plan.taskId ?? "");
+    setRepeat(plan.recurrence.frequency);
+    setRepeatCount(String(plan.recurrence.count > 1 ? plan.recurrence.count : 4));
+    setPlanForm({ open: true, editing: plan });
+  };
   const submitPlan = () => {
     const count = Number.parseInt(repeatCount, 10);
-    if (!planName.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(planDate) || !validTimeRange(planStart, planEnd)) { Alert.alert("无法保存计划", "请填写名称、有效日期，以及结束晚于开始的 HH:mm 时间。"); return; }
-    if (!planForm.editing && repeat !== "none" && (!Number.isFinite(count) || count < 2 || count > 365)) { Alert.alert("重复次数无效", "重复次数需要在 2 到 365 之间。"); return; }
+    if (!planName.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(planDate) || !validTimeRange(planStart, planEnd)) {
+      Alert.alert("无法保存计划", "请填写名称、有效日期，以及结束晚于开始的 HH:mm 时间。");
+      return;
+    }
+    if (repeat !== "none" && (!Number.isFinite(count) || count < 2 || count > 365)) {
+      Alert.alert("重复次数无效", "重复次数需要在 2 到 365 之间。");
+      return;
+    }
     const estimatedMinutes = timeMinutes(planEnd) - timeMinutes(planStart);
+    const planData = {
+      projectId: project.id,
+      taskId: planTaskId || null,
+      name: planName.trim(),
+      description: planDescription.trim(),
+      date: planDate,
+      startTime: planStart,
+      endTime: planEnd,
+      estimatedMinutes,
+      repeat,
+      repeatCount: repeat === "none" ? 1 : count,
+    };
     if (planForm.editing) {
-      store.updatePlan(planForm.editing.id, { projectId: project.id, taskId: planTaskId || null, name: planName.trim(), description: planDescription.trim(), date: planDate, startTime: planStart, endTime: planEnd, estimatedMinutes });
+      store.updatePlan(planForm.editing.id, planData);
     } else {
-      store.addPlans({ projectId: project.id, taskId: planTaskId || null, name: planName.trim(), description: planDescription.trim(), date: planDate, startTime: planStart, endTime: planEnd, estimatedMinutes, repeat, repeatCount: repeat === "none" ? 1 : count });
+      store.addPlans(planData);
       if (planTaskId) setExpandedTasks((prev) => new Set(prev).add(planTaskId));
     }
     resetPlanForm();
@@ -187,8 +215,25 @@ export default function ProjectDetailScreen() {
         <Field label="日期" value={planDate} onChangeText={setPlanDate} placeholder="YYYY-MM-DD" />
         <View style={styles.formRow}><View style={styles.flex}><Field label="开始时间" value={planStart} onChangeText={setPlanStart} placeholder="09:00" /></View><View style={styles.flex}><Field label="结束时间" value={planEnd} onChangeText={setPlanEnd} placeholder="10:00" /></View></View>
         <ChoiceRow label="关联任务（可选）" value={planTaskId} onChange={setPlanTaskId} options={[{ value: "", label: "独立计划" }, ...tasks.map((task) => ({ value: task.id, label: task.name }))]} />
-        {!planForm.editing ? <ChoiceRow label="重复" value={repeat} onChange={(value) => setRepeat(value as DailyPlanRepeat)} options={[{ value: "none", label: "不重复" }, { value: "daily", label: "每天" }, { value: "weekly", label: "每周" }, { value: "monthly", label: "每月" }]} /> : null}
-        {!planForm.editing && repeat !== "none" ? <Field label="重复次数（2-365）" value={repeatCount} onChangeText={setRepeatCount} keyboardType="number-pad" /> : null}
+        <ChoiceRow
+          label="重复"
+          value={repeat}
+          onChange={(value) => setRepeat(value as DailyPlanRepeat)}
+          options={[
+            { value: "none", label: "不重复" },
+            { value: "daily", label: "每天" },
+            { value: "weekly", label: "每周" },
+            { value: "monthly", label: "每月" },
+          ]}
+        />
+        {repeat !== "none" ? (
+          <Field
+            label="重复次数（2-365）"
+            value={repeatCount}
+            onChangeText={setRepeatCount}
+            keyboardType="number-pad"
+          />
+        ) : null}
       </FormModal>
 
       <FormModal visible={projectFormOpen} title="编辑项目" onClose={() => setProjectFormOpen(false)} onSubmit={submitProject} canSubmit={Boolean(projectName.trim())}>

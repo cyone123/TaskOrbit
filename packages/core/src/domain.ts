@@ -74,8 +74,13 @@ export type DailyPlanPatch = Partial<
     | "endTime"
     | "done"
     | "estimatedMinutes"
+    | "recurrence"
   >
->;
+> & {
+  repeat?: DailyPlanRepeat;
+  repeatCount?: number;
+};
+
 
 export interface PomodoroInput extends PomodoroLink {
   kind: PomodoroSession["kind"];
@@ -432,11 +437,366 @@ export function updateDailyPlanState(
   const projectId = patch.projectId !== undefined ? patch.projectId : current.projectId;
   const taskId = patch.taskId !== undefined ? patch.taskId : current.taskId;
   assertPlanRelation(state, projectId, taskId);
+
+  const { repeat, repeatCount, ...directPatch } = patch;
+
+  // If no recurrence change was requested (repeat & repeatCount both undefined):
+  if (repeat === undefined && repeatCount === undefined) {
+    return {
+      ...state,
+      dailyPlans: state.dailyPlans.map((plan) =>
+        plan.id === id ? { ...plan, ...directPatch, projectId, taskId, updatedAt } : plan,
+      ),
+    };
+  }
+
+  // Recurrence rule was provided:
+  const targetRepeat = repeat ?? current.recurrence.frequency;
+  const targetRepeatCount = repeatCount ?? current.recurrence.count;
+  const normalized = normalizeDailyPlanRepeat(targetRepeat, targetRepeatCount);
+
+  // Common updated fields for the target plan:
+  const updatedName = directPatch.name !== undefined ? directPatch.name.trim() : current.name;
+  const updatedDescription =
+    directPatch.description !== undefined ? directPatch.description.trim() : current.description;
+  const updatedDate = directPatch.date !== undefined ? directPatch.date : current.date;
+  const updatedStartTime = directPatch.startTime !== undefined ? directPatch.startTime : current.startTime;
+  const updatedEndTime = directPatch.endTime !== undefined ? directPatch.endTime : current.endTime;
+  const updatedDone = directPatch.done !== undefined ? directPatch.done : current.done;
+  const updatedEstimatedMinutes =
+    directPatch.estimatedMinutes !== undefined ? directPatch.estimatedMinutes : current.estimatedMinutes;
+
+  const baseUpdatedCurrent: DailyPlan = {
+    ...current,
+    ...directPatch,
+    projectId,
+    taskId,
+    name: updatedName,
+    description: updatedDescription,
+    date: updatedDate,
+    startTime: updatedStartTime,
+    endTime: updatedEndTime,
+    done: updatedDone,
+    estimatedMinutes: updatedEstimatedMinutes,
+    updatedAt,
+  };
+
+  const oldSeriesId = current.recurrence.seriesId;
+
+  // Case A: The user wants "none" (not repeating):
+  if (normalized.frequency === "none") {
+    const updatedTarget: DailyPlan = {
+      ...baseUpdatedCurrent,
+      recurrence: {
+        frequency: "none",
+        count: 1,
+        seriesId: null,
+        occurrence: 1,
+      },
+    };
+
+    if (!oldSeriesId) {
+      // Was not a series, just update the single plan
+      return {
+        ...state,
+        dailyPlans: state.dailyPlans.map((plan) => (plan.id === id ? updatedTarget : plan)),
+      };
+    }
+
+    // Was a series: clean up subsequent uncompleted occurrences with no sessions,
+    // and detach completed or previous ones.
+    const plansWithSessions = new Set(
+      state.pomodoroSessions.map((s) => s.dailyPlanId).filter((sId): sId is string => Boolean(sId)),
+    );
+
+    const nextPlans: DailyPlan[] = [];
+    const removedPlanIds = new Set<string>();
+
+    for (const plan of state.dailyPlans) {
+      if (plan.id === id) {
+        nextPlans.push(updatedTarget);
+      } else if (plan.recurrence.seriesId === oldSeriesId) {
+        const hasWork = plan.done || plansWithSessions.has(plan.id);
+        const isSubsequent = plan.recurrence.occurrence > current.recurrence.occurrence;
+        if (isSubsequent && !hasWork) {
+          removedPlanIds.add(plan.id);
+        } else {
+          // Detach as standalone
+          nextPlans.push({
+            ...plan,
+            recurrence: {
+              frequency: "none",
+              count: 1,
+              seriesId: null,
+              occurrence: 1,
+            },
+            updatedAt,
+          });
+        }
+      } else {
+        nextPlans.push(plan);
+      }
+    }
+
+    return {
+      ...state,
+      dailyPlans: nextPlans,
+      activeTimer:
+        state.activeTimer?.dailyPlanId && removedPlanIds.has(state.activeTimer.dailyPlanId)
+          ? null
+          : state.activeTimer,
+    };
+  }
+
+  // Case B: The user wants a repeating series (frequency !== "none"):
+  const newSeriesDates = expandDailyPlanDates(updatedDate, normalized.frequency, normalized.count);
+
+  // If it was NOT previously a series:
+  if (!oldSeriesId) {
+    const newSeriesId = uid("prs_");
+    const updatedTarget: DailyPlan = {
+      ...baseUpdatedCurrent,
+      date: newSeriesDates[0],
+      recurrence: {
+        frequency: normalized.frequency,
+        count: normalized.count,
+        seriesId: newSeriesId,
+        occurrence: 1,
+      },
+    };
+
+    const newOccurrences: DailyPlan[] = newSeriesDates.slice(1).map((d, idx) => ({
+      id: uid("pl_"),
+      projectId,
+      taskId,
+      name: updatedName,
+      description: updatedDescription,
+      date: d,
+      startTime: updatedStartTime,
+      endTime: updatedEndTime,
+      done: false,
+      estimatedMinutes: updatedEstimatedMinutes,
+      recurrence: {
+        frequency: normalized.frequency,
+        count: normalized.count,
+        seriesId: newSeriesId,
+        occurrence: idx + 2,
+      },
+      createdAt: updatedAt,
+      updatedAt,
+    }));
+
+    return {
+      ...state,
+      dailyPlans: [
+        ...newOccurrences,
+        ...state.dailyPlans.map((plan) => (plan.id === id ? updatedTarget : plan)),
+      ],
+    };
+  }
+
+  // Was already a series!
+  const frequencyChanged = normalized.frequency !== current.recurrence.frequency;
+  const countChanged = normalized.count !== current.recurrence.count;
+
+  // If recurrence didn't actually change (same frequency and count):
+  if (!frequencyChanged && !countChanged) {
+    return {
+      ...state,
+      dailyPlans: state.dailyPlans.map((plan) => (plan.id === id ? baseUpdatedCurrent : plan)),
+    };
+  }
+
+  // Series needs reconfiguration from current:
+  const plansWithSessions = new Set(
+    state.pomodoroSessions.map((s) => s.dailyPlanId).filter((sId): sId is string => Boolean(sId)),
+  );
+
+  if (frequencyChanged) {
+    // Frequency changed: new dates for occurrences 2..N
+    const newSeriesId = uid("prs_");
+    const updatedTarget: DailyPlan = {
+      ...baseUpdatedCurrent,
+      date: newSeriesDates[0],
+      recurrence: {
+        frequency: normalized.frequency,
+        count: normalized.count,
+        seriesId: newSeriesId,
+        occurrence: 1,
+      },
+    };
+
+    const nextPlans: DailyPlan[] = [];
+    const removedPlanIds = new Set<string>();
+
+    for (const plan of state.dailyPlans) {
+      if (plan.id === id) {
+        nextPlans.push(updatedTarget);
+      } else if (plan.recurrence.seriesId === oldSeriesId) {
+        const hasWork = plan.done || plansWithSessions.has(plan.id);
+        const isSubsequent = plan.recurrence.occurrence > current.recurrence.occurrence;
+        if (isSubsequent && !hasWork) {
+          removedPlanIds.add(plan.id);
+        } else {
+          // Detach earlier or worked ones
+          nextPlans.push({
+            ...plan,
+            recurrence: {
+              frequency: "none",
+              count: 1,
+              seriesId: null,
+              occurrence: 1,
+            },
+            updatedAt,
+          });
+        }
+      } else {
+        nextPlans.push(plan);
+      }
+    }
+
+    // Generate new occurrences for the new frequency
+    const newOccurrences: DailyPlan[] = newSeriesDates.slice(1).map((d, idx) => ({
+      id: uid("pl_"),
+      projectId,
+      taskId,
+      name: updatedName,
+      description: updatedDescription,
+      date: d,
+      startTime: updatedStartTime,
+      endTime: updatedEndTime,
+      done: false,
+      estimatedMinutes: updatedEstimatedMinutes,
+      recurrence: {
+        frequency: normalized.frequency,
+        count: normalized.count,
+        seriesId: newSeriesId,
+        occurrence: idx + 2,
+      },
+      createdAt: updatedAt,
+      updatedAt,
+    }));
+
+    return {
+      ...state,
+      dailyPlans: [...newOccurrences, ...nextPlans],
+      activeTimer:
+        state.activeTimer?.dailyPlanId && removedPlanIds.has(state.activeTimer.dailyPlanId)
+          ? null
+          : state.activeTimer,
+    };
+  }
+
+  // Same frequency, count changed:
+  if (normalized.count > current.recurrence.count) {
+    // Count increased!
+    const updatedPlans = state.dailyPlans.map((plan) => {
+      if (plan.id === id) {
+        return {
+          ...baseUpdatedCurrent,
+          recurrence: {
+            ...current.recurrence,
+            count: normalized.count,
+          },
+        };
+      }
+      if (plan.recurrence.seriesId === oldSeriesId) {
+        return {
+          ...plan,
+          recurrence: {
+            ...plan.recurrence,
+            count: normalized.count,
+          },
+          updatedAt,
+        };
+      }
+      return plan;
+    });
+
+    const additionalOccurrences: DailyPlan[] = [];
+    for (let i = current.recurrence.count; i < normalized.count; i++) {
+      additionalOccurrences.push({
+        id: uid("pl_"),
+        projectId,
+        taskId,
+        name: updatedName,
+        description: updatedDescription,
+        date: newSeriesDates[i],
+        startTime: updatedStartTime,
+        endTime: updatedEndTime,
+        done: false,
+        estimatedMinutes: updatedEstimatedMinutes,
+        recurrence: {
+          frequency: normalized.frequency,
+          count: normalized.count,
+          seriesId: oldSeriesId,
+          occurrence: i + 1,
+        },
+        createdAt: updatedAt,
+        updatedAt,
+      });
+    }
+
+    return {
+      ...state,
+      dailyPlans: [...additionalOccurrences, ...updatedPlans],
+    };
+  }
+
+  // Count decreased:
+  const removedPlanIds = new Set<string>();
+  const nextPlans: DailyPlan[] = [];
+
+  for (const plan of state.dailyPlans) {
+    if (plan.id === id) {
+      nextPlans.push({
+        ...baseUpdatedCurrent,
+        recurrence: {
+          ...current.recurrence,
+          count: normalized.count,
+          occurrence: Math.min(current.recurrence.occurrence, normalized.count),
+        },
+      });
+    } else if (plan.recurrence.seriesId === oldSeriesId) {
+      if (plan.recurrence.occurrence > normalized.count) {
+        const hasWork = plan.done || plansWithSessions.has(plan.id);
+        if (!hasWork) {
+          removedPlanIds.add(plan.id);
+        } else {
+          // Detach
+          nextPlans.push({
+            ...plan,
+            recurrence: {
+              frequency: "none",
+              count: 1,
+              seriesId: null,
+              occurrence: 1,
+            },
+            updatedAt,
+          });
+        }
+      } else {
+        nextPlans.push({
+          ...plan,
+          recurrence: {
+            ...plan.recurrence,
+            count: normalized.count,
+          },
+          updatedAt,
+        });
+      }
+    } else {
+      nextPlans.push(plan);
+    }
+  }
+
   return {
     ...state,
-    dailyPlans: state.dailyPlans.map((plan) =>
-      plan.id === id ? { ...plan, ...patch, updatedAt } : plan,
-    ),
+    dailyPlans: nextPlans,
+    activeTimer:
+      state.activeTimer?.dailyPlanId && removedPlanIds.has(state.activeTimer.dailyPlanId)
+        ? null
+        : state.activeTimer,
   };
 }
 

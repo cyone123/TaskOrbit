@@ -375,7 +375,16 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
       togglePlan: (id, done) =>
         mutate((current) => updateDailyPlanState(current, id, { done })),
       updatePlan: (id, patch) =>
-        mutate((current) => updateDailyPlanState(current, id, patch)),
+        mutate((current) => {
+          const prevPlanIds = new Set(current.dailyPlans.map((p) => p.id));
+          const next = updateDailyPlanState(current, id, patch);
+          for (const planId of prevPlanIds) {
+            if (!next.dailyPlans.some((p) => p.id === planId)) {
+              addTombstone(planId, "dailyPlan");
+            }
+          }
+          return next;
+        }),
       removePlan: (id) => {
         addTombstone(id, "dailyPlan");
         mutate((current) => deleteDailyPlanState(current, id));
