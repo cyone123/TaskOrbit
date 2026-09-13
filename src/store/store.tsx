@@ -139,6 +139,7 @@ export interface StoreApi {
   skipTimer: () => void;
   resetTimer: () => void;
   updateTimerLink: (link: PomodoroLink) => void;
+  reconcileTimerNow: () => void;
   exportSnapshot: () => string;
   importSnapshot: (raw: unknown) => Promise<void>;
   resetAll: () => Promise<void>;
@@ -758,6 +759,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         skipTimer,
         resetTimer,
         updateTimerLink: updateTimerLinkValue,
+        reconcileTimerNow: reconcileTimerState,
         exportSnapshot,
         importSnapshot,
         resetAll,

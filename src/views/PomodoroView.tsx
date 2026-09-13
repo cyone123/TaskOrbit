@@ -21,6 +21,10 @@ import {
   eventValue,
 } from "../components/material";
 import { Badge, Dialog, SectionHeader, useSnackbar } from "../components/ui";
+import {
+  openPomodoroMiniWindow,
+  supportsPomodoroMiniWindow,
+} from "../desktop/pomodoro-window";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 
@@ -46,29 +50,6 @@ function clock(ms: number): string {
 function formatSessionTime(timestamp: number): string {
   const d = new Date(timestamp);
   return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-}
-
-function playBeep(times = 3) {
-  try {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
-    for (let i = 0; i < times; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      const t = ctx.currentTime + i * 0.35;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-      osc.start(t);
-      osc.stop(t + 0.3);
-    }
-  } catch {
-    /* audio unavailable */
-  }
 }
 
 function linkValueOf(timer: ActiveTimer | null): string {
@@ -100,7 +81,6 @@ export function PomodoroView() {
   const [linkValue, setLinkValue] = useState(() => linkValueOf(timer));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const linkRef = useRef<PomodoroLink>(linkOfTimer(timer));
-  const previousTimerRef = useRef<ActiveTimer | null>(timer);
 
   useEffect(() => {
     if (!running) return;
@@ -118,26 +98,6 @@ export function PomodoroView() {
     linkRef.current = link;
     setLinkValue(linkValueOf(timer));
   }, [timer?.projectId, timer?.taskId, timer?.dailyPlanId]);
-
-  useEffect(() => {
-    const previous = previousTimerRef.current;
-    if (
-      previous &&
-      timer &&
-      previous.phase !== timer.phase &&
-      previous.status === "running" &&
-      timer.status === "running"
-    ) {
-      if (previous.phase === "focus") {
-        playBeep(3);
-        show(timer.phase === "longBreak" ? "专注完成！进入长休息" : "专注完成！进入短休息");
-      } else {
-        playBeep(2);
-        show("休息结束，开始新的专注");
-      }
-    }
-    previousTimerRef.current = timer;
-  }, [show, timer?.phase, timer?.status]);
 
   const linkOptions = useMemo(() => {
     const opts: {
@@ -210,6 +170,14 @@ export function PomodoroView() {
   const progress = total > 0 ? remaining / total : 0;
   const R = 128;
   const C = 2 * Math.PI * R;
+  const miniWindowAvailable = supportsPomodoroMiniWindow();
+
+  const openMiniWindow = () => {
+    void openPomodoroMiniWindow().catch((error) => {
+      console.error("failed to open pomodoro mini window", error);
+      show("无法打开番茄钟小窗");
+    });
+  };
 
   const toggle = () => {
     if (running) {
@@ -240,6 +208,11 @@ export function PomodoroView() {
             <Icon name="check_circle" size={16} style={{ color: "var(--color-success)" }} />
             今日 {todaySessions.length} 个 · {formatDurationMinutes(todayMinutes)}
           </div>
+          {miniWindowAvailable && (
+            <IconButton onClick={openMiniWindow} aria-label="打开小窗" title="打开小窗">
+              <Icon name="picture_in_picture_alt" size={20} />
+            </IconButton>
+          )}
           <IconButton onClick={() => setSettingsOpen(true)} aria-label="设置" title="设置">
             <Icon name="settings" size={20} />
           </IconButton>

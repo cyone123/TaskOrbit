@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pomodoro-mini",
+  "description": "Minimal permissions for the Pomodoro mini window",
+  "windows": ["pomodoro-mini"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
+}

@@ -4,6 +4,8 @@ import { Icon } from "./components/Icon";
 import { Layout } from "./components/Layout";
 import { FilledButton, FilledCard, OutlinedButton } from "./components/material";
 import { SnackbarProvider } from "./components/ui";
+import { PomodoroNotifier } from "./desktop/PomodoroNotifier";
+import { PomodoroWindowBridge } from "./desktop/PomodoroWindowBridge";
 import { StoreProvider, useStore } from "./store/store";
 import { ThemeManager } from "./theme/theme";
 import { CalendarView } from "./views/CalendarView";
@@ -101,6 +103,8 @@ function BootstrapGate() {
         </div>
       )}
       <ThemeManager />
+      <PomodoroWindowBridge />
+      <PomodoroNotifier />
       <Shell />
     </>
   );

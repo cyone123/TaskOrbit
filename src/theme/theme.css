@@ -2818,6 +2818,132 @@ body.is-calendar-dragging--resize {
   flex: 0 0 auto;
 }
 
+/* Pomodoro mini window ------------------------------------------------------- */
+
+.pomodoro-mini-root {
+  --pomo-color: var(--md-primary);
+  --pomo-on-color: var(--md-on-primary);
+
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  box-shadow: inset 0 0 0 1px var(--md-outline-variant);
+}
+
+.pomodoro-mini-root.pomo-phase-shortBreak {
+  --pomo-color: var(--md-tertiary);
+  --pomo-on-color: var(--md-on-tertiary);
+}
+
+.pomodoro-mini-root.pomo-phase-longBreak {
+  --pomo-color: var(--color-success);
+  --pomo-on-color: var(--color-on-success);
+}
+
+.pomodoro-mini-topbar {
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-1);
+  padding: 3px 5px 3px var(--sys-space-3);
+}
+
+.pomodoro-mini-drag {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-2);
+  border-radius: var(--shape-sm);
+  cursor: grab;
+  text-align: left;
+}
+
+.pomodoro-mini-drag:active {
+  cursor: grabbing;
+}
+
+.pomodoro-mini-phase-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--shape-full);
+  background: var(--pomo-color);
+}
+
+.pomodoro-mini-drag .label-sm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pomodoro-mini-close {
+  --md-icon-button-container-width: 34px;
+  --md-icon-button-container-height: 34px;
+  --md-icon-button-icon-size: 18px;
+}
+
+.pomodoro-mini-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--sys-space-5) var(--sys-space-3);
+}
+
+.pomodoro-mini-clock {
+  font-size: 52px;
+  line-height: 58px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+.pomodoro-mini-target {
+  width: 100%;
+  margin-top: 1px;
+  text-align: center;
+}
+
+md-linear-progress.pomodoro-mini-progress {
+  width: 100%;
+  margin-top: var(--sys-space-3);
+  --md-linear-progress-track-height: 4px;
+  --md-linear-progress-active-indicator-height: 4px;
+  --md-linear-progress-active-indicator-color: var(--pomo-color);
+  --md-linear-progress-track-color: var(--md-surface-container-highest);
+}
+
+.pomodoro-mini-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sys-space-3);
+  margin-top: var(--sys-space-3);
+}
+
+.pomodoro-mini-controls md-icon-button {
+  --md-icon-button-container-width: 42px;
+  --md-icon-button-container-height: 42px;
+}
+
+.pomodoro-mini-primary {
+  --md-filled-button-container-height: 42px;
+  --md-filled-button-container-color: var(--pomo-color);
+  --md-filled-button-label-text-color: var(--pomo-on-color);
+  --md-filled-button-icon-color: var(--pomo-on-color);
+  --md-filled-button-hover-label-text-color: var(--pomo-on-color);
+  --md-filled-button-hover-icon-color: var(--pomo-on-color);
+  --md-filled-button-leading-space: 20px;
+  --md-filled-button-trailing-space: 20px;
+}
+
 /* ============================================================================
    Misc utilities
    ========================================================================== */
