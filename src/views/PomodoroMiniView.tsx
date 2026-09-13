@@ -113,57 +113,77 @@ export function PomodoroMiniView() {
 
   return (
     <div className={`pomodoro-mini-root pomo-phase-${phase}${running ? " is-running" : ""}`}>
-      <div className="pomodoro-mini-topbar">
+      <div className="pomodoro-mini-surface">
+        <div className="pomodoro-mini-topbar">
+          <button
+            type="button"
+            className="pomodoro-mini-drag"
+            onMouseDown={(event) => {
+              if (event.button === 0) void getCurrentWindow().startDragging();
+            }}
+            aria-label="拖动番茄钟小窗"
+            title="拖动小窗"
+          >
+            <span className="pomodoro-mini-phase-dot" />
+            <span className="label-lg">{phaseLabel(phase)}</span>
+            <span className="label-sm muted">{status}</span>
+          </button>
+          <IconButton
+            className="pomodoro-mini-close"
+            onClick={() => void getCurrentWindow().close()}
+            aria-label="关闭小窗"
+            title="关闭小窗"
+          >
+            <Icon name="close" size={18} />
+          </IconButton>
+        </div>
+
+        <div className="pomodoro-mini-content">
+          <div className="pomodoro-mini-clock tabular-nums">
+            {snapshot ? clock(remaining) : "--:--"}
+          </div>
+          <div className="body-sm muted pomodoro-mini-target ellipsis">
+            {snapshot?.targetLabel ?? "正在同步…"}
+          </div>
+          <LinearProgress className="pomodoro-mini-progress" value={snapshot ? progress : 0} />
+
+          <div className="pomodoro-mini-controls">
+            <IconButton
+              onClick={() => void sendPomodoroMiniAction({ type: "reset" })}
+              aria-label="重置"
+              title="重置"
+            >
+              <Icon name="replay" size={21} />
+            </IconButton>
+            <FilledButton className="pomodoro-mini-primary" onClick={toggle}>
+              <Icon name={running ? "pause" : "play_arrow"} slot="icon" size={20} />
+              {running ? "暂停" : timer ? "继续" : "开始"}
+            </FilledButton>
+            <IconButton
+              onClick={() => void sendPomodoroMiniAction({ type: "skip" })}
+              aria-label="跳过"
+              title="跳过"
+            >
+              <Icon name="skip_next" size={21} />
+            </IconButton>
+          </div>
+        </div>
+
         <button
           type="button"
-          className="pomodoro-mini-drag"
+          className="pomodoro-mini-resize"
           onMouseDown={(event) => {
-            if (event.button === 0) void getCurrentWindow().startDragging();
+            if (event.button === 0) {
+              event.preventDefault();
+              event.stopPropagation();
+              void getCurrentWindow().startResizeDragging("SouthEast");
+            }
           }}
-          aria-label="拖动番茄钟小窗"
-          title="拖动小窗"
+          aria-label="调整小窗大小"
+          title="拖动调整大小"
         >
-          <span className="pomodoro-mini-phase-dot" />
-          <span className="label-lg">{phaseLabel(phase)}</span>
-          <span className="label-sm muted">{status}</span>
+          <Icon name="south_east" size={14} />
         </button>
-        <IconButton
-          className="pomodoro-mini-close"
-          onClick={() => void getCurrentWindow().close()}
-          aria-label="关闭小窗"
-          title="关闭小窗"
-        >
-          <Icon name="close" size={18} />
-        </IconButton>
-      </div>
-
-      <div className="pomodoro-mini-content">
-        <div className="pomodoro-mini-clock tabular-nums">{snapshot ? clock(remaining) : "--:--"}</div>
-        <div className="body-sm muted pomodoro-mini-target ellipsis">
-          {snapshot?.targetLabel ?? "正在同步…"}
-        </div>
-        <LinearProgress className="pomodoro-mini-progress" value={snapshot ? progress : 0} />
-
-        <div className="pomodoro-mini-controls">
-          <IconButton
-            onClick={() => void sendPomodoroMiniAction({ type: "reset" })}
-            aria-label="重置"
-            title="重置"
-          >
-            <Icon name="replay" size={21} />
-          </IconButton>
-          <FilledButton className="pomodoro-mini-primary" onClick={toggle}>
-            <Icon name={running ? "pause" : "play_arrow"} slot="icon" size={20} />
-            {running ? "暂停" : timer ? "继续" : "开始"}
-          </FilledButton>
-          <IconButton
-            onClick={() => void sendPomodoroMiniAction({ type: "skip" })}
-            aria-label="跳过"
-            title="跳过"
-          >
-            <Icon name="skip_next" size={21} />
-          </IconButton>
-        </div>
       </div>
     </div>
   );

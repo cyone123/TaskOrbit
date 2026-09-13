@@ -72,16 +72,21 @@ export async function openPomodoroMiniWindow(): Promise<void> {
       title: "番茄钟",
       width: 360,
       height: 224,
+      minWidth: 300,
+      minHeight: 190,
+      maxWidth: 720,
+      maxHeight: 440,
       center: true,
-      resizable: false,
+      resizable: true,
       maximizable: false,
       minimizable: false,
       fullscreen: false,
       focus: true,
       decorations: false,
+      transparent: true,
       alwaysOnTop: true,
       skipTaskbar: true,
-      shadow: true,
+      shadow: false,
     });
 
     void miniWindow.once("tauri://created", () => resolve());
