@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { ActiveTimer } from "@task-orbit/core";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import { useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
+import { isTauri } from "../store/persistence";
 
 function playBeep(times = 3) {
   try {
@@ -28,10 +34,41 @@ function playBeep(times = 3) {
   }
 }
 
+let notificationPermissionPromise: Promise<boolean> | null = null;
+
+function ensureNotificationPermission(): Promise<boolean> {
+  if (!isTauri()) return Promise.resolve(false);
+  if (notificationPermissionPromise) return notificationPermissionPromise;
+
+  notificationPermissionPromise = (async () => {
+    try {
+      if (await isPermissionGranted()) return true;
+      return (await requestPermission()) === "granted";
+    } catch {
+      return false;
+    }
+  })();
+
+  return notificationPermissionPromise;
+}
+
+async function notifySystem(title: string, body: string): Promise<void> {
+  if (!(await ensureNotificationPermission())) return;
+  try {
+    sendNotification({ title, body });
+  } catch {
+    /* system notification unavailable */
+  }
+}
+
 export function PomodoroNotifier() {
   const timer = useStore().state.activeTimer;
   const { show } = useSnackbar();
   const previousTimerRef = useRef<ActiveTimer | null>(timer);
+
+  useEffect(() => {
+    void ensureNotificationPermission();
+  }, []);
 
   useEffect(() => {
     const previous = previousTimerRef.current;
@@ -43,15 +80,18 @@ export function PomodoroNotifier() {
       timer.status === "running"
     ) {
       if (previous.phase === "focus") {
-        playBeep(3);
-        show(
+        const message =
           timer.phase === "longBreak"
             ? "专注完成！进入长休息"
-            : "专注完成！进入短休息",
-        );
+            : "专注完成！进入短休息";
+        playBeep(3);
+        show(message);
+        void notifySystem("Task Orbit · 专注完成", message);
       } else {
+        const message = "休息结束，开始新的专注";
         playBeep(2);
-        show("休息结束，开始新的专注");
+        show(message);
+        void notifySystem("Task Orbit · 休息结束", message);
       }
     }
     previousTimerRef.current = timer;
