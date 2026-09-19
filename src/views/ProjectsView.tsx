@@ -35,7 +35,6 @@ import {
   ExtendedFab,
   SearchBar,
   SectionHeader,
-  StatCard,
   useSnackbar,
 } from "../components/ui";
 import { colorByKey } from "../store/colors";
@@ -53,6 +52,12 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   low: "低优先级",
 };
 
+const PRIORITY_LABEL_SHORT: Record<Priority, string> = {
+  high: "高优",
+  medium: "中优",
+  low: "低优",
+};
+
 const PROJECT_TABS = [
   { key: "overview", label: "概览" },
   { key: "tasks", label: "任务与计划" },
@@ -62,11 +67,17 @@ const PROJECT_TABS = [
 
 type ProjectTab = (typeof PROJECT_TABS)[number]["key"];
 
-function statusLabel(startISO: string, endISO: string): { text: string; color: string } {
+interface StatusInfo {
+  text: string;
+  color: string;
+  type: "not-started" | "ongoing" | "ended";
+}
+
+function statusLabel(startISO: string, endISO: string): StatusInfo {
   const today = todayISO();
-  if (today < startISO) return { text: "未开始", color: "var(--md-on-surface-variant)" };
-  if (today > endISO) return { text: "已结束", color: "var(--md-outline)" };
-  return { text: "进行中", color: "var(--md-primary)" };
+  if (today < startISO) return { text: "未开始", color: "var(--md-on-surface-variant)", type: "not-started" };
+  if (today > endISO) return { text: "已结束", color: "var(--md-outline)", type: "ended" };
+  return { text: "进行中", color: "var(--md-primary)", type: "ongoing" };
 }
 
 function monthDays(anchor: Date): Date[] {
@@ -78,6 +89,58 @@ function monthDays(anchor: Date): Date[] {
 function daysRemaining(endISO: string): number {
   const diff = parseISODate(endISO).getTime() - parseISODate(todayISO()).getTime();
   return Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+}
+
+function ProgressRing({
+  value,
+  size = 54,
+  strokeWidth = 5,
+  color = "var(--md-primary)",
+  trackColor = "var(--md-surface-container-highest)",
+}: {
+  value: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+  trackColor?: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(100, Math.max(0, value));
+  const offset = circumference - (clamped / 100) * circumference;
+
+  return (
+    <div className="progress-ring-container" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          className="progress-ring-track"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          stroke={trackColor}
+          fill="transparent"
+        />
+        <circle
+          className="progress-ring-indicator"
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          stroke={color}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div className="progress-ring-label">
+        <strong>{Math.round(clamped)}</strong>
+        <small>%</small>
+      </div>
+    </div>
+  );
 }
 
 export function ProjectsView() {
@@ -99,6 +162,32 @@ export function ProjectsView() {
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
   const [planDate, setPlanDate] = useState(todayISO());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          target.tagName === "MD-OUTLINED-TEXT-FIELD")
+      ) {
+        return;
+      }
+      if (event.key === "[") {
+        event.preventDefault();
+        setLeftSidebarCollapsed((prev) => !prev);
+      } else if (event.key === "]") {
+        event.preventDefault();
+        setRightSidebarCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const [projForm, setProjForm] = useState<{ open: boolean; editing: Project | null }>({
     open: false,
@@ -199,6 +288,13 @@ export function ProjectsView() {
     () => new Set(projectPlans.map((plan) => plan.date)),
     [projectPlans],
   );
+  const plansCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const plan of projectPlans) {
+      map.set(plan.date, (map.get(plan.date) ?? 0) + 1);
+    }
+    return map;
+  }, [projectPlans]);
 
   const toggleTask = (id: string) => {
     setExpandedTasks((previous) => {
@@ -292,8 +388,13 @@ export function ProjectsView() {
   const renderPlanRow = (plan: DailyPlan, compact = false) => {
     const task = plan.taskId ? state.tasks.find((item) => item.id === plan.taskId) : null;
     const projectColor = selectedProject ? colorByKey(selectedProject.color) : "var(--md-outline)";
+    const isToday = plan.date === todayISO();
+    const isFocusing = state.activeTimer?.status === "running" && state.activeTimer?.dailyPlanId === plan.id;
     return (
-      <div className={`project-plan-row ${compact ? "project-plan-row--compact" : ""} ${plan.done ? "is-done" : ""}`} key={plan.id}>
+      <div
+        className={`project-plan-row ${compact ? "project-plan-row--compact" : ""} ${plan.done ? "is-done" : ""} ${isToday ? "is-today" : ""} ${isFocusing ? "is-focusing" : ""}`}
+        key={plan.id}
+      >
         <Checkbox
           checked={plan.done}
           aria-label={`标记计划「${plan.name}」${plan.done ? "未完成" : "已完成"}`}
@@ -308,10 +409,31 @@ export function ProjectsView() {
             {!compact && task && ` · ${task.name}`}
           </div>
         </div>
+        {isToday && <span className="chip chip--small project-today-badge">今日</span>}
         <span className="chip chip--small project-time-chip">
           {plan.startTime} - {plan.endTime}
         </span>
         <div className="project-row-actions">
+          {!plan.done && (
+            <IconButton
+              aria-label={isFocusing ? "正在专注中" : "开始专注"}
+              title={isFocusing ? "正在专注中" : "开始专注"}
+              onClick={() => {
+                store.startTimer({
+                  projectId: plan.projectId,
+                  taskId: plan.taskId,
+                  dailyPlanId: plan.id,
+                });
+                show(`已开始专注「${plan.name}」`);
+              }}
+            >
+              <Icon
+                name={isFocusing ? "timer" : "play_arrow"}
+                size={18}
+                style={isFocusing ? { color: "var(--md-primary)" } : undefined}
+              />
+            </IconButton>
+          )}
           <IconButton
             aria-label="编辑计划"
             title="编辑计划"
@@ -349,10 +471,11 @@ export function ProjectsView() {
             onChange={() => store.updateTask(task.id, { done: !task.done })}
           />
           <span
-            className="dot project-task-row__priority"
-            style={{ background: PRIORITY_COLOR[task.priority] }}
+            className={`project-priority-pill project-priority-pill--${task.priority}`}
             title={PRIORITY_LABEL[task.priority]}
-          />
+          >
+            {PRIORITY_LABEL_SHORT[task.priority]}
+          </span>
           <div className="project-task-row__copy">
             <span className="body-md project-task-row__name">{task.name}</span>
             {task.description && <span className="body-sm muted project-task-row__description">{task.description}</span>}
@@ -363,7 +486,8 @@ export function ProjectsView() {
               <span>{doneCount}/{taskPlans.length}</span>
             </span>
           )}
-          <span className="chip chip--small project-status-chip" style={{ color: taskStatus.color }}>
+          <span className={`chip chip--small project-status-chip project-status-chip--${taskStatus.type}`}>
+            {taskStatus.type === "ongoing" && <span className="project-status-pulse" />}
             {taskStatus.text}
           </span>
           <span className="body-sm muted project-task-row__date">{relativeRangeLabel(task.startDate, task.endDate)}</span>
@@ -484,32 +608,72 @@ export function ProjectsView() {
         <Icon name="chevron_right" size={18} />
         <span>{formatDateFull(planDate)}</span>
       </button>
-      <div className="today-plan-list">
+      <div className="today-plan-timeline">
         {todayPlans.length === 0 ? (
           <div className="project-empty-row project-empty-row--small">{planDayTitle}还没有安排计划。</div>
         ) : (
-          todayPlans.slice(0, 3).map((plan) => (
-            <button
-              type="button"
-              className={`today-plan-item ${plan.done ? "is-done" : ""}`}
-              key={plan.id}
-              onClick={() => setPlanForm({
-                open: true,
-                projectId: plan.projectId,
-                taskId: plan.taskId,
-                lockProject: true,
-                lockTask: true,
-                editing: plan,
-              })}
-            >
-              <span className="chip chip--small today-plan-item__time">{plan.startTime} - {plan.endTime}</span>
-              <span className="title-sm today-plan-item__name">{plan.name}</span>
-              <span className="row gap-6 body-sm muted">
-                <span className="dot" style={{ background: selectedProject ? colorByKey(selectedProject.color) : "var(--md-outline)" }} />
-                {plan.taskId ? state.tasks.find((task) => task.id === plan.taskId)?.name ?? "项目任务" : "独立计划"}
-              </span>
-            </button>
-          ))
+          todayPlans.slice(0, 3).map((plan) => {
+            const isFocusing = state.activeTimer?.status === "running" && state.activeTimer?.dailyPlanId === plan.id;
+            const task = plan.taskId ? state.tasks.find((item) => item.id === plan.taskId) : null;
+            return (
+              <div className="today-plan-timeline-item" key={plan.id}>
+                <div className={`today-plan-timeline-node ${plan.done ? "is-done" : isFocusing ? "is-focusing" : ""}`} />
+                <div
+                  className={`today-plan-item ${plan.done ? "is-done" : ""} ${isFocusing ? "is-focusing" : ""}`}
+                  onClick={() => setPlanForm({
+                    open: true,
+                    projectId: plan.projectId,
+                    taskId: plan.taskId,
+                    lockProject: true,
+                    lockTask: true,
+                    editing: plan,
+                  })}
+                >
+                  <div className="today-plan-item__header">
+                    <div className="row gap-8 align-center">
+                      <Checkbox
+                        checked={plan.done}
+                        aria-label={`标记计划「${plan.name}」${plan.done ? "未完成" : "已完成"}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => store.updateDailyPlan(plan.id, { done: !plan.done })}
+                      />
+                      <span className="chip chip--small today-plan-item__time">{plan.startTime} - {plan.endTime}</span>
+                    </div>
+                    {!plan.done && (
+                      isFocusing ? (
+                        <span className="today-plan-focusing-badge">
+                          <span className="project-status-pulse" /> 专注中
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="today-plan-focus-btn"
+                          title="开始专注此计划"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            store.startTimer({
+                              projectId: plan.projectId,
+                              taskId: plan.taskId,
+                              dailyPlanId: plan.id,
+                            });
+                            show(`已开始专注「${plan.name}」`);
+                          }}
+                        >
+                          <Icon name="play_arrow" size={15} />
+                          <span>专注</span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <div className="title-sm today-plan-item__name">{plan.name}</div>
+                  <div className="row gap-6 body-sm muted today-plan-item__footer">
+                    <span className="dot" style={{ background: selectedProject ? colorByKey(selectedProject.color) : "var(--md-outline)" }} />
+                    <span className="ellipsis">{task ? task.name : "独立计划"}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
       {todayPlans.length > 3 && (
@@ -528,11 +692,22 @@ export function ProjectsView() {
 
   const renderCalendar = () => {
     const currentMonth = parseISODate(planDate).getMonth();
+    const isViewingToday = planDate === todayISO();
     return (
       <section className="project-panel project-calendar-card">
         <div className="project-calendar-header">
           <div className="title-sm">日历</div>
-          <div className="row gap-4">
+          <div className="row gap-4 align-center">
+            {!isViewingToday && (
+              <button
+                type="button"
+                className="project-calendar-today-btn"
+                onClick={() => setPlanDate(todayISO())}
+                title="回到今天"
+              >
+                回到今天
+              </button>
+            )}
             <span className="body-md muted">{monthLabel(parseISODate(planDate))}</span>
             <IconButton aria-label="上个月" title="上个月" onClick={() => shiftPlanMonth(-1)}>
               <Icon name="chevron_left" size={19} />
@@ -550,15 +725,24 @@ export function ProjectsView() {
             const iso = toISODate(day);
             const selected = iso === planDate;
             const outside = day.getMonth() !== currentMonth;
+            const isToday = iso === todayISO();
+            const planCount = plansCountByDate.get(iso) ?? 0;
+            const heatClass = planCount >= 3 ? "heat-2" : planCount > 0 ? "heat-1" : "";
             return (
               <button
                 type="button"
                 key={iso}
-                className={`project-calendar-day ${selected ? "is-selected" : ""} ${outside ? "is-outside" : ""}`}
+                className={`project-calendar-day ${selected ? "is-selected" : ""} ${outside ? "is-outside" : ""} ${isToday ? "is-today-marker" : ""} ${heatClass}`}
                 onClick={() => setPlanDate(iso)}
+                title={planCount > 0 ? `${formatDate(iso)}: ${planCount} 个计划` : formatDate(iso)}
               >
                 <span>{day.getDate()}</span>
-                {projectPlanDates.has(iso) && <i />}
+                {planCount > 0 && (
+                  <span className="project-calendar-heat-dots">
+                    <i />
+                    {planCount >= 3 && <i />}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -586,139 +770,173 @@ export function ProjectsView() {
     </section>
   );
 
-  const renderMainContent = () => {
+  const renderTabContent = () => {
     if (!selectedProject) return null;
-    if (activeTab === "tasks") return renderTaskSection();
+    if (activeTab === "tasks") return renderTaskSection(true);
     if (activeTab === "stats") return renderStatsTab();
     if (activeTab === "notes") return <ProjectNotesPanel project={selectedProject} state={state} />;
     return (
-      <div className="project-overview-grid">
-        <div className="project-overview-main">
-          <section className="project-overview-section">
-            <SectionHeader title="项目概览" />
-            <div className="project-stat-grid">
-              <StatCard
-                title="任务总数"
-                value={projectTasks.length}
-                subtitle={<>{doneTasks} 已完成</>}
-                icon="task_alt"
-                colorVariant="primary"
-                onClick={() => setActiveTab("tasks")}
-              />
-              <StatCard
-                title="计划总数"
-                value={projectPlans.length}
-                subtitle={<>{planDate === todayISO() ? "今日计划" : `${formatDate(planDate)}计划`} {todayPlans.length} 个</>}
-                icon="event_available"
-                colorVariant="info"
-                onClick={() => setActiveTab("tasks")}
-              />
-              <StatCard
-                title="整体进度"
-                value={taskProgress}
-                unit="%"
-                subtitle="任务完成率"
-                icon="trending_up"
-                colorVariant="success"
-              />
-              <StatCard
-                title="预计剩余"
-                value={daysRemaining(selectedProject.endDate)}
-                unit="天"
-                subtitle={`预计 ${formatDate(selectedProject.endDate)} 结束`}
-                icon="schedule"
-                colorVariant="warning"
-              />
+      <div className="project-overview-content">
+        <div className="project-insight-strip">
+          <button
+            type="button"
+            className="project-insight-item is-clickable"
+            onClick={() => setActiveTab("tasks")}
+            title="查看任务与计划"
+          >
+            <span className="project-insight-icon project-insight-icon--primary">
+              <Icon name="task_alt" size={18} />
+            </span>
+            <div className="project-insight-text">
+              <span className="project-insight-label">任务推进</span>
+              <span className="project-insight-value">
+                {doneTasks} / {projectTasks.length}
+                <small className="muted"> ({taskProgress}%)</small>
+              </span>
             </div>
-          </section>
-          {renderTaskSection(false)}
+          </button>
+
+          <button
+            type="button"
+            className="project-insight-item is-clickable"
+            onClick={() => setActiveTab("tasks")}
+            title="查看今日日程"
+          >
+            <span className="project-insight-icon project-insight-icon--info">
+              <Icon name="event_available" size={18} />
+            </span>
+            <div className="project-insight-text">
+              <span className="project-insight-label">今日计划</span>
+              <span className="project-insight-value">
+                {todayPlans.length}
+                <small className="muted"> 个 / 共 {projectPlans.length} 个</small>
+              </span>
+            </div>
+          </button>
+
+          <div className="project-insight-item">
+            <span className="project-insight-icon project-insight-icon--success">
+              <Icon name="trending_up" size={18} />
+            </span>
+            <div className="project-insight-text">
+              <span className="project-insight-label">完成进度</span>
+              <span className="project-insight-value">{taskProgress}%</span>
+            </div>
+          </div>
+
+          <div className="project-insight-item">
+            <span className="project-insight-icon project-insight-icon--warning">
+              <Icon name="schedule" size={18} />
+            </span>
+            <div className="project-insight-text">
+              <span className="project-insight-label">工期剩余</span>
+              <span className="project-insight-value">
+                {daysRemaining(selectedProject.endDate)}
+                <small className="muted"> 天</small>
+              </span>
+            </div>
+          </div>
         </div>
-        <aside className="project-overview-sidebar">
-          {renderTodayPlans()}
-          {renderCalendar()}
-        </aside>
+        {renderTaskSection(false)}
       </div>
     );
   };
 
   return (
-    <div className="projects-workspace">
+    <div className={`projects-workspace ${leftSidebarCollapsed ? "is-left-collapsed" : ""}`}>
       <aside className="projects-sidebar">
-        <div className="projects-sidebar__header">
-          <div className="headline-sm">项目</div>
-          <button type="button" className="projects-sidebar__manage" onClick={() => setShowArchived((value) => !value)}>
-            {showArchived ? "收起" : "管理"}
-          </button>
-        </div>
+        <div className="projects-sidebar__clip">
+          <div className="projects-sidebar__inner">
+            <div className="projects-sidebar__header">
+              <div className="headline-sm">项目</div>
+              <button type="button" className="projects-sidebar__manage" onClick={() => setShowArchived((value) => !value)}>
+                {showArchived ? "收起" : "管理"}
+              </button>
+            </div>
 
-        <div className="projects-sidebar__tools">
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="搜索项目..."
-            className="projects-search-bar"
-          />
-        </div>
+            <div className="projects-sidebar__tools">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="搜索项目..."
+                className="projects-search-bar"
+              />
+            </div>
 
-        <ExtendedFab
-          label="新建项目"
-          icon="add"
-          variant="primary"
-          className="projects-create-fab"
-          onClick={() => setProjForm({ open: true, editing: null })}
-        />
+            <ExtendedFab
+              label="新建项目"
+              icon="add"
+              variant="primary"
+              className="projects-create-fab"
+              onClick={() => setProjForm({ open: true, editing: null })}
+            />
 
-        <div className="projects-sidebar__list">
-          {filteredProjects.length === 0 ? (
-            <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
-          ) : (
-            filteredProjects.map((project) => {
-              const tasks = tasksOfProject.get(project.id) ?? [];
-              const taskDone = tasks.filter((task) => task.done).length;
-              const selected = selectedProjectId === project.id;
-              return (
-                <button
-                  type="button"
-                  className={`project-nav-item ${selected ? "is-selected" : ""}`}
-                  key={project.id}
-                  onClick={() => selectProject(project.id)}
-                >
-                  <span className="dot project-nav-item__dot" style={{ background: colorByKey(project.color) }} />
-                  <span className="project-nav-item__body">
-                    <span className="title-md ellipsis">{project.name}</span>
-                    <span className="body-sm muted project-nav-item__meta">
-                      {tasks.length > 0 ? `${taskDone} / ${tasks.length} 个任务完成` : "暂无任务"}
-                      <span>{relativeRangeLabel(project.startDate, project.endDate)}</span>
-                    </span>
-                  </span>
-                  {selected && <Icon name="chevron_right" size={19} className="project-nav-item__chevron" />}
-                  <Ripple />
+            <div className="projects-sidebar__list">
+              {filteredProjects.length === 0 ? (
+                <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
+              ) : (
+                filteredProjects.map((project) => {
+                  const tasks = tasksOfProject.get(project.id) ?? [];
+                  const taskDone = tasks.filter((task) => task.done).length;
+                  const selected = selectedProjectId === project.id;
+                  return (
+                    <button
+                      type="button"
+                      className={`project-nav-item ${selected ? "is-selected" : ""}`}
+                      key={project.id}
+                      onClick={() => selectProject(project.id)}
+                    >
+                      <span className="dot project-nav-item__dot" style={{ background: colorByKey(project.color) }} />
+                      <span className="project-nav-item__body">
+                        <span className="title-md ellipsis">{project.name}</span>
+                        <span className="body-sm muted project-nav-item__meta">
+                          {tasks.length > 0 ? `${taskDone} / ${tasks.length} 个任务完成` : "暂无任务"}
+                          <span>{relativeRangeLabel(project.startDate, project.endDate)}</span>
+                        </span>
+                      </span>
+                      {selected && <Icon name="chevron_right" size={19} className="project-nav-item__chevron" />}
+                      <Ripple />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {archivedProjects.length > 0 && (
+              <div className="projects-sidebar__archived">
+                <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
+                  <span>已归档项目</span>
+                  <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
                 </button>
-              );
-            })
-          )}
-        </div>
-
-        {archivedProjects.length > 0 && (
-          <div className="projects-sidebar__archived">
-            <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
-              <span>已归档项目</span>
-              <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
-            </button>
-            {showArchived && (
-              <div className="projects-archived-list">
-                {archivedProjects.map((project) => (
-                  <div className="projects-archived-item" key={project.id}>
-                    <span className="dot" style={{ background: colorByKey(project.color) }} />
-                    <span className="body-sm ellipsis grow">{project.name}</span>
-                    <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
-                    <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
+                {showArchived && (
+                  <div className="projects-archived-list">
+                    {archivedProjects.map((project) => (
+                      <div className="projects-archived-item" key={project.id}>
+                        <span className="dot" style={{ background: colorByKey(project.color) }} />
+                        <span className="body-sm ellipsis grow">{project.name}</span>
+                        <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
+                        <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
-        )}
+        </div>
+
+        <button
+          type="button"
+          className="projects-sidebar-handle"
+          onClick={() => setLeftSidebarCollapsed((prev) => !prev)}
+          aria-label={leftSidebarCollapsed ? "展开项目列表 ([)" : "收起项目列表 ([)"}
+          title={leftSidebarCollapsed ? "展开项目列表 ([)" : "收起项目列表 ([)"}
+        >
+          <Icon
+            name={leftSidebarCollapsed ? "chevron_right" : "chevron_left"}
+            size={16}
+          />
+        </button>
       </aside>
 
       <main className="project-detail-area">
@@ -733,39 +951,61 @@ export function ProjectsView() {
                 <div className="project-hero__title-row">
                   <span className="project-hero__dot" style={{ background: colorByKey(selectedProject.color) }} />
                   <h1>{selectedProject.name}</h1>
-                  <span className="chip project-hero__status"><span className="project-status-pulse" />{statusLabel(selectedProject.startDate, selectedProject.endDate).text}</span>
+                  <span className={`chip project-hero__status project-hero__status--${statusLabel(selectedProject.startDate, selectedProject.endDate).type}`}>
+                    <span className="project-status-pulse" />
+                    {statusLabel(selectedProject.startDate, selectedProject.endDate).text}
+                  </span>
                 </div>
                 <div className="project-hero__date body-md muted"><Icon name="calendar_today" size={18} /> {formatDateFull(selectedProject.startDate)} - {formatDate(selectedProject.endDate)}</div>
                 {selectedProject.description && <p className="body-md muted project-hero__description">{selectedProject.description}</p>}
               </div>
               <div className="project-hero__progress">
-                <div className="spread"><span className="label-md">整体进度</span><strong>{taskProgress}%</strong></div>
-                <LinearProgress value={taskProgress} max={100} aria-label="项目整体进度" />
-                <div className="body-sm muted mt-8">{doneTasks} / {projectTasks.length} 个任务完成</div>
+                <ProgressRing value={taskProgress} size={56} strokeWidth={5} />
+                <div className="project-hero__progress-copy">
+                  <div className="label-md">整体进度</div>
+                  <div className="body-sm muted">{doneTasks} / {projectTasks.length} 个任务完成</div>
+                </div>
               </div>
               <div className="project-hero__actions">
-                <button type="button" className="project-share-button" onClick={() => show("分享功能即将推出")}><Icon name="share" size={19} /> 分享</button>
                 <IconButton aria-label="编辑项目" title="编辑项目" onClick={() => setProjForm({ open: true, editing: selectedProject })}><Icon name="edit" size={19} /></IconButton>
                 <IconButton aria-label="归档项目" title="归档项目" onClick={() => askArchiveProject(selectedProject)}><Icon name="more_vert" size={20} /></IconButton>
+                <IconButton
+                  aria-label={rightSidebarCollapsed ? "展开日程侧栏 (])" : "收起日程侧栏 (])"}
+                  title={rightSidebarCollapsed ? "展开日程侧栏 (])" : "收起日程侧栏 (])"}
+                  onClick={() => setRightSidebarCollapsed((prev) => !prev)}
+                >
+                  <Icon name={rightSidebarCollapsed ? "right_panel_open" : "right_panel_close"} size={20} />
+                </IconButton>
               </div>
             </header>
 
-            <Tabs
-              className="project-tabs-md"
-              activeTabIndex={Math.max(0, PROJECT_TABS.findIndex((tab) => tab.key === activeTab))}
-              onChange={(event) => {
-                const index = (event.currentTarget as HTMLElement & { activeTabIndex: number })
-                  .activeTabIndex;
-                const next = PROJECT_TABS[index];
-                if (next) setActiveTab(next.key);
-              }}
-            >
-              {PROJECT_TABS.map((tab) => (
-                <SecondaryTab key={tab.key}>{tab.label}</SecondaryTab>
-              ))}
-            </Tabs>
+            <div className={`project-layout-container ${rightSidebarCollapsed ? "is-right-collapsed" : ""}`}>
+              <div className="project-main-workspace">
+                <Tabs
+                  className="project-tabs-md"
+                  activeTabIndex={Math.max(0, PROJECT_TABS.findIndex((tab) => tab.key === activeTab))}
+                  onChange={(event) => {
+                    const index = (event.currentTarget as HTMLElement & { activeTabIndex: number })
+                      .activeTabIndex;
+                    const next = PROJECT_TABS[index];
+                    if (next) setActiveTab(next.key);
+                  }}
+                >
+                  {PROJECT_TABS.map((tab) => (
+                    <SecondaryTab key={tab.key}>{tab.label}</SecondaryTab>
+                  ))}
+                </Tabs>
 
-            <div className="project-detail-content">{renderMainContent()}</div>
+                <div className="project-tab-body">{renderTabContent()}</div>
+              </div>
+
+              {!rightSidebarCollapsed && (
+                <aside className="project-context-sidebar">
+                  {renderTodayPlans()}
+                  {renderCalendar()}
+                </aside>
+              )}
+            </div>
           </div>
         )}
       </main>
