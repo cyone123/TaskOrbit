@@ -1,0 +1,103 @@
+/* ============================================================================
+   Misc utilities
+   ========================================================================== */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row--wrap {
+  flex-wrap: wrap;
+}
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+}
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.ml-auto { margin-left: auto; }
+.grow { flex: 1; min-width: 0; }
+.ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--md-on-surface-variant);
+}
+.empty svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+/* Page shell — centered content column shared by top-level views */
+.page-shell {
+  width: min(100%, var(--layout-page-max-wide));
+  margin: 0 auto;
+  padding-bottom: var(--sys-space-9);
+}
+.page-shell--medium {
+  width: min(100%, var(--layout-page-max-medium));
+}
+.page-shell--narrow {
+  width: min(100%, var(--layout-page-max-narrow));
+}
+
+.text-done {
+  text-decoration: line-through;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Material Symbols icon font */
+.mso {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+}

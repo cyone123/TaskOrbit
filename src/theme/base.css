@@ -1,0 +1,279 @@
+/* ============================================================================
+   Base / reset
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--md-background);
+  color: var(--md-on-background);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+a {
+  color: var(--md-primary);
+}
+
+/* Unified keyboard focus ring. Material Web components render their own
+   internal focus ring, so hosts are excluded here. */
+:focus-visible {
+  outline: var(--sys-focus-ring-width) solid var(--sys-focus-ring-color);
+  outline-offset: var(--sys-focus-ring-offset);
+  border-radius: var(--shape-xs);
+}
+
+.project-nav-item:focus-visible,
+.today-plan-item:focus-visible,
+.bar-chart__bar:focus-visible,
+.month-calendar__date:focus-visible,
+.month-event:focus-visible,
+.month-task-bar:focus-visible,
+.gantt-dayhead:focus-visible,
+.gantt-bar:focus-visible,
+.gantt-gutter--task:focus-visible,
+.pomo-session-item:focus-visible,
+.nav-item:focus-visible,
+.inbox-item__body:focus-visible,
+.project-task-row:focus-visible,
+.project-plan-row:focus-visible {
+  outline: var(--sys-focus-ring-width) solid var(--sys-focus-ring-color);
+  outline-offset: var(--sys-focus-ring-offset);
+  border-radius: var(--shape-sm);
+}
+
+md-filled-button:focus-visible,
+md-filled-tonal-button:focus-visible,
+md-outlined-button:focus-visible,
+md-text-button:focus-visible,
+md-icon-button:focus-visible,
+md-fab:focus-visible,
+md-checkbox:focus-visible,
+md-switch:focus-visible,
+md-outlined-text-field:focus-visible,
+md-outlined-select:focus-visible,
+md-outlined-segmented-button:focus-visible,
+md-assist-chip:focus-visible,
+md-filter-chip:focus-visible,
+md-input-chip:focus-visible,
+md-suggestion-chip:focus-visible,
+md-primary-tab:focus-visible,
+md-secondary-tab:focus-visible,
+md-list-item:focus-visible,
+md-menu-item:focus-visible {
+  outline: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Typography scale — backed by --sys-type-* tokens */
+.display-lg {
+  font-size: var(--sys-type-display-large-size);
+  font-weight: var(--sys-type-display-large-weight);
+  line-height: var(--sys-type-display-large-line-height);
+  letter-spacing: var(--sys-type-display-large-tracking);
+}
+.display-md {
+  font-size: var(--sys-type-display-medium-size);
+  font-weight: var(--sys-type-display-medium-weight);
+  line-height: var(--sys-type-display-medium-line-height);
+  letter-spacing: var(--sys-type-display-medium-tracking);
+}
+.display-sm,
+.display {
+  font-size: var(--sys-type-display-small-size);
+  font-weight: var(--sys-type-display-small-weight);
+  line-height: var(--sys-type-display-small-line-height);
+  letter-spacing: var(--sys-type-display-small-tracking);
+}
+.headline-lg {
+  font-size: var(--sys-type-headline-large-size);
+  font-weight: var(--sys-type-headline-large-weight);
+  line-height: var(--sys-type-headline-large-line-height);
+  letter-spacing: var(--sys-type-headline-large-tracking);
+}
+.headline-md {
+  font-size: var(--sys-type-headline-medium-size);
+  font-weight: var(--sys-type-headline-medium-weight);
+  line-height: var(--sys-type-headline-medium-line-height);
+  letter-spacing: var(--sys-type-headline-medium-tracking);
+}
+.headline-sm {
+  font-size: var(--sys-type-headline-small-size);
+  font-weight: var(--sys-type-headline-small-weight);
+  line-height: var(--sys-type-headline-small-line-height);
+  letter-spacing: var(--sys-type-headline-small-tracking);
+}
+.title-lg {
+  font-size: var(--sys-type-title-large-size);
+  font-weight: var(--sys-type-title-large-weight);
+  line-height: var(--sys-type-title-large-line-height);
+  letter-spacing: var(--sys-type-title-large-tracking);
+}
+.title-md {
+  font-size: var(--sys-type-title-medium-size);
+  font-weight: var(--sys-type-title-medium-weight);
+  line-height: var(--sys-type-title-medium-line-height);
+  letter-spacing: var(--sys-type-title-medium-tracking);
+}
+.title-sm {
+  font-size: var(--sys-type-title-small-size);
+  font-weight: var(--sys-type-title-small-weight);
+  line-height: var(--sys-type-title-small-line-height);
+  letter-spacing: var(--sys-type-title-small-tracking);
+}
+.body-lg {
+  font-size: var(--sys-type-body-large-size);
+  font-weight: var(--sys-type-body-large-weight);
+  line-height: var(--sys-type-body-large-line-height);
+  letter-spacing: var(--sys-type-body-large-tracking);
+}
+.body-md {
+  font-size: var(--sys-type-body-medium-size);
+  font-weight: var(--sys-type-body-medium-weight);
+  line-height: var(--sys-type-body-medium-line-height);
+  letter-spacing: var(--sys-type-body-medium-tracking);
+}
+.body-sm {
+  font-size: var(--sys-type-body-small-size);
+  font-weight: var(--sys-type-body-small-weight);
+  line-height: var(--sys-type-body-small-line-height);
+  letter-spacing: var(--sys-type-body-small-tracking);
+}
+.label-lg {
+  font-size: var(--sys-type-label-large-size);
+  font-weight: var(--sys-type-label-large-weight);
+  line-height: var(--sys-type-label-large-line-height);
+  letter-spacing: var(--sys-type-label-large-tracking);
+}
+.label-md {
+  font-size: var(--sys-type-label-medium-size);
+  font-weight: var(--sys-type-label-medium-weight);
+  line-height: var(--sys-type-label-medium-line-height);
+  letter-spacing: var(--sys-type-label-medium-tracking);
+}
+.label-sm {
+  font-size: var(--sys-type-label-small-size);
+  font-weight: var(--sys-type-label-small-weight);
+  line-height: var(--sys-type-label-small-line-height);
+  letter-spacing: var(--sys-type-label-small-tracking);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--md-on-surface-variant);
+}
+.error-text {
+  color: var(--md-error);
+}
+
+/* Surface container and tonal helpers */
+.surface-container-lowest {
+  background-color: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+}
+.surface-container-low {
+  background-color: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+}
+.surface-container {
+  background-color: var(--md-surface-container);
+  color: var(--md-on-surface);
+}
+.surface-container-high {
+  background-color: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+.surface-container-highest {
+  background-color: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+
+.bg-surface {
+  background-color: var(--md-surface);
+  color: var(--md-on-surface);
+}
+.bg-surface-container-low {
+  background-color: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+}
+.bg-surface-container {
+  background-color: var(--md-surface-container);
+  color: var(--md-on-surface);
+}
+.bg-surface-container-high {
+  background-color: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+.bg-surface-container-highest {
+  background-color: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+
+.bg-primary-container {
+  background-color: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+.bg-secondary-container {
+  background-color: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+.bg-tertiary-container {
+  background-color: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+.bg-error-container {
+  background-color: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+.bg-success-container {
+  background-color: var(--color-success-container);
+  color: var(--color-on-success-container);
+}
+.bg-warning-container {
+  background-color: var(--color-warning-container);
+  color: var(--color-on-warning-container);
+}
+.bg-info-container {
+  background-color: var(--color-info-container);
+  color: var(--color-on-info-container);
+}

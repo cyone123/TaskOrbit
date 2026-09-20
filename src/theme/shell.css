@@ -1,0 +1,265 @@
+/* ============================================================================
+   App shell layout
+   ========================================================================== */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: var(--md-surface);
+
+  /* Adaptive shell defaults (expanded window class) */
+  --rail-width: var(--rail-width-expanded);
+}
+
+/* Window size classes — compact / medium / expanded */
+.app-shell[data-window="medium"] {
+  --rail-width: var(--rail-width-medium);
+  --layout-gutter: var(--sys-space-5);
+}
+
+.app-shell[data-window="compact"] {
+  --rail-width: var(--rail-width-compact);
+  --layout-gutter: var(--sys-space-4);
+}
+
+/* Compact and medium windows use an icon-only rail. */
+.app-shell[data-window="compact"] .nav-item,
+.app-shell[data-window="medium"] .nav-item {
+  justify-content: center;
+  gap: 0;
+  padding-block: var(--sys-space-2);
+}
+
+.app-shell[data-window="compact"] .nav-item__label,
+.app-shell[data-window="medium"] .nav-item__label {
+  display: none;
+}
+
+.bootstrap-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+}
+
+.bootstrap-card {
+  width: min(100%, 520px);
+  text-align: center;
+}
+
+.app-notice {
+  position: fixed;
+  z-index: 20;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: var(--shape-sm);
+  box-shadow: var(--elev-2);
+  font-size: 13px;
+}
+
+.app-notice--warning {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.app-notice--error {
+  background: var(--md-error-container);
+  color: var(--md-on-error-container);
+}
+
+.main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-stage {
+  min-height: 100%;
+  animation: viewEnter var(--sys-motion-dialog-duration)
+    var(--sys-motion-easing-emphasized-decelerate) both;
+}
+
+.top-bar {
+  height: 64px;
+  flex: 0 0 auto;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-3);
+  padding: 0 var(--layout-gutter);
+  background: var(--md-surface);
+  transition:
+    background-color var(--sys-motion-selection-duration) var(--sys-motion-easing-standard),
+    box-shadow var(--sys-motion-selection-duration) var(--sys-motion-easing-standard);
+}
+
+/* Scrolled: switch to a container tone plus subtle elevation instead of a
+   persistent hairline border. */
+.top-bar--scrolled {
+  background: var(--md-surface-container);
+  box-shadow: var(--sys-elevation-level1);
+}
+
+.top-bar__title {
+  margin: 0;
+  font-size: var(--sys-type-title-large-size);
+  font-weight: 500;
+  line-height: var(--sys-type-title-large-line-height);
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--layout-gutter);
+  background: var(--md-surface);
+  scroll-behavior: smooth;
+}
+
+.content--no-pad {
+  padding: 0;
+}
+
+/* ============================================================================
+   Navigation rail — MD3 rail destinations: the active highlight is a tonal
+   pill that wraps the whole item (icon + label), and the whole destination
+   stays one click target. Utilities stay pinned to the bottom on every view.
+   ========================================================================== */
+
+.nav-rail {
+  width: var(--rail-width);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sys-space-2);
+  padding: var(--sys-space-4) var(--sys-space-2);
+  background: var(--md-surface-container-low);
+}
+
+.nav-rail__brand {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--shape-md);
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--sys-space-4);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.nav-rail__items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sys-space-1);
+}
+
+/* Whole destination as a single click target. */
+.nav-item {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sys-space-1);
+  min-height: 48px;
+  width: 100%;
+  padding: var(--sys-space-1) 0 var(--sys-space-2);
+  border-radius: var(--shape-lg);
+  color: var(--md-on-surface-variant);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color var(--sys-motion-selection-duration) var(--sys-motion-selection-easing),
+    background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+/* Icon sits in a transparent spacer so the pill geometry stays stable. */
+.nav-item__indicator {
+  display: grid;
+  place-items: center;
+  width: var(--rail-indicator-width);
+  height: var(--rail-indicator-height);
+  border-radius: var(--shape-full);
+}
+
+.nav-item__label {
+  font-size: var(--sys-type-label-medium-size);
+  line-height: var(--sys-type-label-medium-line-height);
+  font-weight: var(--sys-type-label-medium-weight);
+  letter-spacing: var(--sys-type-label-medium-tracking);
+}
+
+/* Hover state layer across the whole destination (two signals with the
+   global focus ring; pressed feedback comes from md-ripple). */
+.nav-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-hover));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.nav-item:hover::after {
+  opacity: 1;
+}
+
+.nav-item:active {
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-pressed));
+}
+
+/* Active destination: the whole tile (icon + label) takes secondary-container. */
+.nav-item.is-active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.nav-item.is-active::after {
+  background: color-mix(
+    in srgb,
+    var(--md-on-secondary-container) var(--sys-state-hover),
+    transparent
+  );
+}
+
+.nav-item.is-active:active {
+  background: color-mix(
+    in srgb,
+    var(--md-on-secondary-container) var(--sys-state-pressed),
+    transparent
+  );
+}
+
+.nav-rail__spacer {
+  flex: 1;
+}
+
+.nav-rail__utilities {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sys-space-2);
+  padding-top: var(--sys-space-3);
+  margin-top: var(--sys-space-2);
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.nav-rail__utilities md-icon-button {
+  --md-icon-button-container-width: 48px;
+  --md-icon-button-container-height: 48px;
+  --md-icon-button-icon-size: 22px;
+  --md-icon-button-icon-color: var(--md-on-surface-variant);
+}

@@ -1,0 +1,192 @@
+/* Stat card helpers (stats view KPI tiles) */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sys-space-3);
+}
+.stat-card__value {
+  margin-top: var(--sys-space-2);
+  font-size: var(--sys-type-headline-small-size);
+  line-height: var(--sys-type-headline-small-line-height);
+}
+
+/* Stats view — one hero KPI in primary-container, three tonal secondary
+   tiles differentiated by scheme roles instead of borders. */
+.stats-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-4);
+  overflow: hidden;
+  padding: var(--sys-space-6);
+  border-radius: var(--shape-xl);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.stats-hero__icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--shape-lg);
+  background: color-mix(in srgb, var(--md-on-primary-container) 12%, transparent);
+}
+
+.stats-hero__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats-hero__value {
+  font-size: var(--sys-type-display-small-size);
+  line-height: var(--sys-type-display-small-line-height);
+  font-weight: var(--sys-type-headline-medium-weight);
+}
+
+.stats-hero__spark {
+  align-self: flex-start;
+  opacity: 0.28;
+}
+
+.stats-secondary-grid {
+  margin-top: var(--sys-space-3);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-space-1);
+  padding: var(--sys-space-4);
+  border-radius: var(--shape-lg);
+}
+
+.stat-tile--secondary {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.stat-tile--tertiary {
+  background: var(--md-tertiary-container);
+  color: var(--md-on-tertiary-container);
+}
+
+.stat-tile--success {
+  background: var(--color-success-container);
+  color: var(--color-on-success-container);
+}
+
+.stat-tile__value {
+  margin-top: var(--sys-space-1);
+  font-size: var(--sys-type-headline-small-size);
+  line-height: var(--sys-type-headline-small-line-height);
+  font-weight: 500;
+}
+
+/* Chart panels are flat sections like the rest of the app. */
+.stats-panel {
+  padding: var(--sys-space-5);
+  border-radius: var(--shape-lg);
+  background: var(--md-surface-container-low);
+}
+
+.stats-panel + .stats-panel,
+.stats-panel + .stats-panel + .stats-panel {
+  margin-top: var(--sys-space-3);
+}
+
+.stats-empty {
+  padding: var(--sys-space-8) var(--sys-space-4);
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container-lowest);
+}
+
+.stats-empty svg {
+  width: 40px;
+  height: 40px;
+  opacity: 0.5;
+}
+
+
+/* Bar chart */
+.bar-chart {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 160px;
+  padding: 8px 4px 0;
+  border-bottom: 2px solid var(--md-outline-variant);
+}
+
+/* Average baseline — the reference line the doc asks for. */
+.bar-chart__avg {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--md-tertiary) 70%, transparent);
+  pointer-events: none;
+}
+
+.bar-chart__avg .body-sm {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  padding: 1px 6px;
+  border-radius: var(--shape-full);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface-variant);
+}
+
+.bar-chart__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar-chart__value {
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-chart__bar {
+  width: 100%;
+  max-width: 40px;
+  border: 0;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--bar-color, var(--md-primary));
+  min-height: 2px;
+  transform-origin: bottom;
+  animation: barGrow var(--sys-motion-duration-long2)
+    var(--sys-motion-easing-emphasized-decelerate) both;
+  cursor: pointer;
+  transition: box-shadow var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.bar-chart__bar.is-selected {
+  box-shadow:
+    0 0 0 2px var(--md-surface-container-low),
+    0 0 0 4px var(--md-primary);
+}
+
+.bar-chart__label.is-today {
+  color: var(--md-primary);
+  font-weight: 600;
+}
+
+.bar-chart-detail {
+  min-height: 20px;
+  margin-top: var(--sys-space-2);
+}
+
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
