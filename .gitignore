@@ -125,3 +125,5 @@ playwright-report/
 apps/desktop/public/licenses/
 planning/evidence/m01-*.tmp.json
 .pnpm-store/
+#Flutter app
+flutter_app/

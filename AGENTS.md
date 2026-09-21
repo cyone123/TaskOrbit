@@ -48,12 +48,19 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
 
 ### 数据版本与迁移
 
-- `packages/core/src/version.ts` 的 `STATE_VERSION`（当前为 6）随持久化 JSON 存储。**修改状态结构时必须递增它并在 `packages/core/src/migrations.ts` 添加对应迁移**，`packages/core/src/schema.ts` 的 `appStateSchema` 用 `z.literal(STATE_VERSION)` 严格锁定。
+- `packages/core/src/version.ts` 的 `STATE_VERSION`（当前为 7）随持久化 JSON 存储。**修改状态结构时必须递增它并在 `packages/core/src/migrations.ts` 添加对应迁移**，`packages/core/src/schema.ts` 的 `appStateSchema` 用 `z.literal(STATE_VERSION)` 严格锁定。
 - 导入/导出走 `transfer.ts` 的 `task-orbit-export` 信封格式；导出会剔除 `activeTimer` 和机器相关的 vault 路径（`rootPath`/`vaultName`）。
+
+### 数据同步（WebDAV）
+
+`packages/core/src/sync` 与 `webdav` 模块实现多端双向数据同步：
+- 采用 `Tombstone` 墓碑机制追踪删除，基于 ETag 乐观并发控制与多端数据合并算法保障一致性。
+- 抽象 `HttpTransport` 接口，桌面端（Rust 原生 WebDAV 命令）与移动端（原生 fetch）分别适配。
 
 ### Obsidian Vault 集成
 
-`src-tauri/src/vault.rs` 提供笔记命令（`scan_notes`、`read_note`、`write_note`、`delete_note` 等），用 YAML frontmatter 存储笔记元数据（id、projectId、taskIds 等）并做内容哈希乐观并发控制。前端封装在 `src/store/vault.ts`，仅在桌面环境可用（浏览器模式会抛错）。命令在 `src-tauri/src/lib.rs` 注册。
+- `src-tauri/src/vault.rs` 提供笔记命令（`scan_notes`、`read_note`、`write_note`、`delete_note` 等），用 YAML frontmatter 存储笔记元数据（id、projectId、taskIds 等）并做内容哈希乐观并发控制。前端封装在 `src/store/vault.ts`，仅在桌面环境可用（浏览器模式会抛错）。命令在 `src-tauri/src/lib.rs` 注册。
+- 前端笔记编辑器（`LiveMarkdownEditor`）支持 Markdown 实时预览渲染与内联编辑，扩展支持 GFM 表格解析与渲染。
 
 ### UI 层（Material Design 3 规范）
 
@@ -66,10 +73,12 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
   - **动效与交互反馈**：微交互（hover/press/selection）100–200ms，展开与弹层 250–400ms（配合 standard/emphasized 曲线与弹簧系数）。所有可交互元素必须具备状态反馈（桌面端 state layers + `:focus-visible` 统一聚焦环；移动端 `AnimatedPressable` 按压缩放）。
 - **桌面端实现**：
   - **视图结构**：`src/views/`（收集箱、项目、日历、专注、统计 5 个主页面），由 `App.tsx` 的 `Shell` 配合左侧 Navigation Rail 切换；顶部统一 Top Bar（滚动吸顶阴影）+ 单一内容滚动区；`BootstrapGate` 处理启动加载与错误恢复。
+    - **日历视图**：支持每日计划与任务的时间块拖拽调节（起止时间与排期），具备吸附对齐与冲突处理。
+    - **专注小窗**：支持独立的极简番茄钟悬浮小窗（`PomodoroMiniView`），通过 Tauri 多窗口与主窗口状态双向同步，具备置顶、半透明、缩放及系统完成通知。
   - **组件优先复用**：
     - 基础控件必须优先复用 `src/components/material.tsx`（包装自 `@material/web` 的各类 Button、IconButton、Fab、TextField、Select、Checkbox、Switch、Radio、Tabs、SegmentedButton、Dialog 等）。
     - 复合业务控件统一使用 `src/components/ui.tsx`（`ExtendedFab`、`SearchBar`、`StatCard`、`Badge`、`SectionHeader`、`Dialog` / `ConfirmDialog`、`EmptyState`、`Snackbar` [SnackbarProvider/useSnackbar]）。
-  - **样式与主题**：`src/theme/theme.css`（种子色生成体系 palette → sys → component）与 `src/theme/theme.tsx`（响应 `settings.theme` 与系统色彩模式）。
+  - **样式与主题**：样式按职能拆分为模块化文件（`tokens.css`、`base.css`、`components.css`、`shell.css`、`utilities.css` 及 `views/*.css`），统一由 `src/theme/theme.css` 汇总组织；`src/theme/theme.tsx` 负责响应 `settings.theme` 与系统色彩模式动态注入 MD3 种子色与衍生变量。
 - **无障碍与文案**：UI 文案统一使用简洁清晰的中文，行动导向；所有图标按钮与无文本控件必须配齐 `aria-label`/`title`（桌面端）或 `accessibilityLabel`/`accessibilityRole`（移动端）。
 
 ### 移动端
