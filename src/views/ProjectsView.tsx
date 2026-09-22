@@ -18,7 +18,9 @@ import {
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
+import { InstantNotePanel, type InstantNoteTarget } from "../components/InstantNotePanel";
 import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
+import { stripHtml } from "../utils/htmlText";
 import {
   Checkbox,
   IconButton,
@@ -169,6 +171,25 @@ export function ProjectsView() {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  const [activeNoteTarget, setActiveNoteTarget] = useState<InstantNoteTarget | null>(null);
+
+  const openInstantNote = (type: "task" | "plan", id: string) => {
+    setActiveNoteTarget({ type, id });
+    if (rightSidebarCollapsed) {
+      setRightSidebarCollapsed(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeNoteTarget) return;
+    if (activeNoteTarget.type === "task") {
+      const exists = state.tasks.some((t) => t.id === activeNoteTarget.id);
+      if (!exists) setActiveNoteTarget(null);
+    } else {
+      const exists = state.dailyPlans.some((p) => p.id === activeNoteTarget.id);
+      if (!exists) setActiveNoteTarget(null);
+    }
+  }, [activeNoteTarget, state.tasks, state.dailyPlans]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -326,6 +347,7 @@ export function ProjectsView() {
     setSelectedProjectId(id);
     setActiveTab("overview");
     setExpandedTasks(new Set());
+    setActiveNoteTarget(null);
   };
 
   const openNewTask = (projectId: string) => {
@@ -535,6 +557,18 @@ export function ProjectsView() {
             </IconButton>
           )}
           <IconButton
+            aria-label={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+            title={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+            className={plan.description ? "project-row-action--has-note" : ""}
+            onClick={() => openInstantNote("plan", plan.id)}
+          >
+            <Icon
+              name={plan.description ? "note_alt" : "edit_note"}
+              size={18}
+              style={plan.description ? { color: "var(--md-primary)" } : undefined}
+            />
+          </IconButton>
+          <IconButton
             aria-label="编辑计划"
             title="编辑计划"
             onClick={() => setPlanForm({
@@ -582,7 +616,11 @@ export function ProjectsView() {
           </span>
           <div className="project-task-row__copy">
             <span className="body-md project-task-row__name">{task.name}</span>
-            {task.description && <span className="body-sm muted project-task-row__description">{task.description}</span>}
+            {task.description && (
+              <span className="body-sm muted project-task-row__description">
+                {stripHtml(task.description)}
+              </span>
+            )}
           </div>
           {taskPlans.length > 0 && (() => {
             const percent = Math.round((doneCount / taskPlans.length) * 100);
@@ -617,6 +655,21 @@ export function ProjectsView() {
           </span>
           <span className="body-sm muted project-task-row__date">{relativeRangeLabel(task.startDate, task.endDate)}</span>
           <div className="project-row-actions">
+            <IconButton
+              aria-label={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+              title={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+              className={task.description ? "project-row-action--has-note" : ""}
+              onClick={(event) => {
+                event.stopPropagation();
+                openInstantNote("task", task.id);
+              }}
+            >
+              <Icon
+                name={task.description ? "note_alt" : "edit_note"}
+                size={18}
+                style={task.description ? { color: "var(--md-primary)" } : undefined}
+              />
+            </IconButton>
             <IconButton
               aria-label="添加计划"
               title="添加计划"
@@ -771,31 +824,44 @@ export function ProjectsView() {
                       />
                       <span className="chip chip--small today-plan-item__time">{plan.startTime} - {plan.endTime}</span>
                     </div>
-                    {!plan.done && (
-                      isFocusing ? (
-                        <span className="today-plan-focusing-badge">
-                          <span className="project-status-pulse" /> 专注中
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="today-plan-focus-btn"
-                          title="开始专注此计划"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            store.startTimer({
-                              projectId: plan.projectId,
-                              taskId: plan.taskId,
-                              dailyPlanId: plan.id,
-                            });
-                            show(`已开始专注「${plan.name}」`);
-                          }}
-                        >
-                          <Icon name="play_arrow" size={15} />
-                          <span>专注</span>
-                        </button>
-                      )
-                    )}
+                    <div className="row gap-4 align-center">
+                      <button
+                        type="button"
+                        className={`today-plan-note-btn ${plan.description ? "has-note" : ""}`}
+                        title={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openInstantNote("plan", plan.id);
+                        }}
+                      >
+                        <Icon name={plan.description ? "note_alt" : "edit_note"} size={15} />
+                      </button>
+                      {!plan.done && (
+                        isFocusing ? (
+                          <span className="today-plan-focusing-badge">
+                            <span className="project-status-pulse" /> 专注中
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="today-plan-focus-btn"
+                            title="开始专注此计划"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              store.startTimer({
+                                projectId: plan.projectId,
+                                taskId: plan.taskId,
+                                dailyPlanId: plan.id,
+                              });
+                              show(`已开始专注「${plan.name}」`);
+                            }}
+                          >
+                            <Icon name="play_arrow" size={15} />
+                            <span>专注</span>
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                   <div className="title-sm today-plan-item__name">{plan.name}</div>
                   <div className="row gap-6 body-sm muted today-plan-item__footer">
@@ -1260,8 +1326,17 @@ export function ProjectsView() {
 
               {!rightSidebarCollapsed && (
                 <aside className="project-context-sidebar">
-                  {renderTodayPlans()}
-                  {renderCalendar()}
+                  {activeNoteTarget ? (
+                    <InstantNotePanel
+                      target={activeNoteTarget}
+                      onClose={() => setActiveNoteTarget(null)}
+                    />
+                  ) : (
+                    <>
+                      {renderTodayPlans()}
+                      {renderCalendar()}
+                    </>
+                  )}
                 </aside>
               )}
             </div>

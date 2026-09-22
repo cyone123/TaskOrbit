@@ -2096,3 +2096,231 @@
     justify-content: center;
   }
 }
+
+/* ============================================================================
+   Instant Note Panel (即时笔记面板)
+   ========================================================================== */
+
+.instant-note-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: instantNoteFadeIn 0.2s var(--sys-motion-easing-standard);
+}
+
+@keyframes instantNoteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.instant-note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.instant-note-header__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instant-note-type-chip {
+  font-weight: 500;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface);
+}
+
+.instant-note-save-status {
+  font-size: var(--sys-type-label-small-size);
+  color: var(--md-on-surface-variant);
+  transition: color 0.2s ease;
+}
+
+.instant-note-save-status.is-saving {
+  color: var(--color-warning);
+}
+
+.instant-note-save-status.is-saved {
+  color: var(--color-success);
+}
+
+.instant-note-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-on-surface);
+  font-weight: 600;
+}
+
+/* Toolbar */
+.instant-note-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container-high);
+  border: 1px solid var(--md-outline-variant);
+}
+
+.instant-note-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--shape-sm);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.instant-note-tool-btn:hover {
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-hover));
+  color: var(--md-on-surface);
+}
+
+.instant-note-tool-btn.is-active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-weight: 600;
+}
+
+.instant-note-tool-btn--icon-only {
+  width: 30px;
+  padding: 0;
+}
+
+.instant-note-toolbar__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--md-outline-variant);
+  margin: 0 2px;
+}
+
+/* Editor surface */
+.instant-note-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  max-height: calc(100vh - 360px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: var(--shape-md);
+  background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  transition: border-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              box-shadow var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.instant-note-editor-wrapper:focus-within {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 1px var(--md-primary);
+}
+
+.instant-note-editor {
+  flex: 1;
+  min-height: 180px;
+  outline: none;
+  color: var(--md-on-surface);
+  font-size: 14px;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.instant-note-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--md-on-surface-variant);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.instant-note-editor p {
+  margin: 0 0 8px 0;
+}
+
+.instant-note-editor p:last-child {
+  margin-bottom: 0;
+}
+
+.instant-note-editor h3,
+.instant-note-editor h4 {
+  margin: 10px 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.instant-note-editor h3:first-child,
+.instant-note-editor h4:first-child {
+  margin-top: 0;
+}
+
+.instant-note-editor b,
+.instant-note-editor strong {
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.instant-note-editor ul,
+.instant-note-editor ol {
+  margin: 4px 0 8px 0;
+  padding-left: 22px;
+}
+
+.instant-note-editor li {
+  margin: 3px 0;
+}
+
+.instant-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0;
+}
+
+/* Action button note indicators */
+.project-row-action--has-note {
+  color: var(--md-primary) !important;
+}
+
+.today-plan-note-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--shape-full);
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.today-plan-note-btn:hover {
+  background: rgb(var(--md-on-surface-rgb) / var(--sys-state-hover));
+  color: var(--md-on-surface);
+}
+
+.today-plan-note-btn.has-note {
+  color: var(--md-primary);
+}
+
