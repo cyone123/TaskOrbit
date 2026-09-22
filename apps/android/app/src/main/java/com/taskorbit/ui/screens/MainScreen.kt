@@ -60,14 +60,7 @@ fun MainScreen(
                 .padding(innerPadding)
         ) {
             composable(Destination.Inbox.route) {
-                // Placeholder for Inbox Screen (Slice 1)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    TaskOrbitEmptyState(
-                        icon = Icons.Filled.Inbox,
-                        title = "收件箱",
-                        description = "将想法与待办事项记录于此（切片 1 即将完成）"
-                    )
-                }
+                com.taskorbit.ui.screens.inbox.InboxScreen()
             }
             composable(Destination.Projects.route) {
                 // Placeholder for Projects Screen (Slice 2)
