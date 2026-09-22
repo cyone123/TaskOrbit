@@ -127,3 +127,15 @@ planning/evidence/m01-*.tmp.json
 .pnpm-store/
 #Flutter app
 flutter_app/
+
+# ==========================================
+# Android & Gradle
+# ==========================================
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+*.dex
+.cxx/
+captures/
