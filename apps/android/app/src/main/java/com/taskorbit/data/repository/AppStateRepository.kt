@@ -93,5 +93,49 @@ class AppStateRepository private constructor(context: Context) {
         mutate { InboxDomain.deleteInboxItemState(it, id) }
     }
 
+    // --- Project Operations ---
+
+    fun addProject(input: com.taskorbit.domain.ProjectInput) {
+        val project = com.taskorbit.domain.ProjectDomain.createProject(input)
+        mutate { com.taskorbit.domain.ProjectDomain.appendProject(it, project) }
+    }
+
+    fun updateProject(id: String, input: com.taskorbit.domain.ProjectInput) {
+        mutate { com.taskorbit.domain.ProjectDomain.updateProjectState(it, id, input) }
+    }
+
+    fun archiveProject(id: String) {
+        mutate { com.taskorbit.domain.ProjectDomain.archiveProjectState(it, id) }
+    }
+
+    fun restoreProject(id: String) {
+        mutate { com.taskorbit.domain.ProjectDomain.restoreProjectState(it, id) }
+    }
+
+    fun removeProject(id: String) {
+        tombstones.add(Tombstone(id = id, type = EntityType.PROJECT, deletedAt = System.currentTimeMillis()))
+        mutate { com.taskorbit.domain.ProjectDomain.deleteProjectState(it, id) }
+    }
+
+    // --- Task Operations ---
+
+    fun addTask(input: com.taskorbit.domain.TaskInput) {
+        val task = com.taskorbit.domain.TaskDomain.createTask(input)
+        mutate { com.taskorbit.domain.TaskDomain.appendTask(it, task) }
+    }
+
+    fun updateTask(id: String, patch: com.taskorbit.domain.TaskPatch) {
+        mutate { com.taskorbit.domain.TaskDomain.updateTaskState(it, id, patch) }
+    }
+
+    fun toggleTask(id: String, done: Boolean) {
+        mutate { com.taskorbit.domain.TaskDomain.toggleTaskState(it, id, done) }
+    }
+
+    fun removeTask(id: String) {
+        tombstones.add(Tombstone(id = id, type = EntityType.TASK, deletedAt = System.currentTimeMillis()))
+        mutate { com.taskorbit.domain.TaskDomain.deleteTaskState(it, id) }
+    }
+
     fun getTombstones(): List<Tombstone> = tombstones.toList()
 }

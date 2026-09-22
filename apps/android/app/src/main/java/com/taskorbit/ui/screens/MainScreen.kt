@@ -63,14 +63,28 @@ fun MainScreen(
                 com.taskorbit.ui.screens.inbox.InboxScreen()
             }
             composable(Destination.Projects.route) {
-                // Placeholder for Projects Screen (Slice 2)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    TaskOrbitEmptyState(
-                        icon = Icons.Outlined.Folder,
-                        title = "项目",
-                        description = "管理项目、任务与甘特排期（切片 2）"
+                com.taskorbit.ui.screens.projects.ProjectsScreen(
+                    onProjectClick = { id ->
+                        navController.navigate(Destination.ProjectDetail.createRoute(id))
+                    }
+                )
+            }
+            composable(
+                route = Destination.ProjectDetail.route,
+                arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.StringType })
+            ) { backStackEntry ->
+                val projectId = backStackEntry.arguments?.getString("id") ?: ""
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val viewModel: com.taskorbit.ui.screens.projectdetail.ProjectDetailViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                    factory = com.taskorbit.ui.screens.projectdetail.ProjectDetailViewModel.Factory(
+                        application = context.applicationContext as android.app.Application,
+                        projectId = projectId
                     )
-                }
+                )
+                com.taskorbit.ui.screens.projectdetail.ProjectDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    viewModel = viewModel
+                )
             }
             composable(Destination.Calendar.route) {
                 // Placeholder for Calendar Screen (Slice 3)
