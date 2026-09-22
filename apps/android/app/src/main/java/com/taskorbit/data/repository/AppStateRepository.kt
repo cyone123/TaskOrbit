@@ -137,5 +137,25 @@ class AppStateRepository private constructor(context: Context) {
         mutate { com.taskorbit.domain.TaskDomain.deleteTaskState(it, id) }
     }
 
+    // --- DailyPlan Operations ---
+
+    fun addPlans(input: com.taskorbit.domain.DailyPlanInput) {
+        val plans = com.taskorbit.domain.DailyPlanDomain.createDailyPlans(input)
+        mutate { com.taskorbit.domain.DailyPlanDomain.appendDailyPlans(it, plans) }
+    }
+
+    fun updatePlan(id: String, patch: com.taskorbit.domain.DailyPlanPatch) {
+        mutate { com.taskorbit.domain.DailyPlanDomain.updateDailyPlanState(it, id, patch) }
+    }
+
+    fun togglePlan(id: String, done: Boolean) {
+        mutate { com.taskorbit.domain.DailyPlanDomain.toggleDailyPlanState(it, id, done) }
+    }
+
+    fun removePlan(id: String) {
+        tombstones.add(Tombstone(id = id, type = EntityType.DAILY_PLAN, deletedAt = System.currentTimeMillis()))
+        mutate { com.taskorbit.domain.DailyPlanDomain.deleteDailyPlanState(it, id) }
+    }
+
     fun getTombstones(): List<Tombstone> = tombstones.toList()
 }

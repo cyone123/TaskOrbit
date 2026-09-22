@@ -87,14 +87,7 @@ fun MainScreen(
                 )
             }
             composable(Destination.Calendar.route) {
-                // Placeholder for Calendar Screen (Slice 3)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    TaskOrbitEmptyState(
-                        icon = Icons.Outlined.CalendarMonth,
-                        title = "日历",
-                        description = "日/周/月日程与排期（切片 3）"
-                    )
-                }
+                com.taskorbit.ui.screens.calendar.CalendarScreen()
             }
             composable(Destination.Pomodoro.route) {
                 // Placeholder for Pomodoro Screen (Slice 4)
