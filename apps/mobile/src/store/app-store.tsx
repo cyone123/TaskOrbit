@@ -18,6 +18,7 @@ import {
   parseImportSnapshot,
   pauseTimer,
   reconcileTimer,
+  reorderProjectsState,
   restoreProjectState,
   serializeExportSnapshot,
   skipTimer,
@@ -85,6 +86,7 @@ interface AppStoreValue {
   removeInbox(id: string): void;
   addProject(input: ProjectInput): void;
   updateProject(id: string, input: ProjectInput): void;
+  reorderProjects(orderedIds: string[]): void;
   archiveProject(id: string): void;
   restoreProject(id: string): void;
   removeProject(id: string): void;
@@ -352,6 +354,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         mutate((current) => appendProject(current, createProject(input))),
       updateProject: (id, input) =>
         mutate((current) => updateProjectState(current, id, input)),
+      reorderProjects: (orderedIds) =>
+        mutate((current) => reorderProjectsState(current, orderedIds)),
       archiveProject: (id) =>
         mutate((current) => archiveProjectState(current, id)),
       restoreProject: (id) =>

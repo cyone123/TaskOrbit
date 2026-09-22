@@ -14,6 +14,7 @@ import {
   createTask,
   deleteInboxItemState,
   deleteProjectState,
+  reorderProjectsState,
   updateDailyPlanState,
   updateInboxItemState,
   updateTaskState,
@@ -529,6 +530,47 @@ describe("domain commands", () => {
 
       // No tasks, 2 standalone plans (1 done -> 50%)
       expect(calculateProjectProgress([], [s1, s2])).toBe(50);
+    });
+  });
+
+  describe("reorderProjectsState", () => {
+    it("reorders projects according to the provided ID array", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      const p2 = createProject({ name: "P2", description: "", color: "green", startDate: "2026-08-17", endDate: "2026-08-20" }, 2);
+      const p3 = createProject({ name: "P3", description: "", color: "orange", startDate: "2026-08-17", endDate: "2026-08-20" }, 3);
+
+      let state = createEmptyState();
+      state = appendProject(state, p1);
+      state = appendProject(state, p2);
+      state = appendProject(state, p3);
+      // Currently state.projects is [p3, p2, p1] because appendProject unshifts
+
+      const reordered = reorderProjectsState(state, [p1.id, p3.id, p2.id]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p1.id, p3.id, p2.id]);
+      expect(validateAppState(reordered)).toBeDefined();
+    });
+
+    it("keeps projects not specified in orderedIds at the end", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      const p2 = createProject({ name: "P2", description: "", color: "green", startDate: "2026-08-17", endDate: "2026-08-20" }, 2);
+      const p3 = createProject({ name: "P3", description: "", color: "orange", startDate: "2026-08-17", endDate: "2026-08-20" }, 3);
+
+      let state = createEmptyState();
+      state = appendProject(state, p1);
+      state = appendProject(state, p2);
+      state = appendProject(state, p3);
+
+      // Only reorder p2 and p1, p3 should stay at the end
+      const reordered = reorderProjectsState(state, [p2.id, p1.id]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p2.id, p1.id, p3.id]);
+    });
+
+    it("handles empty or invalid IDs gracefully", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      let state = appendProject(createEmptyState(), p1);
+
+      const reordered = reorderProjectsState(state, ["non-existent-id"]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p1.id]);
     });
   });
 });

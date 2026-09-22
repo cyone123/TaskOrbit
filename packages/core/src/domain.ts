@@ -172,6 +172,27 @@ export function appendProject(state: AppState, project: Project): AppState {
   return { ...state, projects: [project, ...state.projects] };
 }
 
+export function reorderProjectsState(state: AppState, orderedIds: string[]): AppState {
+  const projectMap = new Map(state.projects.map((project) => [project.id, project]));
+  const orderedSet = new Set(orderedIds);
+  const reordered: Project[] = [];
+
+  for (const id of orderedIds) {
+    const project = projectMap.get(id);
+    if (project) {
+      reordered.push(project);
+    }
+  }
+
+  for (const project of state.projects) {
+    if (!orderedSet.has(project.id)) {
+      reordered.push(project);
+    }
+  }
+
+  return { ...state, projects: reordered };
+}
+
 export function updateProjectState(
   state: AppState,
   id: string,

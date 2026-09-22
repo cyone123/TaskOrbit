@@ -26,6 +26,7 @@ import {
   parsePersistedState,
   pauseTimer as pauseTimerState,
   reconcileTimer,
+  reorderProjectsState,
   resetTimer as resetTimerState,
   restoreProjectState,
   resumeTimer as resumeTimerState,
@@ -117,6 +118,7 @@ export interface StoreApi {
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
+  reorderProjects: (orderedIds: string[]) => void;
   archiveProject: (id: string) => void;
   restoreProject: (id: string) => void;
   deleteProject: (id: string) => void;
@@ -512,6 +514,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutate((state) => updateProjectState(state, id, patch));
   }, [mutate]);
 
+  const reorderProjects = useCallback<StoreApi["reorderProjects"]>((orderedIds) => {
+    mutate((state) => reorderProjectsState(state, orderedIds));
+  }, [mutate]);
+
   const archiveProject = useCallback<StoreApi["archiveProject"]>((id) => {
     mutate((state) => archiveProjectState(state, id));
   }, [mutate]);
@@ -737,6 +743,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         retryLoad,
         addProject,
         updateProject,
+        reorderProjects,
         archiveProject,
         restoreProject,
         deleteProject,

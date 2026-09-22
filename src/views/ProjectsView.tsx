@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   addDays,
   calculateProjectProgress,
@@ -160,6 +160,10 @@ export function ProjectsView() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [isManaging, setIsManaging] = useState(false);
+  const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const [isOverArchiveZone, setIsOverArchiveZone] = useState(false);
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
   const [planDate, setPlanDate] = useState(todayISO());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -396,6 +400,82 @@ export function ProjectsView() {
         show("计划已删除");
       },
     });
+  };
+
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData("text/plain", projectId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingProjectId(projectId);
+  };
+
+  const handleDragOverCard = (e: React.DragEvent, projectId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggingProjectId === projectId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? "before" : "after";
+    if (!dragOverTarget || dragOverTarget.id !== projectId || dragOverTarget.position !== position) {
+      setDragOverTarget({ id: projectId, position });
+    }
+  };
+
+  const handleDragLeaveCard = (e: React.DragEvent, projectId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom ||
+      e.clientX < rect.left ||
+      e.clientX > rect.right
+    ) {
+      if (dragOverTarget?.id === projectId) {
+        setDragOverTarget(null);
+      }
+    }
+  };
+
+  const handleDropOnCard = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/plain") || draggingProjectId;
+    const position = dragOverTarget?.position ?? "after";
+    setDragOverTarget(null);
+    setDraggingProjectId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const currentIds = activeProjects.map((p) => p.id);
+    const fromIndex = currentIds.indexOf(sourceId);
+    if (fromIndex === -1) return;
+
+    const nextIds = currentIds.filter((id) => id !== sourceId);
+    const toIndex = nextIds.indexOf(targetId);
+    if (toIndex === -1) return;
+
+    const insertIndex = position === "before" ? toIndex : toIndex + 1;
+    nextIds.splice(insertIndex, 0, sourceId);
+
+    store.reorderProjects(nextIds);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingProjectId(null);
+    setDragOverTarget(null);
+    setIsOverArchiveZone(false);
+  };
+
+  const handleArchiveDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOverArchiveZone(false);
+    const sourceId = e.dataTransfer.getData("text/plain") || draggingProjectId;
+    setDraggingProjectId(null);
+    setDragOverTarget(null);
+
+    if (sourceId) {
+      const targetProject = state.projects.find((p) => p.id === sourceId);
+      store.archiveProject(sourceId);
+      show(targetProject ? `已归档项目「${targetProject.name}」` : "项目已归档");
+    }
   };
 
   const renderPlanRow = (plan: DailyPlan, compact = false) => {
@@ -860,31 +940,44 @@ export function ProjectsView() {
       <aside className="projects-sidebar">
         <div className="projects-sidebar__clip">
           <div className="projects-sidebar__inner">
-            <div className="projects-sidebar__header">
-              <div className="headline-sm">项目</div>
-              <button type="button" className="projects-sidebar__manage" onClick={() => setShowArchived((value) => !value)}>
-                {showArchived ? "收起" : "管理"}
-              </button>
-            </div>
+            <div className="projects-sidebar__top">
+              <div className="projects-sidebar__header">
+                <div className="headline-sm">项目</div>
+                <button
+                  type="button"
+                  className={`projects-sidebar__manage ${isManaging ? "is-active" : ""}`}
+                  onClick={() => setIsManaging((value) => !value)}
+                >
+                  {isManaging ? "完成" : "管理"}
+                </button>
+              </div>
 
-            <div className="projects-sidebar__tools">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="搜索项目..."
-                className="projects-search-bar"
+              <div className="projects-sidebar__tools">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="搜索项目..."
+                  className="projects-search-bar"
+                />
+              </div>
+
+              <ExtendedFab
+                label="新建项目"
+                icon="add"
+                variant="primary"
+                className="projects-create-fab"
+                onClick={() => setProjForm({ open: true, editing: null })}
               />
             </div>
 
-            <ExtendedFab
-              label="新建项目"
-              icon="add"
-              variant="primary"
-              className="projects-create-fab"
-              onClick={() => setProjForm({ open: true, editing: null })}
-            />
-
-            <div className="projects-sidebar__list">
+            <div
+              className="projects-sidebar__list"
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverTarget(null);
+                }
+              }}
+            >
               {filteredProjects.length === 0 ? (
                 <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
               ) : (
@@ -902,88 +995,145 @@ export function ProjectsView() {
                       : plans.length > 0
                         ? `${planDone} / ${plans.length} 个计划完成`
                         : "暂无内容";
+                  const isDragging = draggingProjectId === project.id;
+                  const isTargetBefore = dragOverTarget?.id === project.id && dragOverTarget.position === "before";
+                  const isTargetAfter = dragOverTarget?.id === project.id && dragOverTarget.position === "after";
+
                   return (
-                    <button
-                      type="button"
-                      className={`project-nav-item ${selected ? "is-selected" : ""}`}
-                      key={project.id}
-                      onClick={() => selectProject(project.id)}
-                    >
-                      <div className="project-nav-item__top">
-                        <div
-                          className="project-nav-item__icon"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
-                            color: accent,
-                          }}
-                        >
-                          <Icon name="folder" size={20} fill={true} />
+                    <Fragment key={project.id}>
+                      {isTargetBefore && !isDragging && (
+                        <div className="project-drop-indicator-line" />
+                      )}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={`project-nav-item ${selected ? "is-selected" : ""} ${isManaging ? "is-managing" : ""} ${isDragging ? "is-dragging" : ""}`}
+                        draggable={isManaging}
+                        onDragStart={(e) => handleDragStart(e, project.id)}
+                        onDragOver={(e) => isManaging && handleDragOverCard(e, project.id)}
+                        onDrop={(e) => isManaging && handleDropOnCard(e, project.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => {
+                          if (!isDragging) {
+                            selectProject(project.id);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            selectProject(project.id);
+                          }
+                        }}
+                      >
+                        <div className="project-nav-item__top">
+                          {isManaging && (
+                            <div
+                              className="project-nav-item__drag-handle"
+                              title="拖拽排序或归档"
+                              aria-label="拖拽排序或归档"
+                            >
+                              <Icon name="drag_indicator" size={20} />
+                            </div>
+                          )}
+                          <div
+                            className="project-nav-item__icon"
+                            style={{
+                              backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
+                              color: accent,
+                            }}
+                          >
+                            <Icon name="folder" size={20} fill={true} />
+                          </div>
+                          <div className="project-nav-item__header-copy">
+                            <span className="title-sm ellipsis project-nav-item__name">{project.name}</span>
+                            <span className="body-xs muted project-nav-item__date">
+                              {relativeRangeLabel(project.startDate, project.endDate)}
+                            </span>
+                          </div>
+                          <Icon
+                            name="chevron_right"
+                            size={18}
+                            className={`project-nav-item__chevron ${selected ? "is-active" : ""}`}
+                          />
                         </div>
-                        <div className="project-nav-item__header-copy">
-                          <span className="title-sm ellipsis project-nav-item__name">{project.name}</span>
-                          <span className="body-xs muted project-nav-item__date">
-                            {relativeRangeLabel(project.startDate, project.endDate)}
-                          </span>
-                        </div>
-                        <Icon
-                          name="chevron_right"
-                          size={18}
-                          className={`project-nav-item__chevron ${selected ? "is-active" : ""}`}
-                        />
-                      </div>
 
-                      <div className="project-nav-item__progress-section">
-                        <div className="project-nav-item__progress-label">
-                          <span className="body-xs muted project-nav-item__progress-text">
-                            {summaryText}
-                          </span>
-                          <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
-                            {progress}%
-                          </span>
+                        <div className="project-nav-item__progress-section">
+                          <div className="project-nav-item__progress-label">
+                            <span className="body-xs muted project-nav-item__progress-text">
+                              {summaryText}
+                            </span>
+                            <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
+                              {progress}%
+                            </span>
+                          </div>
+                          <LinearProgress
+                            className="project-nav-item__progress-bar"
+                            value={progress}
+                            max={100}
+                            style={{
+                              "--md-linear-progress-active-indicator-color": accent,
+                              "--md-linear-progress-track-color": `color-mix(in srgb, ${accent} 14%, var(--md-surface-container-highest))`,
+                            } as React.CSSProperties}
+                          />
                         </div>
-                        <LinearProgress
-                          className="project-nav-item__progress-bar"
-                          value={progress}
-                          max={100}
-                          style={{
-                            "--md-linear-progress-active-indicator-color": accent,
-                            "--md-linear-progress-track-color": `color-mix(in srgb, ${accent} 14%, var(--md-surface-container-highest))`,
-                          } as React.CSSProperties}
-                        />
-                      </div>
 
-                      <Ripple />
-                    </button>
+                        <Ripple />
+                      </div>
+                      {isTargetAfter && !isDragging && (
+                        <div className="project-drop-indicator-line" />
+                      )}
+                    </Fragment>
                   );
                 })
               )}
             </div>
 
-            {archivedProjects.length > 0 && (
+            {(isManaging || archivedProjects.length > 0) && (
               <div className="projects-sidebar__archived">
-                <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
-                  <span>已归档项目</span>
-                  <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
-                </button>
-                {showArchived && (
-                  <div className="projects-archived-list">
-                    {archivedProjects.map((project) => (
-                      <div className="projects-archived-item" key={project.id}>
-                        <div
-                          className="projects-archived-item__icon"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, ${colorByKey(project.color)} 16%, transparent)`,
-                            color: colorByKey(project.color),
-                          }}
-                        >
-                          <Icon name="folder" size={16} fill={true} />
-                        </div>
-                        <span className="body-sm ellipsis grow">{project.name}</span>
-                        <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
-                        <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
-                      </div>
-                    ))}
+                {isManaging && (
+                  <div
+                    className={`projects-sidebar__archive-dropzone ${isOverArchiveZone ? "is-drag-over" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setIsOverArchiveZone(true);
+                    }}
+                    onDragLeave={() => {
+                      setIsOverArchiveZone(false);
+                    }}
+                    onDrop={handleArchiveDrop}
+                  >
+                    <Icon name="archive" size={20} />
+                    <span>{isOverArchiveZone ? "松开以直接归档" : "拖拽到此处归档"}</span>
                   </div>
+                )}
+                {archivedProjects.length > 0 && (
+                  <>
+                    <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
+                      <span>已归档项目</span>
+                      <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
+                    </button>
+                    {showArchived && (
+                      <div className="projects-archived-list">
+                        {archivedProjects.map((project) => (
+                          <div className="projects-archived-item" key={project.id}>
+                            <div
+                              className="projects-archived-item__icon"
+                              style={{
+                                backgroundColor: `color-mix(in srgb, ${colorByKey(project.color)} 16%, transparent)`,
+                                color: colorByKey(project.color),
+                              }}
+                            >
+                              <Icon name="folder" size={16} fill={true} />
+                            </div>
+                            <span className="body-sm ellipsis grow">{project.name}</span>
+                            <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
+                            <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
