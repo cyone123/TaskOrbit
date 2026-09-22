@@ -502,6 +502,13 @@ export function ProjectsView() {
             {!compact && task && ` · ${task.name}`}
           </div>
         </div>
+        {isFocusing && (
+          <span className="project-focus-living-badge" title="当前计划正在专注中">
+            <span className="project-status-pulse" />
+            <Icon name="graphic_eq" size={14} />
+            <span>专注中</span>
+          </span>
+        )}
         {isToday && <span className="chip chip--small project-today-badge">今日</span>}
         <span className="chip chip--small project-time-chip">
           {plan.startTime} - {plan.endTime}
@@ -565,20 +572,45 @@ export function ProjectsView() {
           />
           <span
             className={`project-priority-pill project-priority-pill--${task.priority}`}
-            title={PRIORITY_LABEL[task.priority]}
+            title={`优先级: ${PRIORITY_LABEL[task.priority]}`}
           >
-            {PRIORITY_LABEL_SHORT[task.priority]}
+            <Icon
+              name={task.priority === "high" ? "flag" : task.priority === "medium" ? "drag_handle" : "south"}
+              size={12}
+            />
+            <span>{PRIORITY_LABEL[task.priority]}</span>
           </span>
           <div className="project-task-row__copy">
             <span className="body-md project-task-row__name">{task.name}</span>
             {task.description && <span className="body-sm muted project-task-row__description">{task.description}</span>}
           </div>
-          {taskPlans.length > 0 && (
-            <span className="chip chip--small project-plan-count-chip" title={`关联 ${taskPlans.length} 个计划，已完成 ${doneCount} 个`}>
-              <Icon name="calendar_today" size={13} />
-              <span>{doneCount}/{taskPlans.length}</span>
-            </span>
-          )}
+          {taskPlans.length > 0 && (() => {
+            const percent = Math.round((doneCount / taskPlans.length) * 100);
+            const radius = 7;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (percent / 100) * circumference;
+            return (
+              <div
+                className="project-task-progress"
+                title={`关联 ${taskPlans.length} 个计划，已完成 ${doneCount} 个 (${percent}%)`}
+              >
+                <svg className="project-task-progress__ring" viewBox="0 0 20 20" aria-hidden="true">
+                  <circle className="project-task-progress__track" cx="10" cy="10" r={radius} />
+                  <circle
+                    className="project-task-progress__indicator"
+                    cx="10"
+                    cy="10"
+                    r={radius}
+                    style={{
+                      strokeDasharray: circumference,
+                      strokeDashoffset,
+                    }}
+                  />
+                </svg>
+                <span className="project-task-progress__text">{doneCount}/{taskPlans.length}</span>
+              </div>
+            );
+          })()}
           <span className={`chip chip--small project-status-chip project-status-chip--${taskStatus.type}`}>
             {taskStatus.type === "ongoing" && <span className="project-status-pulse" />}
             {taskStatus.text}
@@ -593,7 +625,7 @@ export function ProjectsView() {
                 if (selectedProject) openNewPlan(selectedProject.id, task.id);
               }}
             >
-              <Icon name="add" size={19} />
+              <Icon name="add" size={18} />
             </IconButton>
             <IconButton
               aria-label="编辑任务"
@@ -615,8 +647,15 @@ export function ProjectsView() {
             >
               <Icon name="delete" size={18} />
             </IconButton>
-            {taskPlans.length > 0 && <Icon name={expanded ? "expand_less" : "expand_more"} size={20} className="muted" />}
           </div>
+          {taskPlans.length > 0 && (
+            <div
+              className={`project-task-expand-indicator ${expanded ? "is-expanded" : ""}`}
+              title={expanded ? "收起关联计划" : "展开关联计划"}
+            >
+              <Icon name="expand_more" size={20} />
+            </div>
+          )}
         </div>
         {taskPlans.length > 0 && (
           <div className={`project-task-plans ${expanded ? "is-open" : ""}`}>
