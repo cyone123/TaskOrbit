@@ -157,5 +157,65 @@ class AppStateRepository private constructor(context: Context) {
         mutate { com.taskorbit.domain.DailyPlanDomain.deleteDailyPlanState(it, id) }
     }
 
+    // --- Pomodoro Operations ---
+
+    fun startPomodoro(link: com.taskorbit.domain.model.PomodoroLink) {
+        mutate { state ->
+            val nextTimer = com.taskorbit.domain.TimerEngine.startTimer(state.activeTimer, state.settings, link)
+            state.copy(activeTimer = nextTimer)
+        }
+    }
+
+    fun pausePomodoro() {
+        mutate { state ->
+            val nextTimer = com.taskorbit.domain.TimerEngine.pauseTimer(state.activeTimer)
+            state.copy(activeTimer = nextTimer)
+        }
+    }
+
+    fun skipPomodoro() {
+        mutate { state ->
+            val nextTimer = com.taskorbit.domain.TimerEngine.skipTimer(state.activeTimer, state.settings)
+            state.copy(activeTimer = nextTimer)
+        }
+    }
+
+    fun resetPomodoro() {
+        mutate { state ->
+            state.copy(activeTimer = com.taskorbit.domain.TimerEngine.resetTimer())
+        }
+    }
+
+    fun reconcileTimer() {
+        val current = _state.value
+        val result = com.taskorbit.domain.TimerEngine.reconcileTimer(current.activeTimer, current.settings)
+        if (result.changed) {
+            val sessions = com.taskorbit.domain.TimerEngine.convertCompletedToSessions(current, result.completed)
+            mutate { state ->
+                state.copy(
+                    activeTimer = result.timer,
+                    pomodoroSessions = sessions + state.pomodoroSessions
+                )
+            }
+        }
+    }
+
+    fun updatePomodoroSettings(
+        focusMinutes: Int? = null,
+        shortBreakMinutes: Int? = null,
+        longBreakMinutes: Int? = null,
+        longBreakInterval: Int? = null
+    ) {
+        mutate { state ->
+            val nextSettings = state.settings.copy(
+                focusMinutes = focusMinutes ?: state.settings.focusMinutes,
+                shortBreakMinutes = shortBreakMinutes ?: state.settings.shortBreakMinutes,
+                longBreakMinutes = longBreakMinutes ?: state.settings.longBreakMinutes,
+                longBreakInterval = longBreakInterval ?: state.settings.longBreakInterval
+            )
+            state.copy(settings = nextSettings)
+        }
+    }
+
     fun getTombstones(): List<Tombstone> = tombstones.toList()
 }

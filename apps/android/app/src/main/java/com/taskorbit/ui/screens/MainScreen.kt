@@ -90,14 +90,7 @@ fun MainScreen(
                 com.taskorbit.ui.screens.calendar.CalendarScreen()
             }
             composable(Destination.Pomodoro.route) {
-                // Placeholder for Pomodoro Screen (Slice 4)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    TaskOrbitEmptyState(
-                        icon = Icons.Outlined.Timer,
-                        title = "番茄钟",
-                        description = "沉浸式专注与前台常驻服务（切片 4）"
-                    )
-                }
+                com.taskorbit.ui.screens.pomodoro.PomodoroScreen()
             }
             composable(Destination.Stats.route) {
                 // Placeholder for Stats Screen (Slice 5)
