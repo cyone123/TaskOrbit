@@ -162,9 +162,9 @@ export default function ProjectDetailScreen() {
             <Pressable accessibilityRole="button" accessibilityLabel="归档项目" onPress={() => confirmAction("归档项目", `归档「${project.name}」？归档后可在项目列表恢复。`, () => { store.archiveProject(project.id); goToProjects(); })} style={[styles.archiveButton, { backgroundColor: colors.surfaceContainer }]}><Ionicons name="archive-outline" size={20} color={colors.onSurfaceVariant} /></Pressable>
           </View>
           {project.description ? <Text style={[styles.heroDescription, { color: colors.onSurfaceVariant }]}>{project.description}</Text> : null}
-          <View style={styles.heroProgressLabel}><Text style={[styles.heroProgressText, { color: colors.onSurface }]}>整体进度</Text><Text style={[styles.heroProgressValue, { color: accent }]}>{metrics.taskProgress}%</Text></View>
-          <ProgressBar value={metrics.taskProgress} color={accent} />
-          <Text style={[styles.heroProgressMeta, { color: colors.onSurfaceVariant }]}>{metrics.taskDone} / {metrics.taskTotal} 个任务完成</Text>
+          <View style={styles.heroProgressLabel}><Text style={[styles.heroProgressText, { color: colors.onSurface }]}>整体进度</Text><Text style={[styles.heroProgressValue, { color: accent }]}>{metrics.planProgress}%</Text></View>
+          <ProgressBar value={metrics.planProgress} color={accent} />
+          <Text style={[styles.heroProgressMeta, { color: colors.onSurfaceVariant }]}>{metrics.planDone} / {metrics.planTotal} 个计划完成</Text>
         </Card>
 
         <SegmentedControl value={section} onChange={(value) => setSection(value as DetailSection)} options={[

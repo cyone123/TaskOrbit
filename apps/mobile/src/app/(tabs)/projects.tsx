@@ -91,8 +91,8 @@ export default function ProjectsScreen() {
           activeProjects.map((project) => {
             const tasks = state.tasks.filter((task) => task.projectId === project.id);
             const plans = state.dailyPlans.filter((plan) => plan.projectId === project.id);
-            const completed = tasks.filter((task) => task.done).length;
-            const progress = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
+            const completedPlans = plans.filter((plan) => plan.done).length;
+            const progress = plans.length ? Math.round((completedPlans / plans.length) * 100) : 0;
             const accent = PROJECT_COLOR_HEX[project.color] ?? colors.primary;
 
             return (
@@ -129,7 +129,7 @@ export default function ProjectsScreen() {
 
                     <View style={styles.progressLabel}>
                       <Text style={[styles.progressText, { color: colors.onSurfaceVariant }]}>
-                        {completed} / {tasks.length} 个任务完成
+                        {completedPlans} / {plans.length} 个计划完成
                       </Text>
                       <Text style={[styles.progressValue, { color: accent }]}>{progress}%</Text>
                     </View>

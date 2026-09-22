@@ -253,6 +253,17 @@ export function ProjectsView() {
     return map;
   }, [state.tasks]);
 
+  const plansOfProject = useMemo(() => {
+    const map = new Map<string, DailyPlan[]>();
+    for (const plan of state.dailyPlans) {
+      if (!plan.projectId) continue;
+      const list = map.get(plan.projectId) ?? [];
+      list.push(plan);
+      map.set(plan.projectId, list);
+    }
+    return map;
+  }, [state.dailyPlans]);
+
   const plansOfTask = useMemo(() => {
     const map = new Map<string, DailyPlan[]>();
     for (const plan of state.dailyPlans) {
@@ -820,7 +831,7 @@ export function ProjectsView() {
             </span>
             <div className="project-insight-text">
               <span className="project-insight-label">完成进度</span>
-              <span className="project-insight-value">{taskProgress}%</span>
+              <span className="project-insight-value">{planProgress}%</span>
             </div>
           </div>
 
@@ -876,9 +887,11 @@ export function ProjectsView() {
                 <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
               ) : (
                 filteredProjects.map((project) => {
-                  const tasks = tasksOfProject.get(project.id) ?? [];
-                  const taskDone = tasks.filter((task) => task.done).length;
+                  const plans = plansOfProject.get(project.id) ?? [];
+                  const planDone = plans.filter((plan) => plan.done).length;
+                  const progress = plans.length ? Math.round((planDone / plans.length) * 100) : 0;
                   const selected = selectedProjectId === project.id;
+                  const accent = colorByKey(project.color);
                   return (
                     <button
                       type="button"
@@ -886,15 +899,49 @@ export function ProjectsView() {
                       key={project.id}
                       onClick={() => selectProject(project.id)}
                     >
-                      <span className="dot project-nav-item__dot" style={{ background: colorByKey(project.color) }} />
-                      <span className="project-nav-item__body">
-                        <span className="title-md ellipsis">{project.name}</span>
-                        <span className="body-sm muted project-nav-item__meta">
-                          {tasks.length > 0 ? `${taskDone} / ${tasks.length} 个任务完成` : "暂无任务"}
-                          <span>{relativeRangeLabel(project.startDate, project.endDate)}</span>
-                        </span>
-                      </span>
-                      {selected && <Icon name="chevron_right" size={19} className="project-nav-item__chevron" />}
+                      <div className="project-nav-item__top">
+                        <div
+                          className="project-nav-item__icon"
+                          style={{
+                            backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
+                            color: accent,
+                          }}
+                        >
+                          <Icon name="folder" size={20} fill={true} />
+                        </div>
+                        <div className="project-nav-item__header-copy">
+                          <span className="title-sm ellipsis project-nav-item__name">{project.name}</span>
+                          <span className="body-xs muted project-nav-item__date">
+                            {relativeRangeLabel(project.startDate, project.endDate)}
+                          </span>
+                        </div>
+                        <Icon
+                          name="chevron_right"
+                          size={18}
+                          className={`project-nav-item__chevron ${selected ? "is-active" : ""}`}
+                        />
+                      </div>
+
+                      <div className="project-nav-item__progress-section">
+                        <div className="project-nav-item__progress-label">
+                          <span className="body-xs muted project-nav-item__progress-text">
+                            {plans.length > 0 ? `${planDone} / ${plans.length} 个计划完成` : "暂无计划"}
+                          </span>
+                          <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
+                            {progress}%
+                          </span>
+                        </div>
+                        <LinearProgress
+                          className="project-nav-item__progress-bar"
+                          value={progress}
+                          max={100}
+                          style={{
+                            "--md-linear-progress-active-indicator-color": accent,
+                            "--md-linear-progress-track-color": `color-mix(in srgb, ${accent} 14%, var(--md-surface-container-highest))`,
+                          } as React.CSSProperties}
+                        />
+                      </div>
+
                       <Ripple />
                     </button>
                   );
@@ -912,7 +959,15 @@ export function ProjectsView() {
                   <div className="projects-archived-list">
                     {archivedProjects.map((project) => (
                       <div className="projects-archived-item" key={project.id}>
-                        <span className="dot" style={{ background: colorByKey(project.color) }} />
+                        <div
+                          className="projects-archived-item__icon"
+                          style={{
+                            backgroundColor: `color-mix(in srgb, ${colorByKey(project.color)} 16%, transparent)`,
+                            color: colorByKey(project.color),
+                          }}
+                        >
+                          <Icon name="folder" size={16} fill={true} />
+                        </div>
                         <span className="body-sm ellipsis grow">{project.name}</span>
                         <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
                         <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
@@ -949,7 +1004,6 @@ export function ProjectsView() {
             <header className="project-hero">
               <div className="project-hero__identity">
                 <div className="project-hero__title-row">
-                  <span className="project-hero__dot" style={{ background: colorByKey(selectedProject.color) }} />
                   <h1>{selectedProject.name}</h1>
                   <span className={`chip project-hero__status project-hero__status--${statusLabel(selectedProject.startDate, selectedProject.endDate).type}`}>
                     <span className="project-status-pulse" />
@@ -960,10 +1014,10 @@ export function ProjectsView() {
                 {selectedProject.description && <p className="body-md muted project-hero__description">{selectedProject.description}</p>}
               </div>
               <div className="project-hero__progress">
-                <ProgressRing value={taskProgress} size={56} strokeWidth={5} />
+                <ProgressRing value={planProgress} size={56} strokeWidth={5} />
                 <div className="project-hero__progress-copy">
                   <div className="label-md">整体进度</div>
-                  <div className="body-sm muted">{doneTasks} / {projectTasks.length} 个任务完成</div>
+                  <div className="body-sm muted">{donePlans} / {projectPlans.length} 个计划完成</div>
                 </div>
               </div>
               <div className="project-hero__actions">
