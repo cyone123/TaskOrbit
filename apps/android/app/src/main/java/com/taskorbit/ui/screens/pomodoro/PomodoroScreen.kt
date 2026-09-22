@@ -101,7 +101,10 @@ import com.taskorbit.domain.model.Project
 import com.taskorbit.domain.model.Settings
 import com.taskorbit.domain.model.Task
 import com.taskorbit.domain.model.TimerStatus
+import com.taskorbit.ui.components.CardVariant
 import com.taskorbit.ui.components.TaskOrbitButton
+import com.taskorbit.ui.components.TaskOrbitCard
+import com.taskorbit.ui.theme.bouncyPress
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -475,13 +478,13 @@ fun TargetLinkCard(
     val project = projects.find { it.id == selectedProjectId }
     val task = tasks.find { it.id == selectedTaskId }
 
-    Surface(
+    TaskOrbitCard(
         modifier = Modifier
             .padding(horizontal = 24.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(16.dp)
+            .fillMaxWidth(),
+        variant = CardVariant.FILLED,
+        shape = RoundedCornerShape(16.dp),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
@@ -563,7 +566,7 @@ fun TimerControlButtons(
         // 重置按钮
         FilledTonalIconButton(
             onClick = onReset,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(48.dp).bouncyPress(),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
@@ -583,7 +586,7 @@ fun TimerControlButtons(
             containerColor = activeColor,
             contentColor = MaterialTheme.colorScheme.surface,
             shape = CircleShape,
-            modifier = Modifier.size(76.dp)
+            modifier = Modifier.size(76.dp).bouncyPress()
         ) {
             AnimatedContent(
                 targetState = isRunning,
@@ -601,7 +604,7 @@ fun TimerControlButtons(
         // 跳过阶段按钮
         FilledTonalIconButton(
             onClick = onSkip,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(48.dp).bouncyPress(),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
@@ -620,11 +623,9 @@ fun TodayFocusCard(
     stats: TodayFocusStats,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    TaskOrbitCard(
         modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
+        variant = CardVariant.FILLED,
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(

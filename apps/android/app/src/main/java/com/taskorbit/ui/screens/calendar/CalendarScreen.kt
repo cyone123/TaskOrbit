@@ -1,6 +1,11 @@
 package com.taskorbit.ui.screens.calendar
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -194,50 +199,59 @@ fun CalendarScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             // 主视图渲染
-            when (mode) {
-                CalendarMode.DAY -> {
-                    DayTimelineView(
-                        plans = plansOfDay,
-                        onPlanClick = viewModel::openEditPlanForm,
-                        onToggleDone = viewModel::togglePlan,
-                        onDeletePlan = viewModel::removePlan,
-                        getProjectColor = viewModel::getProjectColor,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                CalendarMode.WEEK -> {
-                    if (weekMode == WeekCalendarMode.PLANS) {
-                        WeekPlansView(
-                            daysOfWeek = daysOfWeek,
-                            plansOfWeek = plansOfWeek,
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = {
+                    fadeIn(tween(250)) togetherWith fadeOut(tween(150))
+                },
+                label = "calendarModeContent",
+                modifier = Modifier.fillMaxSize()
+            ) { targetMode ->
+                when (targetMode) {
+                    CalendarMode.DAY -> {
+                        DayTimelineView(
+                            plans = plansOfDay,
                             onPlanClick = viewModel::openEditPlanForm,
                             onToggleDone = viewModel::togglePlan,
-                            getProjectColor = viewModel::getProjectColor,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        WeekGanttView(
-                            daysOfWeek = daysOfWeek,
-                            tasks = tasksInWeek,
+                            onDeletePlan = viewModel::removePlan,
                             getProjectColor = viewModel::getProjectColor,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                }
-                CalendarMode.MONTH -> {
-                    MonthCalendarView(
-                        anchorDate = anchorDate,
-                        selectedDate = selectedDate,
-                        monthDays = monthDays,
-                        planCounts = monthPlanCounts,
-                        plansOfDay = plansOfDay,
-                        onSelectDate = viewModel::selectDate,
-                        onPlanClick = viewModel::openEditPlanForm,
-                        onToggleDone = viewModel::togglePlan,
-                        onDeletePlan = viewModel::removePlan,
-                        getProjectColor = viewModel::getProjectColor,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    CalendarMode.WEEK -> {
+                        if (weekMode == WeekCalendarMode.PLANS) {
+                            WeekPlansView(
+                                daysOfWeek = daysOfWeek,
+                                plansOfWeek = plansOfWeek,
+                                onPlanClick = viewModel::openEditPlanForm,
+                                onToggleDone = viewModel::togglePlan,
+                                getProjectColor = viewModel::getProjectColor,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            WeekGanttView(
+                                daysOfWeek = daysOfWeek,
+                                tasks = tasksInWeek,
+                                getProjectColor = viewModel::getProjectColor,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    CalendarMode.MONTH -> {
+                        MonthCalendarView(
+                            anchorDate = anchorDate,
+                            selectedDate = selectedDate,
+                            monthDays = monthDays,
+                            planCounts = monthPlanCounts,
+                            plansOfDay = plansOfDay,
+                            onSelectDate = viewModel::selectDate,
+                            onPlanClick = viewModel::openEditPlanForm,
+                            onToggleDone = viewModel::togglePlan,
+                            onDeletePlan = viewModel::removePlan,
+                            getProjectColor = viewModel::getProjectColor,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -378,6 +392,34 @@ private fun DayTimelineView(
                             )
                         }
                     }
+                }
+            }
+
+            // 当前时间红线指示器
+            val now = java.time.LocalTime.now()
+            val currentMinutes = now.hour * 60 + now.minute
+            val visibleStartMinutes = startHour * 60
+            val visibleEndMinutes = (endHour + 1) * 60
+            if (currentMinutes in visibleStartMinutes..visibleEndMinutes) {
+                val currentOffset = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = (currentOffset - 4).dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(ShapeTokens.Full)
+                            .background(MaterialTheme.colorScheme.error)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .background(MaterialTheme.colorScheme.error)
+                    )
                 }
             }
         }

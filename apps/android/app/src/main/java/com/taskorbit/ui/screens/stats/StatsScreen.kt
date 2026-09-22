@@ -5,9 +5,14 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import com.taskorbit.ui.components.CardVariant
+import com.taskorbit.ui.components.TaskOrbitCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -357,9 +362,9 @@ fun MetricCard(
     unit: String,
     label: String
 ) {
-    Card(
+    TaskOrbitCard(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        variant = CardVariant.FILLED,
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -421,9 +426,9 @@ fun ProjectDistributionSection(distribution: List<ProjectTimeDistribution>) {
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
 
-        Card(
+        TaskOrbitCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            variant = CardVariant.FILLED,
             shape = RoundedCornerShape(18.dp)
         ) {
             if (distribution.isEmpty()) {
@@ -478,7 +483,13 @@ fun ProjectDistributionSection(distribution: List<ProjectTimeDistribution>) {
                                 )
                             }
 
-                            // 投入横向进度条
+                            // 投入横向进度条（带加载展开动效）
+                            val animatedRatio by animateFloatAsState(
+                                targetValue = item.relativeBarRatio,
+                                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+                                label = "barRatio"
+                            )
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -488,7 +499,7 @@ fun ProjectDistributionSection(distribution: List<ProjectTimeDistribution>) {
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(item.relativeBarRatio)
+                                        .fillMaxWidth(animatedRatio)
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(barColor)
@@ -508,9 +519,9 @@ fun ThemeCard(
     currentPreference: String,
     onThemeSelect: (String) -> Unit
 ) {
-    Card(
+    TaskOrbitCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        variant = CardVariant.FILLED,
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
@@ -575,9 +586,9 @@ fun LocalFirstCard(
     onExport: () -> Unit,
     onImport: () -> Unit
 ) {
-    Card(
+    TaskOrbitCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        variant = CardVariant.FILLED,
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
@@ -664,9 +675,9 @@ fun WebDavCard(
     onSyncClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Card(
+    TaskOrbitCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        variant = CardVariant.FILLED,
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
