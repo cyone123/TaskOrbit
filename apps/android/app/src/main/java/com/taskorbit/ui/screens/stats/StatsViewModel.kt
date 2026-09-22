@@ -50,6 +50,10 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
         .map { it.webDavSettings }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WebDavSettings())
 
+    val syncStatus = repository.syncStatus
+    val lastSyncAt = repository.lastSyncAt
+    val syncErrorMessage = repository.syncErrorMessage
+
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
 
@@ -58,6 +62,32 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateTheme(theme: String) {
         repository.updateTheme(theme)
+    }
+
+    fun updateWebDavSettings(settings: WebDavSettings) {
+        repository.updateWebDavSettings(settings)
+    }
+
+    suspend fun testWebDavConnection(settings: WebDavSettings): com.taskorbit.data.sync.WebDavConnectionTestResult {
+        return repository.testWebDavConnection(settings)
+    }
+
+    fun syncNow() {
+        viewModelScope.launch {
+            _isBusy.value = true
+            try {
+                val res = repository.syncNow()
+                if (res.success) {
+                    _events.emit(StatsUiEvent.Success(if (res.hasChanges) "同步完成：已完成双向合并" else "同步完成：数据已是最新"))
+                } else {
+                    _events.emit(StatsUiEvent.Error("同步失败: ${res.message}"))
+                }
+            } catch (e: Exception) {
+                _events.emit(StatsUiEvent.Error("同步异常: ${e.message}"))
+            } finally {
+                _isBusy.value = false
+            }
+        }
     }
 
     suspend fun prepareExportFile(): Uri? = withContext(Dispatchers.IO) {

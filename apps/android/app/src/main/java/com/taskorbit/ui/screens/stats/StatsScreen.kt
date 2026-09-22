@@ -24,11 +24,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Share
@@ -93,11 +97,15 @@ fun StatsScreen(
     val overview by viewModel.overviewStats.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
     val webDavSettings by viewModel.webDavSettings.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
+    val lastSyncAt by viewModel.lastSyncAt.collectAsState()
+    val syncErrorMessage by viewModel.syncErrorMessage.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
 
     var showResetConfirmDialog by remember { mutableStateOf(false) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
+    var showWebDavSheet by remember { mutableStateOf(false) }
 
     // 处理来自 ViewModel 的 Toast / Snackbar 事件
     LaunchedEffect(Unit) {
@@ -195,8 +203,13 @@ fun StatsScreen(
 
             // 5. WebDAV 云同步概览
             WebDavCard(
-                enabled = webDavSettings.enabled,
-                serverUrl = webDavSettings.serverUrl
+                settings = webDavSettings,
+                syncStatus = syncStatus,
+                lastSyncAt = lastSyncAt,
+                syncErrorMessage = syncErrorMessage,
+                isBusy = isBusy,
+                onSyncClick = { viewModel.syncNow() },
+                onSettingsClick = { showWebDavSheet = true }
             )
 
             // 6. 危险操作区
@@ -262,6 +275,21 @@ fun StatsScreen(
                     Text("取消")
                 }
             }
+        )
+    }
+
+    // WebDAV 配置弹层
+    if (showWebDavSheet) {
+        WebDavSettingsSheet(
+            settings = webDavSettings,
+            onSave = { newSettings ->
+                viewModel.updateWebDavSettings(newSettings)
+                showWebDavSheet = false
+            },
+            onTestConnection = { settings ->
+                viewModel.testWebDavConnection(settings)
+            },
+            onDismiss = { showWebDavSheet = false }
         )
     }
 }
@@ -628,8 +656,13 @@ fun LocalFirstCard(
 
 @Composable
 fun WebDavCard(
-    enabled: Boolean,
-    serverUrl: String
+    settings: com.taskorbit.domain.model.WebDavSettings,
+    syncStatus: com.taskorbit.data.sync.SyncStatus,
+    lastSyncAt: Long?,
+    syncErrorMessage: String?,
+    isBusy: Boolean,
+    onSyncClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -640,7 +673,7 @@ fun WebDavCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -660,19 +693,288 @@ fun WebDavCard(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "WebDAV 云同步",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
+                    val statusDesc = when {
+                        !settings.enabled -> "未启用。可配置自建或公共 WebDAV 服务器进行跨设备双向同步。"
+                        syncStatus == com.taskorbit.data.sync.SyncStatus.SYNCING -> "正在与云端双向同步中…"
+                        syncStatus == com.taskorbit.data.sync.SyncStatus.ERROR -> "同步异常：$syncErrorMessage"
+                        lastSyncAt != null -> "已同步 (${formatLastSyncTime(lastSyncAt)})"
+                        else -> "已配置，等待首次同步"
+                    }
                     Text(
-                        text = if (enabled) "已启用同步 ($serverUrl)" else "未启用。可连接云端进行跨设备双向合并同步",
+                        text = statusDesc,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (syncStatus == com.taskorbit.data.sync.SyncStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = onSyncClick,
+                    enabled = settings.enabled && !isBusy && syncStatus != com.taskorbit.data.sync.SyncStatus.SYNCING,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (syncStatus == com.taskorbit.data.sync.SyncStatus.SYNCING) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("同步中…")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("立即同步")
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("配置云同步")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WebDavSettingsSheet(
+    settings: com.taskorbit.domain.model.WebDavSettings,
+    onSave: (com.taskorbit.domain.model.WebDavSettings) -> Unit,
+    onTestConnection: suspend (com.taskorbit.domain.model.WebDavSettings) -> com.taskorbit.data.sync.WebDavConnectionTestResult,
+    onDismiss: () -> Unit
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    var enabled by remember { mutableStateOf(settings.enabled) }
+    var serverUrl by remember { mutableStateOf(settings.serverUrl) }
+    var username by remember { mutableStateOf(settings.username) }
+    var password by remember { mutableStateOf(settings.password) }
+    var remoteDir by remember { mutableStateOf(settings.remoteDir) }
+    var autoSync by remember { mutableStateOf(settings.autoSync) }
+
+    var passwordVisible by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<com.taskorbit.data.sync.WebDavConnectionTestResult?>(null) }
+    var isTesting by remember { mutableStateOf(false) }
+
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "WebDAV 云同步配置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            // 启用开关
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("启用 WebDAV 双向同步", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text("开启后将自动同步任务、计划与专注记录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Switch(
+                    checked = enabled,
+                    onCheckedChange = { enabled = it }
+                )
+            }
+
+            androidx.compose.material3.OutlinedTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it },
+                label = { Text("服务器地址") },
+                placeholder = { Text("https://dav.example.com/webdav/") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            androidx.compose.material3.OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("用户名 / 账户") },
+                placeholder = { Text("WebDAV 账户名") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            androidx.compose.material3.OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("密码 / 应用令牌") },
+                placeholder = { Text("WebDAV 密码") },
+                singleLine = true,
+                visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            androidx.compose.material3.OutlinedTextField(
+                value = remoteDir,
+                onValueChange = { remoteDir = it },
+                label = { Text("远端存储目录") },
+                placeholder = { Text("/taskorbit") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // 自动静默同步开关
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("自动静默同步", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text("在应用启动或唤醒时自动在后台执行一次同步", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Switch(
+                    checked = autoSync,
+                    onCheckedChange = { autoSync = it }
+                )
+            }
+
+            // 测试连接反馈
+            testResult?.let { res ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (res.success) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (res.success) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = if (res.success) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = res.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (res.success) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+
+            // 测试连接按钮
+            OutlinedButton(
+                onClick = {
+                    val candidate = com.taskorbit.domain.model.WebDavSettings(
+                        serverUrl = serverUrl,
+                        username = username,
+                        password = password,
+                        remoteDir = remoteDir,
+                        enabled = enabled,
+                        autoSync = autoSync
+                    )
+                    coroutineScope.launch {
+                        isTesting = true
+                        testResult = onTestConnection(candidate)
+                        isTesting = false
+                    }
+                },
+                enabled = !isTesting && serverUrl.trim().isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isTesting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("正在测试连接…")
+                } else {
+                    Text("测试连接")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // 保存与取消
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        onSave(
+                            com.taskorbit.domain.model.WebDavSettings(
+                                serverUrl = serverUrl,
+                                username = username,
+                                password = password,
+                                remoteDir = remoteDir,
+                                enabled = enabled,
+                                autoSync = autoSync
+                            )
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("保存配置")
+                }
+            }
+        }
+    }
+}
+
+fun formatLastSyncTime(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diffMin = (now - timestamp) / 60_000L
+    return when {
+        diffMin < 1L -> "刚刚"
+        diffMin < 60L -> "${diffMin}分钟前"
+        else -> {
+            val date = java.time.Instant.ofEpochMilli(timestamp)
+                .atZone(java.time.ZoneId.systemDefault())
+            date.format(java.time.format.DateTimeFormatter.ofPattern("M/d HH:mm"))
         }
     }
 }

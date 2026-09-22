@@ -42,9 +42,54 @@ class AppStateRepository private constructor(context: Context) {
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
     private val _notice = MutableStateFlow<String?>(null)
-    val notice: StateFlow<String?> = _notice.asStateFlow()
-
     private val tombstones = mutableListOf<Tombstone>()
+
+    private var lastRemoteEtag: String? = null
+    private var isLocalDirty: Boolean = false
+
+    private val _syncStatus = MutableStateFlow(com.taskorbit.data.sync.SyncStatus.IDLE)
+    val syncStatus: StateFlow<com.taskorbit.data.sync.SyncStatus> = _syncStatus.asStateFlow()
+
+    private val _lastSyncAt = MutableStateFlow<Long?>(null)
+    val lastSyncAt: StateFlow<Long?> = _lastSyncAt.asStateFlow()
+
+    private val _syncErrorMessage = MutableStateFlow<String?>(null)
+    val syncErrorMessage: StateFlow<String?> = _syncErrorMessage.asStateFlow()
+
+    private val deviceId: String by lazy {
+        android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            android.provider.Settings.Secure.ANDROID_ID
+        ) ?: java.util.UUID.randomUUID().toString()
+    }
+
+    private val syncCoordinator: com.taskorbit.data.sync.SyncCoordinator by lazy {
+        com.taskorbit.data.sync.SyncCoordinator(
+            deviceId = deviceId,
+            callbacks = object : com.taskorbit.data.sync.SyncCoordinatorCallbacks {
+                override fun getState(): AppState = _state.value
+
+                override fun getTombstones(): List<Tombstone> = tombstones.toList()
+
+                override fun getLastRemoteEtag(): String? = lastRemoteEtag
+
+                override fun isLocalDirty(): Boolean = isLocalDirty
+
+                override suspend fun onStateMerged(mergedState: AppState, mergedTombstones: List<Tombstone>) {
+                    tombstones.clear()
+                    tombstones.addAll(mergedTombstones)
+                    _state.value = mergedState
+                    persistence.saveImmediately(mergedState)
+                }
+
+                override suspend fun onSyncSuccess(etag: String?, timestamp: Long) {
+                    lastRemoteEtag = etag
+                    isLocalDirty = false
+                    _lastSyncAt.value = timestamp
+                }
+            }
+        )
+    }
 
     init {
         applicationScope.launch {
@@ -54,6 +99,11 @@ class AppStateRepository private constructor(context: Context) {
                 _notice.value = "主数据异常，已从本地备份恢复。"
             }
             _isReady.value = true
+
+            // 自动静默同步检查
+            if (result.state.webDavSettings.enabled && result.state.webDavSettings.autoSync) {
+                syncNow()
+            }
         }
     }
 
@@ -69,6 +119,7 @@ class AppStateRepository private constructor(context: Context) {
                 try {
                     StateValidator.validate(next)
                     _state.value = next
+                    isLocalDirty = true
                     persistence.scheduleSave(next)
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -241,4 +292,29 @@ class AppStateRepository private constructor(context: Context) {
     }
 
     fun getTombstones(): List<Tombstone> = tombstones.toList()
+
+    suspend fun testWebDavConnection(settings: com.taskorbit.domain.model.WebDavSettings): com.taskorbit.data.sync.WebDavConnectionTestResult {
+        val client = com.taskorbit.data.sync.WebDavClient(settings)
+        return client.testConnection()
+    }
+
+    fun updateWebDavSettings(settings: com.taskorbit.domain.model.WebDavSettings) {
+        mutate { state ->
+            state.copy(webDavSettings = settings)
+        }
+    }
+
+    suspend fun syncNow(): com.taskorbit.data.sync.SyncResult {
+        _syncStatus.value = com.taskorbit.data.sync.SyncStatus.SYNCING
+        _syncErrorMessage.value = null
+
+        val result = syncCoordinator.sync()
+        if (result.success) {
+            _syncStatus.value = com.taskorbit.data.sync.SyncStatus.SUCCESS
+        } else {
+            _syncStatus.value = com.taskorbit.data.sync.SyncStatus.ERROR
+            _syncErrorMessage.value = result.message
+        }
+        return result
+    }
 }
