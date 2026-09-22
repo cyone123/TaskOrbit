@@ -217,5 +217,28 @@ class AppStateRepository private constructor(context: Context) {
         }
     }
 
+    fun updateTheme(theme: String) {
+        mutate { state ->
+            state.copy(settings = state.settings.copy(theme = theme))
+        }
+    }
+
+    fun exportSnapshot(): String {
+        return com.taskorbit.domain.TransferEngine.serializeExportSnapshot(_state.value)
+    }
+
+    suspend fun importSnapshot(rawJson: String) {
+        val importedState = com.taskorbit.domain.TransferEngine.parseImportSnapshot(rawJson)
+        com.taskorbit.data.common.StateValidator.validate(importedState)
+        _state.value = importedState
+        persistence.saveImmediately(importedState)
+    }
+
+    suspend fun resetAllData() {
+        val emptyState = AppState()
+        _state.value = emptyState
+        persistence.saveImmediately(emptyState)
+    }
+
     fun getTombstones(): List<Tombstone> = tombstones.toList()
 }

@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.taskorbit.data.repository.AppStateRepository
 import com.taskorbit.ui.screens.MainScreen
 import com.taskorbit.ui.theme.TaskOrbitTheme
 
@@ -12,7 +16,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            TaskOrbitTheme {
+            val repository = AppStateRepository.getInstance(application)
+            val state by repository.state.collectAsState()
+            val themeSetting = state.settings.theme
+            val isDark = when (themeSetting) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+            TaskOrbitTheme(darkTheme = isDark) {
                 MainScreen()
             }
         }

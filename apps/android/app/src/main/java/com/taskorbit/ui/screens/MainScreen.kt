@@ -93,14 +93,7 @@ fun MainScreen(
                 com.taskorbit.ui.screens.pomodoro.PomodoroScreen()
             }
             composable(Destination.Stats.route) {
-                // Placeholder for Stats Screen (Slice 5)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    TaskOrbitEmptyState(
-                        icon = Icons.Outlined.BarChart,
-                        title = "统计与设置",
-                        description = "专注统计、WebDAV 同步与数据备份（切片 5 & 6）"
-                    )
-                }
+                com.taskorbit.ui.screens.stats.StatsScreen()
             }
         }
     }
