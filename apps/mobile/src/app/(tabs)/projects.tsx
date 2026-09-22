@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { addDays, relativeRangeLabel, toISODate, todayISO } from "@task-orbit/core";
+import { addDays, calculateProjectProgress, relativeRangeLabel, toISODate, todayISO } from "@task-orbit/core";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -91,8 +91,9 @@ export default function ProjectsScreen() {
           activeProjects.map((project) => {
             const tasks = state.tasks.filter((task) => task.projectId === project.id);
             const plans = state.dailyPlans.filter((plan) => plan.projectId === project.id);
+            const completedTasks = tasks.filter((task) => task.done).length;
             const completedPlans = plans.filter((plan) => plan.done).length;
-            const progress = plans.length ? Math.round((completedPlans / plans.length) * 100) : 0;
+            const progress = calculateProjectProgress(tasks, plans);
             const accent = PROJECT_COLOR_HEX[project.color] ?? colors.primary;
 
             return (
@@ -129,7 +130,7 @@ export default function ProjectsScreen() {
 
                     <View style={styles.progressLabel}>
                       <Text style={[styles.progressText, { color: colors.onSurfaceVariant }]}>
-                        {completedPlans} / {plans.length} 个计划完成
+                        {tasks.length > 0 ? `${completedTasks} / ${tasks.length} 个任务完成` : `${completedPlans} / ${plans.length} 个计划完成`}
                       </Text>
                       <Text style={[styles.progressValue, { color: accent }]}>{progress}%</Text>
                     </View>

@@ -19,6 +19,7 @@ describe("project metrics", () => {
     expect(calculateProjectMetrics(state, "p1", "2026-08-20")).toEqual({
       taskTotal: 2, taskDone: 1, taskProgress: 50,
       planTotal: 1, planDone: 1, planProgress: 100,
+      progress: 50,
       remainingDays: 10, focusSessions: 1, focusMinutes: 25,
     });
   });

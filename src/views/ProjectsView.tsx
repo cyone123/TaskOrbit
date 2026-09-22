@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   addDays,
+  calculateProjectProgress,
   dailyPlanRepeatLabel,
   formatDate,
   formatDateFull,
@@ -294,6 +295,7 @@ export function ProjectsView() {
   const donePlans = projectPlans.filter((plan) => plan.done).length;
   const taskProgress = projectTasks.length ? Math.round((doneTasks / projectTasks.length) * 100) : 0;
   const planProgress = projectPlans.length ? Math.round((donePlans / projectPlans.length) * 100) : 0;
+  const projectProgress = calculateProjectProgress(projectTasks, projectPlans);
   const calendarDays = useMemo(() => monthDays(parseISODate(planDate)), [planDate]);
   const projectPlanDates = useMemo(
     () => new Set(projectPlans.map((plan) => plan.date)),
@@ -831,7 +833,7 @@ export function ProjectsView() {
             </span>
             <div className="project-insight-text">
               <span className="project-insight-label">完成进度</span>
-              <span className="project-insight-value">{planProgress}%</span>
+              <span className="project-insight-value">{projectProgress}%</span>
             </div>
           </div>
 
@@ -887,11 +889,19 @@ export function ProjectsView() {
                 <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
               ) : (
                 filteredProjects.map((project) => {
+                  const tasks = tasksOfProject.get(project.id) ?? [];
                   const plans = plansOfProject.get(project.id) ?? [];
+                  const taskDone = tasks.filter((task) => task.done).length;
                   const planDone = plans.filter((plan) => plan.done).length;
-                  const progress = plans.length ? Math.round((planDone / plans.length) * 100) : 0;
+                  const progress = calculateProjectProgress(tasks, plans);
                   const selected = selectedProjectId === project.id;
                   const accent = colorByKey(project.color);
+                  const summaryText =
+                    tasks.length > 0
+                      ? `${taskDone} / ${tasks.length} 个任务完成`
+                      : plans.length > 0
+                        ? `${planDone} / ${plans.length} 个计划完成`
+                        : "暂无内容";
                   return (
                     <button
                       type="button"
@@ -925,7 +935,7 @@ export function ProjectsView() {
                       <div className="project-nav-item__progress-section">
                         <div className="project-nav-item__progress-label">
                           <span className="body-xs muted project-nav-item__progress-text">
-                            {plans.length > 0 ? `${planDone} / ${plans.length} 个计划完成` : "暂无计划"}
+                            {summaryText}
                           </span>
                           <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
                             {progress}%
@@ -1014,10 +1024,16 @@ export function ProjectsView() {
                 {selectedProject.description && <p className="body-md muted project-hero__description">{selectedProject.description}</p>}
               </div>
               <div className="project-hero__progress">
-                <ProgressRing value={planProgress} size={56} strokeWidth={5} />
+                <ProgressRing value={projectProgress} size={56} strokeWidth={5} />
                 <div className="project-hero__progress-copy">
                   <div className="label-md">整体进度</div>
-                  <div className="body-sm muted">{donePlans} / {projectPlans.length} 个计划完成</div>
+                  <div className="body-sm muted">
+                    {projectTasks.length > 0
+                      ? `${doneTasks} / ${projectTasks.length} 个任务完成`
+                      : projectPlans.length > 0
+                        ? `${donePlans} / ${projectPlans.length} 个计划完成`
+                        : "暂无内容"}
+                  </div>
                 </div>
               </div>
               <div className="project-hero__actions">

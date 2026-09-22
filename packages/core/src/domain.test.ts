@@ -6,6 +6,7 @@ import {
   appendProject,
   appendTask,
   archiveProjectState,
+  calculateProjectProgress,
   createDailyPlan,
   createDailyPlans,
   createInboxItem,
@@ -412,5 +413,124 @@ describe("domain commands", () => {
       expect(uncheckedTask.dailyPlans.find((p) => p.id === plan2.id)?.done).toBe(false);
     });
   });
+
+  describe("calculateProjectProgress", () => {
+    it("computes weighted progress correctly with tasks and plans", () => {
+      const { project, task } = fixtureState();
+      const task2 = createTask({
+        projectId: project.id,
+        name: "任务二",
+        description: "",
+        startDate: "2026-08-17",
+        endDate: "2026-08-20",
+        priority: "low",
+      });
+
+      // Task 1 has 2 plans (1 done -> 50%)
+      const p1 = createDailyPlan({
+        projectId: project.id,
+        taskId: task.id,
+        name: "P1",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+      });
+      p1.done = true;
+
+      const p2 = createDailyPlan({
+        projectId: project.id,
+        taskId: task.id,
+        name: "P2",
+        description: "",
+        date: "2026-08-18",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+      });
+
+      // Task 2 has no plans, done: true (100%)
+      task2.done = true;
+
+      // Progress should be (0.5 + 1.0) / 2 = 75%
+      expect(calculateProjectProgress([task, task2], [p1, p2])).toBe(75);
+    });
+
+    it("includes standalone plans as an additional unit (Option A)", () => {
+      const { project, task } = fixtureState();
+      // Task has 1 plan (1 done -> 100%)
+      const p1 = createDailyPlan({
+        projectId: project.id,
+        taskId: task.id,
+        name: "P1",
+        description: "",
+        date: "2026-08-17",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+      });
+      p1.done = true;
+
+      // Standalone plans: 2 plans (1 done -> 50%)
+      const s1 = createDailyPlan({
+        projectId: project.id,
+        taskId: null,
+        name: "S1",
+        description: "",
+        date: "2026-08-17",
+        startTime: "10:00",
+        endTime: "11:00",
+        estimatedMinutes: 60,
+      });
+      s1.done = true;
+
+      const s2 = createDailyPlan({
+        projectId: project.id,
+        taskId: null,
+        name: "S2",
+        description: "",
+        date: "2026-08-18",
+        startTime: "10:00",
+        endTime: "11:00",
+        estimatedMinutes: 60,
+      });
+
+      // Total units: 1 task + 1 standalone unit = 2 units.
+      // Progress: (1.0 + 0.5) / 2 = 75%
+      expect(calculateProjectProgress([task], [p1, s1, s2])).toBe(75);
+    });
+
+    it("returns 0 for empty projects, or standalone rate when no tasks exist", () => {
+      expect(calculateProjectProgress([], [])).toBe(0);
+
+      const s1 = createDailyPlan({
+        projectId: "p1",
+        taskId: null,
+        name: "S1",
+        description: "",
+        date: "2026-08-17",
+        startTime: "10:00",
+        endTime: "11:00",
+        estimatedMinutes: 60,
+      });
+      s1.done = true;
+
+      const s2 = createDailyPlan({
+        projectId: "p1",
+        taskId: null,
+        name: "S2",
+        description: "",
+        date: "2026-08-18",
+        startTime: "10:00",
+        endTime: "11:00",
+        estimatedMinutes: 60,
+      });
+
+      // No tasks, 2 standalone plans (1 done -> 50%)
+      expect(calculateProjectProgress([], [s1, s2])).toBe(50);
+    });
+  });
 });
+
 

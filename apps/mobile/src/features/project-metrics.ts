@@ -1,4 +1,11 @@
-import { DAY_MS, parseISODate, resolveSessionProjectId, todayISO, type AppState } from "@task-orbit/core";
+import {
+  DAY_MS,
+  calculateProjectProgress,
+  parseISODate,
+  resolveSessionProjectId,
+  todayISO,
+  type AppState,
+} from "@task-orbit/core";
 
 export interface ProjectMetrics {
   taskTotal: number;
@@ -7,6 +14,7 @@ export interface ProjectMetrics {
   planTotal: number;
   planDone: number;
   planProgress: number;
+  progress: number;
   remainingDays: number;
   focusSessions: number;
   focusMinutes: number;
@@ -26,6 +34,7 @@ export function calculateProjectMetrics(state: AppState, projectId: string, toda
     planTotal: plans.length,
     planDone,
     planProgress: plans.length ? Math.round(planDone / plans.length * 100) : 0,
+    progress: calculateProjectProgress(tasks, plans),
     remainingDays: project ? Math.max(0, Math.ceil((parseISODate(project.endDate).getTime() - parseISODate(today).getTime()) / DAY_MS)) : 0,
     focusSessions: sessions.length,
     focusMinutes: sessions.reduce((sum, session) => sum + session.minutes, 0),

@@ -914,3 +914,53 @@ export function updateWebDavSettingsState(
 ): AppState {
   return { ...state, webDavSettings: { ...state.webDavSettings, ...patch } };
 }
+
+/**
+ * Calculates weighted project progress (0 - 100):
+ * - Each task is an equal work unit (weight 1/N).
+ * - A task's progress is (completed plans / total plans) if it has daily plans,
+ *   or (100% if task.done, 0% otherwise) if it has no plans.
+ * - Standalone daily plans (not linked to any task) are bundled into an additional unit (weight 1/(N+1)).
+ * - If a project has no tasks, it falls back to standalone plan completion rate.
+ */
+export function calculateProjectProgress(
+  tasks: Task[],
+  plans: DailyPlan[],
+): number {
+  const taskPlansMap = new Map<string, { total: number; done: number }>();
+  let standaloneTotal = 0;
+  let standaloneDone = 0;
+
+  for (const plan of plans) {
+    if (plan.taskId) {
+      const entry = taskPlansMap.get(plan.taskId) ?? { total: 0, done: 0 };
+      entry.total += 1;
+      if (plan.done) entry.done += 1;
+      taskPlansMap.set(plan.taskId, entry);
+    } else {
+      standaloneTotal += 1;
+      if (plan.done) standaloneDone += 1;
+    }
+  }
+
+  let totalUnits = tasks.length;
+  let progressSum = 0;
+
+  for (const task of tasks) {
+    const planStats = taskPlansMap.get(task.id);
+    if (planStats && planStats.total > 0) {
+      progressSum += planStats.done / planStats.total;
+    } else {
+      progressSum += task.done ? 1 : 0;
+    }
+  }
+
+  if (standaloneTotal > 0) {
+    totalUnits += 1;
+    progressSum += standaloneDone / standaloneTotal;
+  }
+
+  if (totalUnits === 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((progressSum / totalUnits) * 100)));
+}
+
