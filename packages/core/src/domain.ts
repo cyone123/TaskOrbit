@@ -288,11 +288,24 @@ export function updateTaskState(
   patch: TaskPatch,
   updatedAt = Date.now(),
 ): AppState {
+  const nextTasks = state.tasks.map((task) =>
+    task.id === id ? { ...task, ...patch, updatedAt } : task,
+  );
+
+  let nextDailyPlans = state.dailyPlans;
+  if (patch.done !== undefined) {
+    const targetDone = patch.done;
+    nextDailyPlans = state.dailyPlans.map((plan) =>
+      plan.taskId === id && plan.done !== targetDone
+        ? { ...plan, done: targetDone, updatedAt }
+        : plan,
+    );
+  }
+
   return {
     ...state,
-    tasks: state.tasks.map((task) =>
-      task.id === id ? { ...task, ...patch, updatedAt } : task,
-    ),
+    tasks: nextTasks,
+    dailyPlans: nextDailyPlans,
   };
 }
 
@@ -426,7 +439,7 @@ export function appendDailyPlan(state: AppState, plan: DailyPlan): AppState {
   return appendDailyPlans(state, [plan]);
 }
 
-export function updateDailyPlanState(
+function rawUpdateDailyPlanState(
   state: AppState,
   id: string,
   patch: DailyPlanPatch,
@@ -798,6 +811,43 @@ export function updateDailyPlanState(
         ? null
         : state.activeTimer,
   };
+}
+
+export function updateDailyPlanState(
+  state: AppState,
+  id: string,
+  patch: DailyPlanPatch,
+  updatedAt = Date.now(),
+): AppState {
+  const nextState = rawUpdateDailyPlanState(state, id, patch, updatedAt);
+  if (nextState === state) return state;
+
+  const current = state.dailyPlans.find((plan) => plan.id === id);
+  const affectedTaskIds = new Set<string>();
+  if (current?.taskId) affectedTaskIds.add(current.taskId);
+  if (patch.taskId) affectedTaskIds.add(patch.taskId);
+
+  let nextTasks = nextState.tasks;
+  for (const tId of affectedTaskIds) {
+    const task = nextTasks.find((t) => t.id === tId);
+    if (!task) continue;
+    const taskPlans = nextState.dailyPlans.filter((p) => p.taskId === tId);
+    if (taskPlans.length > 0) {
+      const allDone = taskPlans.every((p) => p.done);
+      if (task.done !== allDone) {
+        nextTasks = nextTasks.map((t) => (t.id === tId ? { ...t, done: allDone, updatedAt } : t));
+      }
+    }
+  }
+
+  if (nextTasks !== nextState.tasks) {
+    return {
+      ...nextState,
+      tasks: nextTasks,
+    };
+  }
+
+  return nextState;
 }
 
 export function deleteDailyPlanState(state: AppState, id: string): AppState {

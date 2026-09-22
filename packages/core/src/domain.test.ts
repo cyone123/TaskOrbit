@@ -15,6 +15,7 @@ import {
   deleteProjectState,
   updateDailyPlanState,
   updateInboxItemState,
+  updateTaskState,
 } from "./domain";
 import { createEmptyState, validateAppState } from "./schema";
 
@@ -352,5 +353,64 @@ describe("domain commands", () => {
         "2026-08-31",
       ]);
     });
+
+    it("automatically marks task done when all its daily plans are completed, and uncompletes task when a plan is unchecked", () => {
+      const { state, project, task, plan } = fixtureState();
+      expect(task.done).toBe(false);
+
+      const plan2 = createDailyPlan({
+        projectId: project.id,
+        taskId: task.id,
+        name: "计划2",
+        description: "",
+        date: "2026-08-18",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+      });
+
+      const withTwoPlans = appendDailyPlan(state, plan2);
+
+      // Complete only plan -> task should still be false because plan2 is not done
+      const step1 = updateDailyPlanState(withTwoPlans, plan.id, { done: true });
+      expect(step1.tasks.find((t) => t.id === task.id)?.done).toBe(false);
+
+      // Complete plan2 -> task should now be auto-completed (true)
+      const step2 = updateDailyPlanState(step1, plan2.id, { done: true });
+      expect(step2.tasks.find((t) => t.id === task.id)?.done).toBe(true);
+
+      // Uncheck plan1 -> task should now be automatically uncompleted (false)
+      const step3 = updateDailyPlanState(step2, plan.id, { done: false });
+      expect(step3.tasks.find((t) => t.id === task.id)?.done).toBe(false);
+    });
+
+    it("automatically checks or unchecks all plans under a task when task completion is toggled", () => {
+      const { state, project, task, plan } = fixtureState();
+      const plan2 = createDailyPlan({
+        projectId: project.id,
+        taskId: task.id,
+        name: "计划2",
+        description: "",
+        date: "2026-08-18",
+        startTime: "09:00",
+        endTime: "10:00",
+        estimatedMinutes: 60,
+      });
+
+      const withTwoPlans = appendDailyPlan(state, plan2);
+
+      // Check task -> both plans under this task should automatically become done: true
+      const checkedTask = updateTaskState(withTwoPlans, task.id, { done: true });
+      expect(checkedTask.tasks.find((t) => t.id === task.id)?.done).toBe(true);
+      expect(checkedTask.dailyPlans.find((p) => p.id === plan.id)?.done).toBe(true);
+      expect(checkedTask.dailyPlans.find((p) => p.id === plan2.id)?.done).toBe(true);
+
+      // Uncheck task -> both plans under this task should automatically become done: false
+      const uncheckedTask = updateTaskState(checkedTask, task.id, { done: false });
+      expect(uncheckedTask.tasks.find((t) => t.id === task.id)?.done).toBe(false);
+      expect(uncheckedTask.dailyPlans.find((p) => p.id === plan.id)?.done).toBe(false);
+      expect(uncheckedTask.dailyPlans.find((p) => p.id === plan2.id)?.done).toBe(false);
+    });
   });
 });
+
