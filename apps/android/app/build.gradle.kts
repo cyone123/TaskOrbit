@@ -22,9 +22,19 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("taskorbit-release.jks")
+            storePassword = (findProperty("TASKORBIT_KEYSTORE_PASSWORD") as? String) ?: "taskorbit123"
+            keyAlias = (findProperty("TASKORBIT_KEY_ALIAS") as? String) ?: "taskorbit"
+            keyPassword = (findProperty("TASKORBIT_KEY_PASSWORD") as? String) ?: "taskorbit123"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

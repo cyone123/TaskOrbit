@@ -13,8 +13,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -291,8 +295,8 @@ fun CalendarScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 6.dp)
-                    .clickable(enabled = !isAppBarExpanded) { isAppBarExpanded = true },
-                trailingContent = if (isAppBarExpanded && mode == CalendarMode.WEEK) {
+                    .bouncyClickable(enabled = !isAppBarExpanded) { isAppBarExpanded = true },
+                trailingContent = if (mode == CalendarMode.WEEK) {
                     {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -324,66 +328,80 @@ fun CalendarScreen(
                     }
                 } else null
             ) {
-                if (!isAppBarExpanded) {
-                    // 紧凑指示点模式：展示 3 个指示点（高亮当前激活的模式）+ 模式微标签，释放垂直阅读空间
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.CalendarMonth,
-                            contentDescription = "展开视图切换",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        val currentModeIndex = when (mode) {
-                            CalendarMode.DAY -> 0
-                            CalendarMode.WEEK -> 1
-                            CalendarMode.MONTH -> 2
-                        }
+                val motionScheme = MaterialTheme.motionScheme
+                val effectsFloatSpec = motionScheme.fastEffectsSpec<Float>()
+                val spatialFloatSpec = motionScheme.defaultSpatialSpec<Float>()
+
+                AnimatedContent(
+                    targetState = isAppBarExpanded,
+                    transitionSpec = {
+                        (fadeIn(effectsFloatSpec) + scaleIn(initialScale = 0.88f, animationSpec = spatialFloatSpec))
+                            .togetherWith(fadeOut(effectsFloatSpec) + scaleOut(targetScale = 0.88f, animationSpec = spatialFloatSpec))
+                    },
+                    contentAlignment = Alignment.Center,
+                    label = "floatingAppBarContentTransition"
+                ) { expandedState ->
+                    if (!expandedState) {
+                        // 紧凑指示点模式：展示 3 个指示点（高亮当前激活的模式）+ 模式微标签，释放垂直阅读空间
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            repeat(3) { index ->
-                                val isCurrent = index == currentModeIndex
-                                Box(
-                                    modifier = Modifier
-                                        .size(if (isCurrent) 8.dp else 5.dp)
-                                        .clip(ShapeTokens.Full)
-                                        .background(
-                                            if (isCurrent) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.outlineVariant
-                                        )
-                                )
+                            Icon(
+                                imageVector = Icons.Outlined.CalendarMonth,
+                                contentDescription = "展开视图切换",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            val currentModeIndex = when (mode) {
+                                CalendarMode.DAY -> 0
+                                CalendarMode.WEEK -> 1
+                                CalendarMode.MONTH -> 2
                             }
-                        }
-                        Text(
-                            text = when (mode) {
-                                CalendarMode.DAY -> "日"
-                                CalendarMode.WEEK -> if (weekMode == WeekCalendarMode.PLANS) "周·计划" else "周·甘特"
-                                CalendarMode.MONTH -> "月"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                } else {
-                    // 展开态：Expressive 胶囊按钮组
-                    ButtonGroup(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        val modes = listOf(CalendarMode.DAY to "日", CalendarMode.WEEK to "周", CalendarMode.MONTH to "月")
-                        modes.forEach { (m, label) ->
-                            val isSelected = mode == m
-                            TonalToggleButton(
-                                checked = isSelected,
-                                onCheckedChange = { viewModel.setMode(m) },
-                                modifier = Modifier.height(32.dp)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(label, style = MaterialTheme.typography.labelMedium)
+                                repeat(3) { index ->
+                                    val isCurrent = index == currentModeIndex
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isCurrent) 8.dp else 5.dp)
+                                            .clip(ShapeTokens.Full)
+                                            .background(
+                                                if (isCurrent) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.outlineVariant
+                                            )
+                                    )
+                                }
+                            }
+                            Text(
+                                text = when (mode) {
+                                    CalendarMode.DAY -> "日"
+                                    CalendarMode.WEEK -> if (weekMode == WeekCalendarMode.PLANS) "周·计划" else "周·甘特"
+                                    CalendarMode.MONTH -> "月"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    } else {
+                        // 展开态：Expressive 胶囊按钮组
+                        ButtonGroup(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            val modes = listOf(CalendarMode.DAY to "日", CalendarMode.WEEK to "周", CalendarMode.MONTH to "月")
+                            modes.forEach { (m, label) ->
+                                val isSelected = mode == m
+                                TonalToggleButton(
+                                    checked = isSelected,
+                                    onCheckedChange = { viewModel.setMode(m) },
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium)
+                                }
                             }
                         }
                     }
