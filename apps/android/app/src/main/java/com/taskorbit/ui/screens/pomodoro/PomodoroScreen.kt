@@ -47,7 +47,10 @@ import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -86,6 +89,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -109,7 +113,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PomodoroScreen(
     viewModel: PomodoroViewModel = viewModel()
@@ -342,6 +346,7 @@ fun PhaseChip(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TimerCountdownRing(
     remainingMs: Long,
@@ -355,6 +360,14 @@ fun TimerCountdownRing(
         targetValue = progress,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "progress"
+    )
+
+    // 波浪振幅控制：运行状态下波浪全幅生动流动，暂停或就绪时收敛为平缓微波
+    val targetWaveAmplitude = if (isRunning) 1.0f else 0.35f
+    val animatedWaveAmplitude by animateFloatAsState(
+        targetValue = targetWaveAmplitude,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "waveAmplitude"
     )
 
     // 呼吸律动光晕动效
@@ -394,6 +407,10 @@ fun TimerCountdownRing(
     }
 
     val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val strokeWidthPx = with(LocalDensity.current) { 12.dp.toPx() }
+    val ringStroke = remember(strokeWidthPx) {
+        Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+    }
 
     Box(
         modifier = Modifier
@@ -401,46 +418,39 @@ fun TimerCountdownRing(
             .scale(pulseScale),
         contentAlignment = Alignment.Center
     ) {
-        // Canvas 绘制圆环与发光底圈
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 14.dp.toPx()
-            val diameter = size.minDimension - strokeWidth
-            val topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f)
-            val arcSize = Size(diameter, diameter)
-
-            // 发光背景晕
-            if (isRunning) {
+        // 1. 发光背景光晕
+        if (isRunning) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val diameter = size.minDimension - strokeWidthPx
                 drawCircle(
                     color = color.copy(alpha = glowAlpha),
-                    radius = (diameter + strokeWidth * 2) / 2f,
+                    radius = (diameter + strokeWidthPx * 2) / 2f,
                     center = center
                 )
             }
-
-            // 背景轨道
-            drawArc(
-                color = trackColor,
-                startAngle = -90f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // 进度条（顺时针从顶部开始）
-            drawArc(
-                color = color,
-                startAngle = -90f,
-                sweepAngle = 360f * animatedProgress,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
         }
 
-        // 倒计时核心文本
+        // 2. 官方实验性 Material 3 Expressive 波浪环形进度条
+        CircularWavyProgressIndicator(
+            progress = { animatedProgress },
+            modifier = Modifier.fillMaxSize(),
+            color = color,
+            trackColor = trackColor,
+            stroke = ringStroke,
+            trackStroke = ringStroke,
+            gapSize = 6.dp,
+            wavelength = 36.dp,
+            amplitude = { p ->
+                val edgeTaper = when {
+                    p < 0.02f -> (p / 0.02f)
+                    p > 0.99f -> ((1f - p) / 0.01f).coerceIn(0f, 1f)
+                    else -> 1f
+                }
+                edgeTaper * animatedWaveAmplitude
+            }
+        )
+
+        // 3. 倒计时核心文本
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
