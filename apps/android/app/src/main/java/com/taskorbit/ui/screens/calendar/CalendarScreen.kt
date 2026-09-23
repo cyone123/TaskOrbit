@@ -224,11 +224,11 @@ fun CalendarScreen(
                 .padding(innerPadding)
                 .nestedScroll(nestedScrollConnection)
         ) {
-            // 主视图内容区域（留出顶部悬浮胶囊空间）
+            // 主视图内容区域（留出顶部悬浮胶囊空间，避免收起状态遮挡顶部日期/时间槽）
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 46.dp)
+                    .padding(top = 54.dp)
             ) {
                 AnimatedContent(
                     targetState = mode,
@@ -292,10 +292,10 @@ fun CalendarScreen(
             // Expressive 顶部日历视图切换浮岛 (HorizontalFloatingAppBar)
             com.taskorbit.ui.components.TaskOrbitFloatingAppBar(
                 expanded = isAppBarExpanded,
+                onClick = { isAppBarExpanded = true },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 6.dp)
-                    .bouncyClickable(enabled = !isAppBarExpanded) { isAppBarExpanded = true },
+                    .padding(top = 4.dp),
                 trailingContent = if (mode == CalendarMode.WEEK) {
                     {
                         Row(

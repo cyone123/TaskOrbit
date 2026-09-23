@@ -84,7 +84,7 @@ fun Modifier.bouncyClickable(
     )
 
     this
-        .scale(scale)
+        .then(if (scale != 1f) Modifier.scale(scale) else Modifier)
         .clickable(
             interactionSource = interactionSource,
             indication = ripple(),
@@ -115,5 +115,5 @@ fun Modifier.bouncyPress(
         label = "bouncyScale"
     )
 
-    this.scale(scale)
+    this.then(if (scale != 1f) Modifier.scale(scale) else Modifier)
 }
