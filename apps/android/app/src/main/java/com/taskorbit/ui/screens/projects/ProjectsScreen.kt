@@ -62,6 +62,7 @@ import com.taskorbit.ui.components.TaskOrbitCard
 import com.taskorbit.ui.components.TaskOrbitEmptyState
 import com.taskorbit.ui.components.TaskOrbitIconButton
 import com.taskorbit.ui.components.TaskOrbitProgressBar
+import com.taskorbit.ui.components.TaskOrbitWavyProgressBar
 import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
@@ -402,7 +403,7 @@ private fun ProjectItemCard(
             }
 
             Spacer(modifier = Modifier.height(6.dp))
-            TaskOrbitProgressBar(progress = progress, color = accentColor)
+            TaskOrbitWavyProgressBar(progress = progress, color = accentColor)
 
             Spacer(modifier = Modifier.height(12.dp))
 

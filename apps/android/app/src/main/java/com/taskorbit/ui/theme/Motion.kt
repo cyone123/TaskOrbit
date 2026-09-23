@@ -11,7 +11,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -45,12 +48,24 @@ object MotionTokens {
     val EmphasizedEasing: Easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
     val EmphasizedDecelerateEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
     val EmphasizedAccelerateEasing: Easing = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
+
+    // Material 3 Expressive 弹簧物理规范
+    val ExpressiveSpatialSpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
+
+    val ExpressiveTouchSpring = spring<Float>(
+        dampingRatio = 0.75f,
+        stiffness = 400f
+    )
 }
 
 /**
  * 物理弹簧按压微交互修饰符：
- * 按下时产生 0.975x 缩放与触觉反馈，释放时具有柔和阻尼弹簧回弹。
+ * 按下时产生 0.975x 缩放与触觉反馈，释放时由 Expressive 弹簧阻尼自然过冲回弹。
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     pressedScale: Float = 0.975f,
@@ -60,12 +75,11 @@ fun Modifier.bouncyClickable(
     val isPressed by interactionSource.collectIsPressedAsState()
     val haptic = LocalHapticFeedback.current
 
+    val springSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+
     val scale by animateFloatAsState(
         targetValue = if (isPressed && enabled) pressedScale else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = springSpec,
         label = "bouncyScale"
     )
 
@@ -85,6 +99,7 @@ fun Modifier.bouncyClickable(
 /**
  * 仅用于产生物理弹簧按压缩放效果（配合已有点击处理）
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun Modifier.bouncyPress(
     enabled: Boolean = true,
     pressedScale: Float = 0.975f
@@ -92,12 +107,11 @@ fun Modifier.bouncyPress(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    val springSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+
     val scale by animateFloatAsState(
         targetValue = if (isPressed && enabled) pressedScale else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = springSpec,
         label = "bouncyScale"
     )
 

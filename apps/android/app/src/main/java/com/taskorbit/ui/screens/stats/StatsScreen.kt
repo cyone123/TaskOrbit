@@ -49,6 +49,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import com.taskorbit.ui.components.TaskOrbitLoadingIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -735,9 +736,8 @@ fun WebDavCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     if (syncStatus == com.taskorbit.data.sync.SyncStatus.SYNCING) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                        TaskOrbitLoadingIndicator(
+                            size = 18.dp,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -932,7 +932,10 @@ fun WebDavSettingsSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (isTesting) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    TaskOrbitLoadingIndicator(
+                        size = 18.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("正在测试连接…")
                 } else {
