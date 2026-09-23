@@ -95,4 +95,105 @@ class CalendarRecurrenceTest {
         val range2 = CalendarModel.taskRangeInWeek(task2, weekDays)
         assertNull(range2)
     }
+
+    @Test
+    fun `timeToMinutes and minutesToTime accurately convert and snap 15-minute slots`() {
+        assertEquals(570, CalendarModel.timeToMinutes("09:30"))
+        assertEquals("09:30", CalendarModel.minutesToTime(570))
+        assertEquals("00:00", CalendarModel.minutesToTime(0))
+        assertEquals("23:45", CalendarModel.minutesToTime(1425))
+
+        // 模拟拖拽微小位移后的 15 分钟槽位吸附（Snap）
+        val rawMinutes = 570 + 8 // 移动了 8 分钟 -> 应四舍五入吸附到 585 (09:45)
+        val snappedMinutes = ((rawMinutes + 7) / 15) * 15
+        assertEquals(585, snappedMinutes)
+        assertEquals("09:45", CalendarModel.minutesToTime(snappedMinutes))
+    }
+
+    @Test
+    fun `reschedule daily plan updates start and end time with proper duration preservation`() {
+        val plan = DailyPlan(
+            id = "plan-1",
+            name = "架构评审",
+            date = "2026-09-23",
+            startTime = "10:00",
+            endTime = "11:00",
+            estimatedMinutes = 60,
+            createdAt = 1000L,
+            updatedAt = 1000L
+        )
+        val initialAppState = com.taskorbit.domain.model.AppState(dailyPlans = listOf(plan))
+
+        val patch = com.taskorbit.domain.DailyPlanPatch(
+            startTime = "14:30",
+            endTime = "15:30",
+            estimatedMinutes = 60
+        )
+        val updatedState = DailyPlanDomain.updateDailyPlanState(initialAppState, "plan-1", patch)
+        val updatedPlan = updatedState.dailyPlans.find { it.id == "plan-1" }
+
+        assertNotNull(updatedPlan)
+        assertEquals("14:30", updatedPlan!!.startTime)
+        assertEquals("15:30", updatedPlan.endTime)
+        assertEquals(60, updatedPlan.estimatedMinutes)
+        assertEquals("架构评审", updatedPlan.name)
+    }
+
+    @Test
+    fun `visibleHourRange provides standard bounds even with empty plans`() {
+        val emptyRange = CalendarModel.visibleHourRange(emptyList())
+        assertEquals(8, emptyRange.first)
+        assertEquals(20, emptyRange.second)
+
+        val earlyPlan = DailyPlan(id = "e", name = "Early", date = "2026-09-23", startTime = "06:15", endTime = "07:00", createdAt = 0, updatedAt = 0)
+        val earlyRange = CalendarModel.visibleHourRange(listOf(earlyPlan))
+        assertEquals(6, earlyRange.first)
+        assertEquals(20, earlyRange.second)
+    }
+
+    @Test
+    fun `visibleHourRange dynamically expands bounds to guarantee inclusion of current time`() {
+        // Early morning at 5 AM (before default 8 AM)
+        val earlyMorningRange = CalendarModel.visibleHourRange(emptyList(), includeHour = 5)
+        assertEquals(5, earlyMorningRange.first)
+        assertEquals(20, earlyMorningRange.second)
+
+        // Late night at 22 (10 PM, after default 20)
+        val lateNightRange = CalendarModel.visibleHourRange(emptyList(), includeHour = 22)
+        assertEquals(8, lateNightRange.first)
+        assertEquals(23, lateNightRange.second)
+
+        // Mid-day at 14 (within standard 8..20)
+        val midDayRange = CalendarModel.visibleHourRange(emptyList(), includeHour = 14)
+        assertEquals(8, midDayRange.first)
+        assertEquals(20, midDayRange.second)
+    }
+
+    @Test
+    fun `drag snap boundary clamping preserves validity and duration`() {
+        val origStartMin = CalendarModel.timeToMinutes("10:00") // 600
+        val origEndMin = CalendarModel.timeToMinutes("11:30")   // 690, duration = 90 min
+        val durMin = origEndMin - origStartMin
+
+        // 1. 向上拖拽越界（比如 delta = -700，想要拖到负数时间）
+        val rawEarly = origStartMin - 700
+        val maxStartSlot = maxOf(0, ((1439 - durMin) / 15) * 15)
+        val snappedEarlyStart = (((rawEarly + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+        val snappedEarlyEnd = snappedEarlyStart + durMin
+        assertEquals(0, snappedEarlyStart) // 00:00
+        assertEquals(90, snappedEarlyEnd)  // 01:30
+        assertEquals("00:00", CalendarModel.minutesToTime(snappedEarlyStart))
+        assertEquals("01:30", CalendarModel.minutesToTime(snappedEarlyEnd))
+
+        // 2. 向下拖拽越界（比如 delta = +900，想要拖到深更半夜甚至第二天）
+        val rawLate = origStartMin + 900
+        val snappedLateStart = (((rawLate + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+        val snappedLateEnd = snappedLateStart + durMin
+        // maxStartSlot for 90min: (1439 - 90) = 1349 / 15 * 15 = 1335 (22:15)
+        assertEquals(1335, snappedLateStart)
+        assertEquals(1425, snappedLateEnd) // 23:45
+        assertEquals("22:15", CalendarModel.minutesToTime(snappedLateStart))
+        assertEquals("23:45", CalendarModel.minutesToTime(snappedLateEnd))
+        assertEquals(durMin, snappedLateEnd - snappedLateStart)
+    }
 }

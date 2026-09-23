@@ -2,13 +2,26 @@ package com.taskorbit.ui.screens.calendar
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +34,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,6 +63,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -56,25 +71,41 @@ import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.TonalToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.taskorbit.domain.CalendarMode
 import com.taskorbit.domain.CalendarModel
@@ -92,7 +123,12 @@ import com.taskorbit.ui.components.TaskOrbitIconButton
 import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
+import com.taskorbit.ui.theme.bouncyClickable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -201,10 +237,12 @@ fun CalendarScreen(
                     when (targetMode) {
                         CalendarMode.DAY -> {
                             DayTimelineView(
+                                currentDate = selectedDate,
                                 plans = plansOfDay,
                                 onPlanClick = viewModel::openEditPlanForm,
                                 onToggleDone = viewModel::togglePlan,
                                 onDeletePlan = viewModel::removePlan,
+                                onReschedulePlan = viewModel::reschedulePlan,
                                 getProjectColor = viewModel::getProjectColor,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -342,7 +380,7 @@ fun CalendarScreen(
                             val isSelected = mode == m
                             TonalToggleButton(
                                 checked = isSelected,
-                                onCheckedChange = { viewModel.mode.value = m },
+                                onCheckedChange = { viewModel.setMode(m) },
                                 modifier = Modifier.height(32.dp)
                             ) {
                                 Text(label, style = MaterialTheme.typography.labelMedium)
@@ -361,34 +399,467 @@ fun CalendarScreen(
 }
 
 /**
- * 日视图：垂直 24 小时时间轴与分列计划块
+ * 动态时间波浪轴（Timeline Wave Cursor）：
+ * 表达“时间正在流淌”的设计意图，由左侧脉冲呼吸指示光晕与右侧动态起伏的水平正弦波浪线组合而成。
+ */
+@Composable
+private fun TimelineWaveCursor(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.error
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "timelineWave")
+
+    // 水平正弦波相位循环（0 到 2π，持续 3200ms）
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wavePhase"
+    )
+
+    // 微弱起伏的呼吸振幅（1.8dp ~ 3.2dp，持续 2400ms）
+    val breathingAmp by infiniteTransition.animateFloat(
+        initialValue = 1.8f,
+        targetValue = 3.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathingAmp"
+    )
+
+    // 头部脉冲光晕缩放（1.0x ~ 1.45x）
+    val haloScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.45f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "haloScale"
+    )
+
+    // 头部脉冲光晕透明度呼吸（0.40f ~ 0.08f）
+    val haloAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.40f,
+        targetValue = 0.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "haloAlpha"
+    )
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 左侧指示头：脉冲呼吸光晕 + 实体核心圆点
+        Box(
+            modifier = Modifier.size(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .graphicsLayer {
+                        scaleX = haloScale
+                        scaleY = haloScale
+                        alpha = haloAlpha
+                    }
+                    .clip(ShapeTokens.Full)
+                    .background(color)
+            )
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(ShapeTokens.Full)
+                    .background(color)
+            )
+        }
+
+        // 右侧流淌波浪线：Canvas 实时绘制背景微光导轨与动态正弦波痕迹
+        Canvas(
+            modifier = Modifier
+                .weight(1f)
+                .height(16.dp)
+                .padding(start = 2.dp)
+        ) {
+            val width = size.width
+            val centerY = size.height / 2f
+            val wavelengthPx = 32.dp.toPx()
+            val ampPx = breathingAmp.dp.toPx()
+
+            // 柔和的时间基准导轨微光线
+            drawLine(
+                color = color.copy(alpha = 0.22f),
+                start = Offset(0f, centerY),
+                end = Offset(width, centerY),
+                strokeWidth = 1.dp.toPx()
+            )
+
+            // 动态流动的起伏波浪
+            val path = Path()
+            val startY = centerY + kotlin.math.sin(-wavePhase) * ampPx
+            path.moveTo(0f, startY)
+
+            var x = 2f
+            val step = 3f
+            while (x <= width) {
+                val angle = (x / wavelengthPx) * (2f * Math.PI.toFloat()) - wavePhase
+                val y = centerY + kotlin.math.sin(angle) * ampPx
+                path.lineTo(x, y)
+                x += step
+            }
+            if (x < width + step) {
+                val angle = (width / wavelengthPx) * (2f * Math.PI.toFloat()) - wavePhase
+                val y = centerY + kotlin.math.sin(angle) * ampPx
+                path.lineTo(width, y)
+            }
+
+            drawPath(
+                path = path,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        color,
+                        color.copy(alpha = 0.9f),
+                        color.copy(alpha = 0.45f)
+                    )
+                ),
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+        }
+    }
+}
+
+/**
+ * 带有果冻弹性吸附（Overshoot Snap）的拖拽时间块：
+ * 长按激活拖拽，随手势移动并在释放时应用 MaterialTheme.motionScheme.defaultSpatialSpec()
+ * 带轻微果冻回弹吸附至最近的 15 分钟刻度槽位，同步触发日程时间重排。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DraggablePlanBlock(
+    plan: DailyPlan,
+    startHour: Int,
+    hourHeight: Dp,
+    layout: com.taskorbit.domain.PlanColumnLayout,
+    accent: Color,
+    onPlanClick: (DailyPlan) -> Unit,
+    onReschedulePlan: (String, String, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+    val floatSpringSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val fastEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Dp>()
+    val fastSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+
+    // 使用 rememberUpdatedState 防止 pointerInput 协程闭包捕获陈旧的参数值
+    val currentPlan by rememberUpdatedState(plan)
+    val currentOnReschedule by rememberUpdatedState(onReschedulePlan)
+    val currentFloatSpringSpec by rememberUpdatedState(floatSpringSpec)
+
+    val startMin = CalendarModel.timeToMinutes(plan.startTime) - startHour * 60
+    val endMin = CalendarModel.timeToMinutes(plan.endTime) - startHour * 60
+    val durationMin = (endMin - startMin).coerceAtLeast(15)
+
+    val baseTopOffsetDp = (startMin.toFloat() / 60f) * hourHeight.value
+    val blockHeightDp = (durationMin.toFloat() / 60f) * hourHeight.value
+
+    val hourHeightPx = with(density) { hourHeight.toPx() }
+    val minutesPerPx = 60f / hourHeightPx
+
+    val animSpringOffset = remember { Animatable(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var isSettling by remember { mutableStateOf(false) }
+
+    var settlingTargetTopOffsetDp by remember { mutableFloatStateOf(0f) }
+    var settlingStartStr by remember { mutableStateOf("") }
+    var settlingEndStr by remember { mutableStateOf("") }
+
+    LaunchedEffect(plan.startTime, plan.endTime) {
+        if (!isSettling && !isDragging) {
+            dragOffsetY = 0f
+            animSpringOffset.snapTo(0f)
+        }
+    }
+
+    val currentDeltaMin = if (isDragging) {
+        (dragOffsetY * minutesPerPx).roundToInt()
+    } else 0
+    val originalStartTotalMin = CalendarModel.timeToMinutes(plan.startTime)
+    val planDurationMin = CalendarModel.timeToMinutes(plan.endTime) - originalStartTotalMin
+    val rawPreviewStartMin = originalStartTotalMin + currentDeltaMin
+    val maxStart = maxOf(0, ((1439 - planDurationMin) / 15) * 15)
+    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(0, maxStart)
+    val snappedPreviewEndMin = snappedPreviewStartMin + planDurationMin
+
+    val previewStartStr = CalendarModel.minutesToTime(snappedPreviewStartMin)
+    val previewEndStr = CalendarModel.minutesToTime(snappedPreviewEndMin)
+
+    val displayStartStr = if (isSettling) settlingStartStr else if (isDragging) previewStartStr else plan.startTime
+    val displayEndStr = if (isSettling) settlingEndStr else if (isDragging) previewEndStr else plan.endTime
+
+    val elevation by animateDpAsState(
+        targetValue = if (isDragging) 8.dp else 0.dp,
+        animationSpec = fastEffectsSpec,
+        label = "dragElevation"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isDragging) 1.03f else 1f,
+        animationSpec = fastSpatialSpec,
+        label = "dragScale"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isDragging) 2.dp else 1.dp,
+        animationSpec = fastEffectsSpec,
+        label = "dragBorderWidth"
+    )
+    val surfaceColor by animateColorAsState(
+        targetValue = if (isDragging) accent.copy(alpha = 0.28f) else accent.copy(alpha = 0.16f),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "dragSurfaceColor"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isDragging) accent else accent.copy(alpha = 0.5f),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "dragBorderColor"
+    )
+
+    val activeTopOffsetDp = if (isSettling) settlingTargetTopOffsetDp else baseTopOffsetDp
+    val activeOffsetPx = if (isSettling) animSpringOffset.value else dragOffsetY
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = activeTopOffsetDp.dp)
+            .height(blockHeightDp.dp)
+            .offset { IntOffset(0, activeOffsetPx.roundToInt()) }
+            .zIndex(if (isDragging || isSettling) 10f else 1f)
+    ) {
+        if (layout.column > 0) {
+            Spacer(modifier = Modifier.weight(layout.column.toFloat()))
+        }
+
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(horizontal = 2.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .pointerInput(plan.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            isDragging = true
+                            isSettling = false
+                            dragOffsetY = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetY += dragAmount.y
+                        },
+                        onDragEnd = {
+                            val finalDragOffsetY = dragOffsetY
+                            val origStartMin = CalendarModel.timeToMinutes(currentPlan.startTime)
+                            val origEndMin = CalendarModel.timeToMinutes(currentPlan.endTime)
+                            val durMin = (origEndMin - origStartMin).coerceAtLeast(15)
+                            val deltaMin = (finalDragOffsetY * minutesPerPx).roundToInt()
+                            val rawStartMin = origStartMin + deltaMin
+                            val maxStartSlot = maxOf(0, ((1439 - durMin) / 15) * 15)
+                            val targetStartMin = (((rawStartMin + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+                            val targetEndMin = targetStartMin + durMin
+
+                            val targetSnapOffsetY = ((targetStartMin - origStartMin).toFloat() / 60f) * hourHeightPx
+
+                            val targetStartStr = CalendarModel.minutesToTime(targetStartMin)
+                            val targetEndStr = CalendarModel.minutesToTime(targetEndMin)
+
+                            val targetTopDp = (targetStartMin - startHour * 60).toFloat() / 60f * hourHeight.value
+                            val initialSpringOffset = finalDragOffsetY - targetSnapOffsetY
+
+                            settlingTargetTopOffsetDp = targetTopDp
+                            settlingStartStr = targetStartStr
+                            settlingEndStr = targetEndStr
+
+                            coroutineScope.launch {
+                                isSettling = true
+                                isDragging = false
+                                dragOffsetY = 0f
+
+                                // 立即提交变更到数据层，后台异步持久化与重排，避免等待动画完成后才提交造成停顿
+                                if (targetStartStr != currentPlan.startTime || targetEndStr != currentPlan.endTime) {
+                                    currentOnReschedule(currentPlan.id, targetStartStr, targetEndStr)
+                                }
+
+                                // 果冻超调吸附：从松手位置无缝弹簧落位至槽位中心，基准锚定在目标槽位，彻底消除双重偏移闪烁
+                                animSpringOffset.snapTo(initialSpringOffset)
+                                animSpringOffset.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = currentFloatSpringSpec
+                                )
+
+                                isSettling = false
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                isSettling = true
+                                isDragging = false
+                                settlingTargetTopOffsetDp = baseTopOffsetDp
+                                animSpringOffset.snapTo(dragOffsetY)
+                                dragOffsetY = 0f
+                                animSpringOffset.animateTo(0f, animationSpec = currentFloatSpringSpec)
+                                isSettling = false
+                            }
+                        }
+                    )
+                }
+                .clickable(enabled = !isDragging && !isSettling) { onPlanClick(plan) },
+            shape = ShapeTokens.Small,
+            color = surfaceColor,
+            border = BorderStroke(width = borderWidth, color = borderColor),
+            shadowElevation = elevation
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            ) {
+                if (blockHeightDp < 32f) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = plan.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = if (isDragging || isSettling) "$displayStartStr-$displayEndStr" else plan.startTime,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Text(
+                            text = plan.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
+                        )
+                        Text(
+                            text = if (isDragging || isSettling) "$displayStartStr-$displayEndStr" else "${plan.startTime}-${plan.endTime}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDragging || isSettling) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (isDragging || isSettling) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+
+                // 拖拽过程中在右上角显示实时吸附时间胶囊
+                if (isDragging) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp),
+                        shape = ShapeTokens.Full,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shadowElevation = 4.dp
+                    ) {
+                        Text(
+                            text = previewStartStr,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        val trailingCount = layout.columnCount - 1 - layout.column
+        if (trailingCount > 0) {
+            Spacer(modifier = Modifier.weight(trailingCount.toFloat()))
+        }
+    }
+}
+
+/**
+ * 日视图：垂直 24 小时时间轴与分列计划块（支持果冻拖拽调整与流淌波浪指示线）
  */
 @Composable
 private fun DayTimelineView(
+    currentDate: LocalDate,
     plans: List<DailyPlan>,
     onPlanClick: (DailyPlan) -> Unit,
     onToggleDone: (String, Boolean) -> Unit,
     onDeletePlan: (String) -> Unit,
+    onReschedulePlan: (String, String, String) -> Unit,
     getProjectColor: (String?) -> String,
     modifier: Modifier = Modifier
 ) {
-    if (plans.isEmpty()) {
-        TaskOrbitEmptyState(
-            icon = Icons.Outlined.CalendarMonth,
-            title = "今日暂无计划",
-            description = "点击右下角按钮添加你的时间安排。",
-            modifier = modifier
-        )
-        return
+    val hourHeight = 64.dp
+    val density = LocalDensity.current
+    val today = remember { LocalDate.now() }
+    val isToday = currentDate == today
+
+    // 每 15 秒更新一次当前时刻，使指示线平滑随时间推进
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    LaunchedEffect(isToday) {
+        if (isToday) {
+            while (true) {
+                currentTime = LocalTime.now()
+                delay(15_000)
+            }
+        }
     }
 
-    val hourHeight = 64.dp
-    val (startHour, endHour) = remember(plans) { CalendarModel.visibleHourRange(plans) }
+    // 动态小时范围：若是今天，保证当前小时必定包含在视图之内（自动扩展边界，即使在清晨、深夜或不同时区）
+    val (startHour, endHour) = remember(plans, isToday, currentTime.hour) {
+        CalendarModel.visibleHourRange(
+            plans = plans,
+            includeHour = if (isToday) currentTime.hour else null
+        )
+    }
     val layouts = remember(plans) { CalendarModel.layoutPlanColumns(plans) }
 
     val scrollState = rememberScrollState()
 
+    // 初始进入或切换至今天时，平滑自动滚动居中当前时间线，避免停留在顶部看不见指示线
+    LaunchedEffect(isToday, startHour) {
+        if (isToday) {
+            val currentMinutes = currentTime.hour * 60 + currentTime.minute
+            val visibleStartMinutes = startHour * 60
+            val offsetDp = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
+            val targetScrollDp = maxOf(0f, offsetDp - 140f)
+            val targetScrollPx = with(density) { targetScrollDp.dp.roundToPx() }
+            scrollState.animateScrollTo(targetScrollPx)
+        }
+    }
+
     Box(modifier = modifier.verticalScroll(scrollState)) {
+        // 小时背景线
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -400,7 +871,6 @@ private fun DayTimelineView(
                         .fillMaxWidth()
                         .height(hourHeight)
                 ) {
-                    // 小时背景线
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -439,86 +909,71 @@ private fun DayTimelineView(
                 .fillMaxWidth()
                 .padding(start = 60.dp, end = 16.dp, top = 16.dp)
         ) {
-            plans.forEach { plan ->
-                val startMin = CalendarModel.timeToMinutes(plan.startTime) - startHour * 60
-                val endMin = CalendarModel.timeToMinutes(plan.endTime) - startHour * 60
-                val durationMin = (endMin - startMin).coerceAtLeast(20)
-
-                val topOffset = (startMin.toFloat() / 60f) * hourHeight.value
-                val blockHeight = (durationMin.toFloat() / 60f) * hourHeight.value
-
-                val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
-                val colFraction = 1f / layout.columnCount
-
-                val colorKey = getProjectColor(plan.projectId)
-                val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
-
-                Row(
+            if (plans.isEmpty()) {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = topOffset.dp)
-                        .height(blockHeight.dp)
+                        .padding(top = 32.dp, end = 16.dp),
+                    shape = ShapeTokens.Medium,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f)
                 ) {
-                    if (layout.column > 0) {
-                        Spacer(modifier = Modifier.fillMaxWidth(layout.column * colFraction))
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(colFraction)
-                            .fillMaxHeight()
-                            .padding(horizontal = 2.dp)
-                            .clip(ShapeTokens.Small)
-                            .background(accent.copy(alpha = 0.16f))
-                            .border(1.dp, accent.copy(alpha = 0.5f), ShapeTokens.Small)
-                            .clickable { onPlanClick(plan) }
-                            .padding(6.dp)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = plan.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
-                            )
-                            Text(
-                                text = "${plan.startTime}-${plan.endTime}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "今日暂无日程计划，点击右下角按钮添加安排",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                plans.forEach { plan ->
+                    key(plan.id) {
+                        val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
+                        val colorKey = getProjectColor(plan.projectId)
+                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+
+                        DraggablePlanBlock(
+                            plan = plan,
+                            startHour = startHour,
+                            hourHeight = hourHeight,
+                            layout = layout,
+                            accent = accent,
+                            onPlanClick = onPlanClick,
+                            onReschedulePlan = onReschedulePlan
+                        )
                     }
                 }
             }
+        }
 
-            // 当前时间红线指示器
-            val now = java.time.LocalTime.now()
-            val currentMinutes = now.hour * 60 + now.minute
+        // 动态时间波浪轴（Timeline Wave Cursor）
+        if (isToday) {
+            val currentMinutes = currentTime.hour * 60 + currentTime.minute
             val visibleStartMinutes = startHour * 60
-            val visibleEndMinutes = (endHour + 1) * 60
-            if (currentMinutes in visibleStartMinutes..visibleEndMinutes) {
-                val currentOffset = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = (currentOffset - 4).dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(ShapeTokens.Full)
-                            .background(MaterialTheme.colorScheme.error)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(MaterialTheme.colorScheme.error)
-                    )
-                }
-            }
+            val currentOffsetDp = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
+            TimelineWaveCursor(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 46.dp, end = 16.dp)
+                    .offset {
+                        IntOffset(
+                            x = 0,
+                            y = (8f + currentOffsetDp).dp.roundToPx()
+                        )
+                    }
+                    .zIndex(20f),
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }
@@ -605,7 +1060,7 @@ private fun WeekPlansView(
                                 .clip(ShapeTokens.Small)
                                 .background(accent.copy(alpha = 0.16f))
                                 .border(1.dp, accent.copy(alpha = 0.4f), ShapeTokens.Small)
-                                .clickable { onPlanClick(plan) }
+                                .bouncyClickable { onPlanClick(plan) }
                                 .padding(6.dp)
                         ) {
                             Column {

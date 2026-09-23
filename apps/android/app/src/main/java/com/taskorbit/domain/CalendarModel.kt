@@ -105,12 +105,15 @@ object CalendarModel {
         return layouts
     }
 
-    fun visibleHourRange(plans: List<DailyPlan>): Pair<Int, Int> {
+    fun visibleHourRange(plans: List<DailyPlan>, includeHour: Int? = null): Pair<Int, Int> {
         val earliest = if (plans.isNotEmpty()) plans.minOf { timeToMinutes(it.startTime) } else 8 * 60
         val latest = if (plans.isNotEmpty()) plans.maxOf { timeToMinutes(it.endTime) } else 18 * 60
 
-        val startHour = minOf(8, maxOf(0, earliest / 60))
-        val endHour = maxOf(20, minOf(24, (latest + 59) / 60))
+        val minLimit = if (includeHour != null) minOf(8, earliest / 60, includeHour) else minOf(8, earliest / 60)
+        val maxLimit = if (includeHour != null) maxOf(20, (latest + 59) / 60, includeHour + 1) else maxOf(20, (latest + 59) / 60)
+
+        val startHour = maxOf(0, minLimit)
+        val endHour = minOf(23, maxLimit)
         return Pair(startHour, endHour)
     }
 

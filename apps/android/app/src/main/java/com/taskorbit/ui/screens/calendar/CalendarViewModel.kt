@@ -104,6 +104,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         if (pId == null) emptyList() else state.tasks.filter { it.projectId == pId && !it.done }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    fun setMode(newMode: CalendarMode) {
+        mode.value = newMode
+        if (newMode == CalendarMode.DAY) {
+            selectedDate.value = anchorDate.value
+        }
+    }
+
     fun navigate(direction: Int) {
         val current = anchorDate.value
         val next = when (mode.value) {
@@ -205,6 +212,19 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun togglePlan(id: String, done: Boolean) {
         repository.togglePlan(id, done)
+    }
+
+    fun reschedulePlan(id: String, newStartTime: String, newEndTime: String, newDate: String? = null) {
+        val estimatedMinutes = CalendarModel.timeToMinutes(newEndTime) - CalendarModel.timeToMinutes(newStartTime)
+        repository.updatePlan(
+            id = id,
+            patch = DailyPlanPatch(
+                startTime = newStartTime,
+                endTime = newEndTime,
+                date = newDate,
+                estimatedMinutes = estimatedMinutes
+            )
+        )
     }
 
     fun removePlan(id: String) {
