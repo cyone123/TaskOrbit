@@ -2,12 +2,15 @@ package com.taskorbit.ui.screens.pomodoro
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -44,12 +47,15 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -73,6 +79,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -82,14 +89,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -412,12 +424,64 @@ fun TimerCountdownRing(
         Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
     }
 
+    val burstScale = remember { Animatable(0.4f) }
+    val burstAlpha = remember { Animatable(0f) }
+    val burstRotation = remember { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
+    val burstShape = MaterialShapes.Burst.toShape()
+
+    // 倒计时归零时触发盛大金色多边形绽放动效
+    LaunchedEffect(remainingMs) {
+        if (remainingMs <= 0L && progress <= 0.005f) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            launch {
+                burstScale.snapTo(0.5f)
+                burstAlpha.snapTo(0.85f)
+                burstRotation.snapTo(0f)
+                burstScale.animateTo(
+                    targetValue = 1.35f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
+            launch {
+                burstRotation.animateTo(
+                    targetValue = 45f,
+                    animationSpec = tween(1200, easing = FastOutSlowInEasing)
+                )
+            }
+            launch {
+                burstAlpha.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(1200, easing = FastOutSlowInEasing)
+                )
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .size(280.dp)
             .scale(pulseScale),
         contentAlignment = Alignment.Center
     ) {
+        // 0. 完成时刻“绽放（Blooming Burst）”金色辉光层
+        if (burstAlpha.value > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .size(280.dp)
+                    .scale(burstScale.value)
+                    .rotate(burstRotation.value)
+                    .alpha(burstAlpha.value)
+                    .background(
+                        color = Color(0xFFFFD700).copy(alpha = 0.35f),
+                        shape = burstShape
+                    )
+            )
+        }
+
         // 1. 发光背景光晕
         if (isRunning) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -559,6 +623,7 @@ fun TargetLinkCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TimerControlButtons(
     isRunning: Boolean,
@@ -569,14 +634,34 @@ fun TimerControlButtons(
     onSkip: () -> Unit,
     onReset: () -> Unit
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val playPauseCornerRadius by animateFloatAsState(
+        targetValue = if (isRunning) 22f else 36f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "playPauseCornerRadius"
+    )
+    val playPauseWidth by animateFloatAsState(
+        targetValue = if (isRunning) 116f else 96f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "playPauseWidth"
+    )
+
+    ButtonGroup(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.padding(horizontal = 24.dp)
     ) {
-        // 重置按钮
+        // 1. 重置胶囊按钮
         FilledTonalIconButton(
             onClick = onReset,
-            modifier = Modifier.size(48.dp).bouncyPress(),
+            modifier = Modifier
+                .size(56.dp)
+                .bouncyPress(),
+            shape = RoundedCornerShape(20.dp),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
@@ -584,37 +669,58 @@ fun TimerControlButtons(
             Icon(
                 imageVector = Icons.Default.Refresh,
                 contentDescription = "重置",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
             )
         }
 
-        // 主操作按钮：大号 FAB
-        LargeFloatingActionButton(
+        // 2. 主操作按钮：圆形 ↔ 药丸形弹性形变
+        FilledIconButton(
             onClick = {
                 if (isRunning) onPause() else onStart()
             },
-            containerColor = activeColor,
-            contentColor = MaterialTheme.colorScheme.surface,
-            shape = CircleShape,
-            modifier = Modifier.size(76.dp).bouncyPress()
+            modifier = Modifier
+                .height(56.dp)
+                .width(playPauseWidth.dp)
+                .bouncyPress(),
+            shape = RoundedCornerShape(playPauseCornerRadius.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = activeColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) {
             AnimatedContent(
                 targetState = isRunning,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "playPause"
+                label = "playPauseIcon"
             ) { running ->
-                Icon(
-                    imageVector = if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (running) "暂停" else "开始",
-                    modifier = Modifier.size(36.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (running) "暂停" else "开始",
+                        modifier = Modifier.size(30.dp)
+                    )
+                    if (running) {
+                        Text(
+                            text = "暂停",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
 
-        // 跳过阶段按钮
+        // 3. 跳过阶段胶囊按钮
         FilledTonalIconButton(
             onClick = onSkip,
-            modifier = Modifier.size(48.dp).bouncyPress(),
+            modifier = Modifier
+                .size(56.dp)
+                .bouncyPress(),
+            shape = RoundedCornerShape(20.dp),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
@@ -622,7 +728,8 @@ fun TimerControlButtons(
             Icon(
                 imageVector = Icons.Default.SkipNext,
                 contentDescription = "跳过当前阶段",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
             )
         }
     }

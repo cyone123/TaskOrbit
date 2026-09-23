@@ -2,12 +2,14 @@ package com.taskorbit.ui.screens.inbox
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,13 +28,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,13 +48,19 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.TonalToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
@@ -69,9 +83,17 @@ import com.taskorbit.ui.theme.ShapeTokens
 import com.taskorbit.ui.theme.SuccessDark
 import com.taskorbit.ui.theme.SuccessLight
 
-@OptIn(ExperimentalMaterial3Api::class)
+enum class InboxFilter(val label: String) {
+    ALL("全部"),
+    TODO("待办"),
+    DONE("已完成"),
+    NOTE("备忘")
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun InboxScreen(
+    onNavigateToPomodoro: (() -> Unit)? = null,
     viewModel: InboxViewModel = viewModel()
 ) {
     val items by viewModel.inboxItems.collectAsState()
@@ -80,7 +102,19 @@ fun InboxScreen(
     val kind by viewModel.kind.collectAsState()
     val isFocused by viewModel.isFocused.collectAsState()
 
+    var selectedFilter by remember { mutableStateOf(InboxFilter.ALL) }
+    var isFabMenuExpanded by remember { mutableStateOf(false) }
+
     val isNoteExpanded = kind == InboxItemKind.NOTE && isFocused
+
+    val filteredItems = remember(items, selectedFilter) {
+        when (selectedFilter) {
+            InboxFilter.ALL -> items
+            InboxFilter.TODO -> items.filter { it.kind == InboxItemKind.TODO && !it.done }
+            InboxFilter.DONE -> items.filter { it.done }
+            InboxFilter.NOTE -> items.filter { it.kind == InboxItemKind.NOTE }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -92,6 +126,59 @@ fun InboxScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButtonMenu(
+                expanded = isFabMenuExpanded,
+                button = {
+                    ToggleFloatingActionButton(
+                        checked = isFabMenuExpanded,
+                        onCheckedChange = { isFabMenuExpanded = it }
+                    ) {
+                        val rotation by animateFloatAsState(
+                            targetValue = if (isFabMenuExpanded) 45f else 0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "fabRotation"
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = if (isFabMenuExpanded) "关闭菜单" else "新建操作",
+                            modifier = Modifier.rotate(rotation)
+                        )
+                    }
+                },
+                horizontalAlignment = Alignment.End
+            ) {
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        isFabMenuExpanded = false
+                        if (kind != InboxItemKind.TODO) viewModel.toggleKind()
+                        viewModel.onFocusChange(true)
+                    },
+                    text = { Text("新建待办") },
+                    icon = { Icon(Icons.Filled.CheckBox, contentDescription = null) }
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        isFabMenuExpanded = false
+                        if (kind != InboxItemKind.NOTE) viewModel.toggleKind()
+                        viewModel.onFocusChange(true)
+                    },
+                    text = { Text("记录备忘") },
+                    icon = { Icon(Icons.Outlined.Description, contentDescription = null) }
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        isFabMenuExpanded = false
+                        onNavigateToPomodoro?.invoke()
+                    },
+                    text = { Text("开启专注") },
+                    icon = { Icon(Icons.Outlined.Timer, contentDescription = null) }
+                )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -114,22 +201,63 @@ fun InboxScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
+            // Expressive 分类过滤胶囊
+            ButtonGroup(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                InboxFilter.entries.forEach { filter ->
+                    val count = when (filter) {
+                        InboxFilter.ALL -> items.size
+                        InboxFilter.TODO -> items.count { it.kind == InboxItemKind.TODO && !it.done }
+                        InboxFilter.DONE -> items.count { it.done }
+                        InboxFilter.NOTE -> items.count { it.kind == InboxItemKind.NOTE }
+                    }
+                    TonalToggleButton(
+                        checked = selectedFilter == filter,
+                        onCheckedChange = { selectedFilter = filter },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "${filter.label} $count",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             // 列表区域
-            if (items.isEmpty()) {
+            if (filteredItems.isEmpty()) {
+                val emptyDesc = when (selectedFilter) {
+                    InboxFilter.ALL -> "把脑海里的事先记下来，之后再慢慢整理。"
+                    InboxFilter.TODO -> "目前没有未完成的待办事项，太棒了！"
+                    InboxFilter.DONE -> "暂无已完成项，继续加油。"
+                    InboxFilter.NOTE -> "暂无记录的备忘笔记。"
+                }
                 TaskOrbitEmptyState(
                     icon = Icons.Outlined.Inbox,
-                    title = "收件箱是空的",
-                    description = "把脑海里的事先记下来，之后再慢慢整理。",
+                    title = "暂无内容",
+                    description = emptyDesc,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        top = 8.dp,
+                        end = 16.dp,
+                        bottom = 80.dp // 给浮动 FAB 菜单预留底部空间
+                    ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
-                        items = items,
+                        items = filteredItems,
                         key = { it.id }
                     ) { item ->
                         InboxItemRow(

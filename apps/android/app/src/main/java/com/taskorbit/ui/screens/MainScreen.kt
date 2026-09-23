@@ -80,7 +80,17 @@ fun MainScreen(
             }
         ) {
             composable(Destination.Inbox.route) {
-                com.taskorbit.ui.screens.inbox.InboxScreen()
+                com.taskorbit.ui.screens.inbox.InboxScreen(
+                    onNavigateToPomodoro = {
+                        navController.navigate(Destination.Pomodoro.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(Destination.Projects.route) {
                 com.taskorbit.ui.screens.projects.ProjectsScreen(
