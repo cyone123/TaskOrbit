@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -129,6 +130,9 @@ fun InboxScreen(
         },
         floatingActionButton = {
             FloatingActionButtonMenu(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 76.dp),
                 expanded = isFabMenuExpanded,
                 button = {
                     ToggleFloatingActionButton(
@@ -252,7 +256,7 @@ fun InboxScreen(
                         start = 16.dp,
                         top = 8.dp,
                         end = 16.dp,
-                        bottom = 80.dp // 给浮动 FAB 菜单预留底部空间
+                        bottom = 110.dp // 给悬浮底栏和 FAB 预留底部充足滑动空间
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {

@@ -257,7 +257,7 @@ fun PomodoroScreen(
                     .padding(horizontal = 20.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 

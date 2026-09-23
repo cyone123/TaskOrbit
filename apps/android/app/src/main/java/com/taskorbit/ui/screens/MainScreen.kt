@@ -14,9 +14,9 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -39,31 +39,13 @@ fun MainScreen(
 
     val isTopLevel = TOP_LEVEL_DESTINATIONS.any { it.route == currentRoute }
 
-    Scaffold(
-        bottomBar = {
-            if (isTopLevel) {
-                TaskOrbitNavigationBar(
-                    items = TOP_LEVEL_DESTINATIONS,
-                    currentRoute = currentRoute,
-                    onItemClick = { item ->
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                )
-            }
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
         NavHost(
             navController = navController,
             startDestination = Destination.Inbox.route,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             enterTransition = {
                 fadeIn(animationSpec = tween(MotionTokens.DurationMedium2, easing = MotionTokens.StandardEasing)) +
                     scaleIn(initialScale = 0.96f, animationSpec = tween(MotionTokens.DurationMedium2, easing = MotionTokens.StandardEasing))
@@ -150,5 +132,23 @@ fun MainScreen(
                 com.taskorbit.ui.screens.stats.StatsScreen()
             }
         }
+
+        if (isTopLevel) {
+            TaskOrbitNavigationBar(
+                items = TOP_LEVEL_DESTINATIONS,
+                currentRoute = currentRoute,
+                onItemClick = { item ->
+                    navController.navigate(item.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
     }
 }
+

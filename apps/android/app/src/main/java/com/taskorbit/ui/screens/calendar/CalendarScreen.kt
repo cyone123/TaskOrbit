@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,6 +52,9 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.TonalToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,7 +64,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -87,7 +95,7 @@ import com.taskorbit.ui.theme.ShapeTokens
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CalendarScreen(
     viewModel: CalendarViewModel = viewModel()
@@ -105,6 +113,22 @@ fun CalendarScreen(
     val monthPlanCounts by viewModel.monthPlanCounts.collectAsState()
 
     val isPlanFormOpen by viewModel.isPlanFormOpen.collectAsState()
+
+    // Expressive 浮岛伸缩状态与滚动感知
+    var isAppBarExpanded by remember { mutableStateOf(true) }
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (delta < -8f && isAppBarExpanded) {
+                    isAppBarExpanded = false
+                } else if (delta > 8f && !isAppBarExpanded) {
+                    isAppBarExpanded = true
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     val headingText = remember(mode, anchorDate) {
         when (mode) {
@@ -145,112 +169,185 @@ fun CalendarScreen(
                 onClick = { viewModel.openNewPlanForm() },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = ShapeTokens.Large
+                shape = ShapeTokens.Large,
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 76.dp)
             ) {
                 Icon(Icons.Filled.Add, contentDescription = "新建计划")
             }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .nestedScroll(nestedScrollConnection)
         ) {
-            // 模式切换分段按钮
-            Row(
+            // 主视图内容区域（留出顶部悬浮胶囊空间）
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(top = 46.dp)
             ) {
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    val modes = listOf(CalendarMode.DAY to "日", CalendarMode.WEEK to "周", CalendarMode.MONTH to "月")
-                    modes.forEachIndexed { index, (m, label) ->
-                        SegmentedButton(
-                            selected = mode == m,
-                            onClick = { viewModel.mode.value = m },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
-                        ) {
-                            Text(label)
+                AnimatedContent(
+                    targetState = mode,
+                    transitionSpec = {
+                        fadeIn(tween(250)) togetherWith fadeOut(tween(150))
+                    },
+                    label = "calendarModeContent",
+                    modifier = Modifier.fillMaxSize()
+                ) { targetMode ->
+                    when (targetMode) {
+                        CalendarMode.DAY -> {
+                            DayTimelineView(
+                                plans = plansOfDay,
+                                onPlanClick = viewModel::openEditPlanForm,
+                                onToggleDone = viewModel::togglePlan,
+                                onDeletePlan = viewModel::removePlan,
+                                getProjectColor = viewModel::getProjectColor,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    }
-                }
-
-                if (mode == CalendarMode.WEEK) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    SingleChoiceSegmentedButtonRow {
-                        val subModes = listOf(WeekCalendarMode.PLANS to "计划", WeekCalendarMode.GANTT to "甘特")
-                        subModes.forEachIndexed { index, (wm, label) ->
-                            SegmentedButton(
-                                selected = weekMode == wm,
-                                onClick = { viewModel.weekMode.value = wm },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = subModes.size)
-                            ) {
-                                Text(label, style = MaterialTheme.typography.labelSmall)
+                        CalendarMode.WEEK -> {
+                            if (weekMode == WeekCalendarMode.PLANS) {
+                                WeekPlansView(
+                                    daysOfWeek = daysOfWeek,
+                                    plansOfWeek = plansOfWeek,
+                                    onPlanClick = viewModel::openEditPlanForm,
+                                    onToggleDone = viewModel::togglePlan,
+                                    getProjectColor = viewModel::getProjectColor,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                WeekGanttView(
+                                    daysOfWeek = daysOfWeek,
+                                    tasks = tasksInWeek,
+                                    getProjectColor = viewModel::getProjectColor,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
+                        }
+                        CalendarMode.MONTH -> {
+                            MonthCalendarView(
+                                anchorDate = anchorDate,
+                                selectedDate = selectedDate,
+                                monthDays = monthDays,
+                                planCounts = monthPlanCounts,
+                                plansOfDay = plansOfDay,
+                                onSelectDate = viewModel::selectDate,
+                                onPlanClick = viewModel::openEditPlanForm,
+                                onToggleDone = viewModel::togglePlan,
+                                onDeletePlan = viewModel::removePlan,
+                                getProjectColor = viewModel::getProjectColor,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 主视图渲染
-            AnimatedContent(
-                targetState = mode,
-                transitionSpec = {
-                    fadeIn(tween(250)) togetherWith fadeOut(tween(150))
-                },
-                label = "calendarModeContent",
-                modifier = Modifier.fillMaxSize()
-            ) { targetMode ->
-                when (targetMode) {
-                    CalendarMode.DAY -> {
-                        DayTimelineView(
-                            plans = plansOfDay,
-                            onPlanClick = viewModel::openEditPlanForm,
-                            onToggleDone = viewModel::togglePlan,
-                            onDeletePlan = viewModel::removePlan,
-                            getProjectColor = viewModel::getProjectColor,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    CalendarMode.WEEK -> {
-                        if (weekMode == WeekCalendarMode.PLANS) {
-                            WeekPlansView(
-                                daysOfWeek = daysOfWeek,
-                                plansOfWeek = plansOfWeek,
-                                onPlanClick = viewModel::openEditPlanForm,
-                                onToggleDone = viewModel::togglePlan,
-                                getProjectColor = viewModel::getProjectColor,
-                                modifier = Modifier.fillMaxSize()
+            // Expressive 顶部日历视图切换浮岛 (HorizontalFloatingAppBar)
+            com.taskorbit.ui.components.TaskOrbitFloatingAppBar(
+                expanded = isAppBarExpanded,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 6.dp)
+                    .clickable(enabled = !isAppBarExpanded) { isAppBarExpanded = true },
+                trailingContent = if (isAppBarExpanded && mode == CalendarMode.WEEK) {
+                    {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .height(18.dp)
+                                    .width(1.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                             )
-                        } else {
-                            WeekGanttView(
-                                daysOfWeek = daysOfWeek,
-                                tasks = tasksInWeek,
-                                getProjectColor = viewModel::getProjectColor,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            ButtonGroup(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                val subModes = listOf(WeekCalendarMode.PLANS to "计划", WeekCalendarMode.GANTT to "甘特")
+                                subModes.forEach { (wm, label) ->
+                                    val isSelected = weekMode == wm
+                                    TonalToggleButton(
+                                        checked = isSelected,
+                                        onCheckedChange = { viewModel.weekMode.value = wm },
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(label, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
                         }
                     }
-                    CalendarMode.MONTH -> {
-                        MonthCalendarView(
-                            anchorDate = anchorDate,
-                            selectedDate = selectedDate,
-                            monthDays = monthDays,
-                            planCounts = monthPlanCounts,
-                            plansOfDay = plansOfDay,
-                            onSelectDate = viewModel::selectDate,
-                            onPlanClick = viewModel::openEditPlanForm,
-                            onToggleDone = viewModel::togglePlan,
-                            onDeletePlan = viewModel::removePlan,
-                            getProjectColor = viewModel::getProjectColor,
-                            modifier = Modifier.fillMaxSize()
+                } else null
+            ) {
+                if (!isAppBarExpanded) {
+                    // 紧凑指示点模式：展示 3 个指示点（高亮当前激活的模式）+ 模式微标签，释放垂直阅读空间
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarMonth,
+                            contentDescription = "展开视图切换",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
                         )
+                        val currentModeIndex = when (mode) {
+                            CalendarMode.DAY -> 0
+                            CalendarMode.WEEK -> 1
+                            CalendarMode.MONTH -> 2
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(3) { index ->
+                                val isCurrent = index == currentModeIndex
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (isCurrent) 8.dp else 5.dp)
+                                        .clip(ShapeTokens.Full)
+                                        .background(
+                                            if (isCurrent) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                )
+                            }
+                        }
+                        Text(
+                            text = when (mode) {
+                                CalendarMode.DAY -> "日"
+                                CalendarMode.WEEK -> if (weekMode == WeekCalendarMode.PLANS) "周·计划" else "周·甘特"
+                                CalendarMode.MONTH -> "月"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                } else {
+                    // 展开态：Expressive 胶囊按钮组
+                    ButtonGroup(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val modes = listOf(CalendarMode.DAY to "日", CalendarMode.WEEK to "周", CalendarMode.MONTH to "月")
+                        modes.forEach { (m, label) ->
+                            val isSelected = mode == m
+                            TonalToggleButton(
+                                checked = isSelected,
+                                onCheckedChange = { viewModel.mode.value = m },
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
                     }
                 }
             }
