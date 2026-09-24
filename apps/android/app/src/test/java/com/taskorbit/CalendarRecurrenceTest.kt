@@ -81,7 +81,7 @@ class CalendarRecurrenceTest {
 
     @Test
     fun `taskRangeInWeek computes correct horizontal span indices`() {
-        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 21)) // 2026-09-21 (Mon) to 2026-09-27 (Sun)
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 21), java.time.DayOfWeek.MONDAY) // 2026-09-21 (Mon) to 2026-09-27 (Sun)
 
         // 任务跨越周二至周五
         val task1 = Task(id = "t1", projectId = "p1", name = "T1", startDate = "2026-09-22", endDate = "2026-09-25", createdAt = 0, updatedAt = 0)
@@ -94,6 +94,22 @@ class CalendarRecurrenceTest {
         val task2 = Task(id = "t2", projectId = "p1", name = "T2", startDate = "2026-09-10", endDate = "2026-09-15", createdAt = 0, updatedAt = 0)
         val range2 = CalendarModel.taskRangeInWeek(task2, weekDays)
         assertNull(range2)
+    }
+
+    @Test
+    fun `weekDays defaults to Sunday first and tasksByDate correctly maps tasks`() {
+        val sunWeekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23)) // Wednesday
+        assertEquals(java.time.DayOfWeek.SUNDAY, sunWeekDays.first().dayOfWeek)
+        assertEquals(java.time.DayOfWeek.SATURDAY, sunWeekDays.last().dayOfWeek)
+
+        val taskA = Task(id = "a", projectId = "p1", name = "A", startDate = "2026-09-20", endDate = "2026-09-21", createdAt = 0, updatedAt = 0)
+        val taskB = Task(id = "b", projectId = "p2", name = "B", startDate = "2026-09-21", endDate = "2026-09-22", createdAt = 0, updatedAt = 0)
+        val byDate = CalendarModel.tasksByDate(listOf(taskA, taskB), sunWeekDays)
+
+        assertEquals(1, byDate[LocalDate.of(2026, 9, 20)]?.size) // taskA only
+        assertEquals(2, byDate[LocalDate.of(2026, 9, 21)]?.size) // taskA and taskB
+        assertEquals(1, byDate[LocalDate.of(2026, 9, 22)]?.size) // taskB only
+        assertEquals(0, byDate[LocalDate.of(2026, 9, 23)]?.size) // none
     }
 
     @Test

@@ -29,6 +29,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,6 +44,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -80,6 +82,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -101,6 +104,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -151,6 +155,8 @@ fun CalendarScreen(
     val plansOfWeek by viewModel.plansOfWeek.collectAsState()
     val tasksInWeek by viewModel.tasksInWeek.collectAsState()
     val monthPlanCounts by viewModel.monthPlanCounts.collectAsState()
+    val tasksByDateInMonth by viewModel.tasksByDateInMonth.collectAsState()
+    val tasksOfDay by viewModel.tasksOfDay.collectAsState()
 
     val isPlanFormOpen by viewModel.isPlanFormOpen.collectAsState()
 
@@ -256,8 +262,11 @@ fun CalendarScreen(
                                 WeekPlansView(
                                     daysOfWeek = daysOfWeek,
                                     plansOfWeek = plansOfWeek,
+                                    selectedDate = selectedDate,
+                                    onSelectDate = viewModel::selectDate,
                                     onPlanClick = viewModel::openEditPlanForm,
                                     onToggleDone = viewModel::togglePlan,
+                                    onReschedulePlan = viewModel::reschedulePlan,
                                     getProjectColor = viewModel::getProjectColor,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -275,12 +284,10 @@ fun CalendarScreen(
                                 anchorDate = anchorDate,
                                 selectedDate = selectedDate,
                                 monthDays = monthDays,
-                                planCounts = monthPlanCounts,
-                                plansOfDay = plansOfDay,
+                                tasksByDate = tasksByDateInMonth,
+                                tasksOfDay = tasksOfDay,
                                 onSelectDate = viewModel::selectDate,
-                                onPlanClick = viewModel::openEditPlanForm,
-                                onToggleDone = viewModel::togglePlan,
-                                onDeletePlan = viewModel::removePlan,
+                                onToggleTaskDone = viewModel::toggleTask,
                                 getProjectColor = viewModel::getProjectColor,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -997,105 +1004,469 @@ private fun DayTimelineView(
 }
 
 /**
- * 周视图 - 每日计划（横向 7 列）
+ * 周视图 24 小时排期色块（支持跨天横向拖拽与纵向 15 分钟槽位吸附）
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DraggableWeekPlanBlock(
+    plan: DailyPlan,
+    dayIndex: Int,
+    daysOfWeek: List<LocalDate>,
+    columnWidth: Dp,
+    hourHeight: Dp,
+    hourGutterWidth: Dp,
+    layout: com.taskorbit.domain.PlanColumnLayout,
+    accent: Color,
+    onPlanClick: (DailyPlan) -> Unit,
+    onReschedulePlan: (String, String, String, String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+    val floatSpringSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val fastEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Dp>()
+    val fastSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+
+    val currentPlan by rememberUpdatedState(plan)
+    val currentOnReschedule by rememberUpdatedState(onReschedulePlan)
+    val currentFloatSpringSpec by rememberUpdatedState(floatSpringSpec)
+
+    val startMin = CalendarModel.timeToMinutes(plan.startTime)
+    val endMin = CalendarModel.timeToMinutes(plan.endTime)
+    val durationMin = (endMin - startMin).coerceAtLeast(15)
+
+    val baseTopOffsetDp = (startMin.toFloat() / 60f) * hourHeight.value
+    val blockHeightDp = (durationMin.toFloat() / 60f) * hourHeight.value
+
+    val subColWidthDp = columnWidth / layout.columnCount
+    val baseLeftOffsetDp = hourGutterWidth + (columnWidth * dayIndex) + (subColWidthDp * layout.column)
+    val blockWidthDp = (subColWidthDp - 2.dp).coerceAtLeast(8.dp)
+
+    val hourHeightPx = with(density) { hourHeight.toPx() }
+    val colWidthPx = with(density) { columnWidth.toPx() }
+    val minutesPerPx = 60f / hourHeightPx
+
+    val animSpringOffsetY = remember { Animatable(0f) }
+    val animSpringOffsetX = remember { Animatable(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var isSettling by remember { mutableStateOf(false) }
+
+    var settlingTargetTopDp by remember { mutableFloatStateOf(0f) }
+    var settlingTargetLeftDp by remember { mutableFloatStateOf(0f) }
+    var settlingStartStr by remember { mutableStateOf("") }
+    var settlingEndStr by remember { mutableStateOf("") }
+    var settlingDayName by remember { mutableStateOf("") }
+
+    LaunchedEffect(plan.startTime, plan.endTime, plan.date) {
+        if (!isSettling && !isDragging) {
+            dragOffsetY = 0f
+            dragOffsetX = 0f
+            animSpringOffsetY.snapTo(0f)
+            animSpringOffsetX.snapTo(0f)
+        }
+    }
+
+    val currentDeltaMin = if (isDragging) (dragOffsetY * minutesPerPx).roundToInt() else 0
+    val originalStartTotalMin = CalendarModel.timeToMinutes(plan.startTime)
+    val planDurationMin = (CalendarModel.timeToMinutes(plan.endTime) - originalStartTotalMin).coerceAtLeast(15)
+    val rawPreviewStartMin = originalStartTotalMin + currentDeltaMin
+    val maxStart = maxOf(0, ((1439 - planDurationMin) / 15) * 15)
+    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(0, maxStart)
+    val snappedPreviewEndMin = snappedPreviewStartMin + planDurationMin
+
+    val previewStartStr = CalendarModel.minutesToTime(snappedPreviewStartMin)
+    val previewEndStr = CalendarModel.minutesToTime(snappedPreviewEndMin)
+
+    val dayShift = if (isDragging) (dragOffsetX / colWidthPx).roundToInt() else 0
+    val targetDayIndex = (dayIndex + dayShift).coerceIn(0, daysOfWeek.size - 1)
+    val targetDay = daysOfWeek[targetDayIndex]
+    val targetDayName = when (targetDay.dayOfWeek) {
+        java.time.DayOfWeek.SUNDAY -> "周日"
+        java.time.DayOfWeek.MONDAY -> "周一"
+        java.time.DayOfWeek.TUESDAY -> "周二"
+        java.time.DayOfWeek.WEDNESDAY -> "周三"
+        java.time.DayOfWeek.THURSDAY -> "周四"
+        java.time.DayOfWeek.FRIDAY -> "周五"
+        java.time.DayOfWeek.SATURDAY -> "周六"
+    }
+
+    val displayStartStr = if (isSettling) settlingStartStr else if (isDragging) previewStartStr else plan.startTime
+    val displayDayName = if (isSettling) settlingDayName else if (isDragging) targetDayName else ""
+
+    val elevation by animateDpAsState(
+        targetValue = if (isDragging) 8.dp else 0.dp,
+        animationSpec = fastEffectsSpec,
+        label = "weekDragElevation"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isDragging) 1.03f else 1f,
+        animationSpec = fastSpatialSpec,
+        label = "weekDragScale"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isDragging) 2.dp else 1.dp,
+        animationSpec = fastEffectsSpec,
+        label = "weekDragBorderWidth"
+    )
+    val surfaceColor by animateColorAsState(
+        targetValue = if (isDragging) accent.copy(alpha = 0.42f) else accent.copy(alpha = 0.22f),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "weekDragSurfaceColor"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isDragging) accent else accent.copy(alpha = 0.55f),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "weekDragBorderColor"
+    )
+
+    val activeTopOffsetDp = if (isSettling) settlingTargetTopDp else baseTopOffsetDp
+    val activeLeftOffsetDp = if (isSettling) settlingTargetLeftDp else baseLeftOffsetDp.value
+    val activeOffsetYPx = if (isSettling) animSpringOffsetY.value else dragOffsetY
+    val activeOffsetXPx = if (isSettling) animSpringOffsetX.value else dragOffsetX
+
+    Box(
+        modifier = modifier
+            .offset(x = activeLeftOffsetDp.dp, y = activeTopOffsetDp.dp)
+            .width(blockWidthDp)
+            .height(blockHeightDp.dp)
+            .offset { IntOffset(activeOffsetXPx.roundToInt(), activeOffsetYPx.roundToInt()) }
+            .zIndex(if (isDragging || isSettling) 15f else 1f)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .pointerInput(plan.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            isDragging = true
+                            isSettling = false
+                            dragOffsetY = 0f
+                            dragOffsetX = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetY += dragAmount.y
+                            dragOffsetX += dragAmount.x
+                        },
+                        onDragEnd = {
+                            val finalDragOffsetY = dragOffsetY
+                            val finalDragOffsetX = dragOffsetX
+                            val origStartMin = CalendarModel.timeToMinutes(currentPlan.startTime)
+                            val origEndMin = CalendarModel.timeToMinutes(currentPlan.endTime)
+                            val durMin = (origEndMin - origStartMin).coerceAtLeast(15)
+
+                            val dMin = (finalDragOffsetY * minutesPerPx).roundToInt()
+                            val rStartMin = origStartMin + dMin
+                            val maxStartSlot = maxOf(0, ((1439 - durMin) / 15) * 15)
+                            val targetStartMin = (((rStartMin + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+                            val targetEndMin = targetStartMin + durMin
+
+                            val dShift = (finalDragOffsetX / colWidthPx).roundToInt()
+                            val tDayIndex = (dayIndex + dShift).coerceIn(0, daysOfWeek.size - 1)
+                            val tDay = daysOfWeek[tDayIndex]
+                            val tDayIso = tDay.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+
+                            val targetSnapOffsetY = ((targetStartMin - origStartMin).toFloat() / 60f) * hourHeightPx
+                            val targetSnapOffsetX = (tDayIndex - dayIndex) * colWidthPx
+
+                            val targetStartStr = CalendarModel.minutesToTime(targetStartMin)
+                            val targetEndStr = CalendarModel.minutesToTime(targetEndMin)
+
+                            val targetTopDp = (targetStartMin.toFloat() / 60f) * hourHeight.value
+                            val targetLeftDp = (hourGutterWidth + columnWidth * tDayIndex + subColWidthDp * layout.column).value
+
+                            val initialSpringOffsetY = finalDragOffsetY - targetSnapOffsetY
+                            val initialSpringOffsetX = finalDragOffsetX - targetSnapOffsetX
+
+                            settlingTargetTopDp = targetTopDp
+                            settlingTargetLeftDp = targetLeftDp
+                            settlingStartStr = targetStartStr
+                            settlingEndStr = targetEndStr
+                            settlingDayName = when (tDay.dayOfWeek) {
+                                java.time.DayOfWeek.SUNDAY -> "周日"
+                                java.time.DayOfWeek.MONDAY -> "周一"
+                                java.time.DayOfWeek.TUESDAY -> "周二"
+                                java.time.DayOfWeek.WEDNESDAY -> "周三"
+                                java.time.DayOfWeek.THURSDAY -> "周四"
+                                java.time.DayOfWeek.FRIDAY -> "周五"
+                                java.time.DayOfWeek.SATURDAY -> "周六"
+                            }
+
+                            coroutineScope.launch {
+                                isSettling = true
+                                isDragging = false
+                                dragOffsetY = 0f
+                                dragOffsetX = 0f
+
+                                if (targetStartStr != currentPlan.startTime || targetEndStr != currentPlan.endTime || tDayIso != currentPlan.date) {
+                                    currentOnReschedule(currentPlan.id, targetStartStr, targetEndStr, tDayIso)
+                                }
+
+                                animSpringOffsetY.snapTo(initialSpringOffsetY)
+                                animSpringOffsetX.snapTo(initialSpringOffsetX)
+
+                                launch { animSpringOffsetY.animateTo(0f, currentFloatSpringSpec) }
+                                launch { animSpringOffsetX.animateTo(0f, currentFloatSpringSpec) }
+
+                                isSettling = false
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                isSettling = true
+                                isDragging = false
+                                settlingTargetTopDp = baseTopOffsetDp
+                                settlingTargetLeftDp = baseLeftOffsetDp.value
+                                animSpringOffsetY.snapTo(dragOffsetY)
+                                animSpringOffsetX.snapTo(dragOffsetX)
+                                dragOffsetY = 0f
+                                dragOffsetX = 0f
+                                launch { animSpringOffsetY.animateTo(0f, currentFloatSpringSpec) }
+                                launch { animSpringOffsetX.animateTo(0f, currentFloatSpringSpec) }
+                                isSettling = false
+                            }
+                        }
+                    )
+                }
+                .clickable(enabled = !isDragging && !isSettling) { onPlanClick(plan) },
+            shape = ShapeTokens.Small,
+            color = surfaceColor,
+            border = BorderStroke(width = borderWidth, color = borderColor),
+            shadowElevation = elevation
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        text = plan.name,
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = if (blockHeightDp > 36f) 2 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
+                    )
+                    if (blockHeightDp >= 30f) {
+                        Text(
+                            text = if (isDragging || isSettling) displayStartStr else plan.startTime,
+                            style = TextStyle(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 拖拽过程中的实时浮动胶囊
+                if (isDragging) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(y = (-10).dp),
+                        shape = ShapeTokens.Full,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shadowElevation = 4.dp
+                    ) {
+                        Text(
+                            text = "$displayDayName $displayStartStr",
+                            style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 周视图 - 24 小时 7 列排期网格（支持整点时间标尺与拖拽跨天改期）
  */
 @Composable
 private fun WeekPlansView(
     daysOfWeek: List<LocalDate>,
     plansOfWeek: Map<LocalDate, List<DailyPlan>>,
+    selectedDate: LocalDate,
+    onSelectDate: (LocalDate) -> Unit,
     onPlanClick: (DailyPlan) -> Unit,
     onToggleDone: (String, Boolean) -> Unit,
+    onReschedulePlan: (String, String, String, String?) -> Unit,
     getProjectColor: (String?) -> String,
     modifier: Modifier = Modifier
 ) {
-    val hScrollState = rememberScrollState()
     val today = LocalDate.now()
+    val hourHeight = 60.dp
+    val hourGutterWidth = 38.dp
+    val totalHeight = hourHeight * 24
+    val density = LocalDensity.current
+    val vScrollState = rememberScrollState()
 
-    Row(
-        modifier = modifier
-            .horizontalScroll(hScrollState)
-            .padding(bottom = 88.dp)
-    ) {
-        daysOfWeek.forEach { day ->
-            val isToday = day == today
-            val plans = plansOfWeek[day] ?: emptyList()
+    // 默认平滑滚动至上午 8 点
+    LaunchedEffect(Unit) {
+        val targetScrollY = with(density) { (hourHeight * 8).toPx() }.roundToInt()
+        vScrollState.scrollTo(targetScrollY)
+    }
 
-            Column(
-                modifier = Modifier
-                    .width(130.dp)
-                    .fillMaxHeight()
-                    .border(
-                        width = if (isToday) 2.dp else 0.5.dp,
-                        color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                    )
-            ) {
-                // 列头：日期
+    Column(modifier = modifier.fillMaxSize()) {
+        // 固定周表头：星期与公历日期
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.width(hourGutterWidth))
+
+            daysOfWeek.forEach { day ->
+                val isToday = day == today
+                val isSelected = day == selectedDate
+                val weekDayName = when (day.dayOfWeek) {
+                    java.time.DayOfWeek.SUNDAY -> "日"
+                    java.time.DayOfWeek.MONDAY -> "一"
+                    java.time.DayOfWeek.TUESDAY -> "二"
+                    java.time.DayOfWeek.WEDNESDAY -> "三"
+                    java.time.DayOfWeek.THURSDAY -> "四"
+                    java.time.DayOfWeek.FRIDAY -> "五"
+                    java.time.DayOfWeek.SATURDAY -> "六"
+                }
+
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
-                        )
-                        .padding(vertical = 8.dp),
+                        .weight(1f)
+                        .clickable { onSelectDate(day) },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = when (day.dayOfWeek) {
-                            java.time.DayOfWeek.MONDAY -> "周一"
-                            java.time.DayOfWeek.TUESDAY -> "周二"
-                            java.time.DayOfWeek.WEDNESDAY -> "周三"
-                            java.time.DayOfWeek.THURSDAY -> "周四"
-                            java.time.DayOfWeek.FRIDAY -> "周五"
-                            java.time.DayOfWeek.SATURDAY -> "周六"
-                            java.time.DayOfWeek.SUNDAY -> "周日"
-                        },
+                        text = weekDayName,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = "${day.dayOfMonth}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                    else -> Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${day.dayOfMonth}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = when {
+                                isToday -> MaterialTheme.colorScheme.onPrimary
+                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // 分割线
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.8.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        )
+
+        // 24 小时 7 列时间网格
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(vScrollState)
+                .padding(bottom = 88.dp)
+        ) {
+            val availableWidth = maxWidth - hourGutterWidth
+            val columnWidth = availableWidth / 7
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(totalHeight)
+            ) {
+                // 1. 小时标尺与整点横向对齐线
+                for (h in 0..23) {
+                    val topOffset = hourHeight * h
+
+                    // 整点小时标签
+                    Box(
+                        modifier = Modifier
+                            .width(hourGutterWidth)
+                            .offset(y = topOffset)
+                            .padding(end = 6.dp),
+                        contentAlignment = Alignment.TopEnd
+                    ) {
+                        Text(
+                            text = String.format("%02d", h),
+                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+
+                    // 整点横向辅助线
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset(y = topOffset)
+                            .padding(start = hourGutterWidth)
+                            .height(0.8.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     )
                 }
 
-                // 计划列表
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(plans, key = { it.id }) { plan ->
+                // 2. 7 列纵向微弱分割线
+                for (i in 0..6) {
+                    val leftOffset = hourGutterWidth + columnWidth * i
+                    Box(
+                        modifier = Modifier
+                            .offset(x = leftOffset)
+                            .width(0.8.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
+                    )
+                }
+
+                // 3. 各天计划卡片（支持拖拽与重叠分列）
+                daysOfWeek.forEachIndexed { dayIdx, day ->
+                    val dayPlans = plansOfWeek[day] ?: emptyList()
+                    val layouts = CalendarModel.layoutPlanColumns(dayPlans)
+
+                    dayPlans.forEach { plan ->
+                        val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
                         val colorKey = getProjectColor(plan.projectId)
                         val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(ShapeTokens.Small)
-                                .background(accent.copy(alpha = 0.16f))
-                                .border(1.dp, accent.copy(alpha = 0.4f), ShapeTokens.Small)
-                                .bouncyClickable { onPlanClick(plan) }
-                                .padding(6.dp)
-                        ) {
-                            Column {
-                                Text(
-                                    text = plan.name,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
-                                )
-                                Text(
-                                    text = "${plan.startTime}-${plan.endTime}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                        key(plan.id) {
+                            DraggableWeekPlanBlock(
+                                plan = plan,
+                                dayIndex = dayIdx,
+                                daysOfWeek = daysOfWeek,
+                                columnWidth = columnWidth,
+                                hourHeight = hourHeight,
+                                hourGutterWidth = hourGutterWidth,
+                                layout = layout,
+                                accent = accent,
+                                onPlanClick = onPlanClick,
+                                onReschedulePlan = onReschedulePlan
+                            )
                         }
                     }
                 }
@@ -1220,19 +1591,17 @@ private fun WeekGanttView(
 }
 
 /**
- * 月视图：42 天月历网格与下方当日简表
+ * 月视图：42 天月历网格（展示项目彩色任务条）与选中日期任务清单联动
  */
 @Composable
 private fun MonthCalendarView(
     anchorDate: LocalDate,
     selectedDate: LocalDate,
     monthDays: List<LocalDate>,
-    planCounts: Map<String, Int>,
-    plansOfDay: List<DailyPlan>,
+    tasksByDate: Map<LocalDate, List<Task>>,
+    tasksOfDay: List<Task>,
     onSelectDate: (LocalDate) -> Unit,
-    onPlanClick: (DailyPlan) -> Unit,
-    onToggleDone: (String, Boolean) -> Unit,
-    onDeletePlan: (String) -> Unit,
+    onToggleTaskDone: (String, Boolean) -> Unit,
     getProjectColor: (String?) -> String,
     modifier: Modifier = Modifier
 ) {
@@ -1240,17 +1609,17 @@ private fun MonthCalendarView(
     val currentMonth = anchorDate.monthValue
 
     Column(modifier = modifier) {
-        // 星期头
+        // 星期头：日 一 二 三 四 五 六
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            listOf("一", "二", "三", "四", "五", "六", "日").forEach {
+            listOf("日", "一", "二", "三", "四", "五", "六").forEach {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
@@ -1262,7 +1631,7 @@ private fun MonthCalendarView(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = 4.dp)
         ) {
             val rows = monthDays.chunked(7)
             rows.forEach { week ->
@@ -1274,45 +1643,114 @@ private fun MonthCalendarView(
                         val isCurrentMonth = day.monthValue == currentMonth
                         val isToday = day == today
                         val isSelected = day == selectedDate
-                        val dateIso = day.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                        val count = planCounts[dateIso] ?: 0
+                        val tasks = tasksByDate[day] ?: emptyList()
 
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
-                                .padding(2.dp)
+                                .height(76.dp)
+                                .padding(1.5.dp)
                                 .clip(ShapeTokens.Small)
                                 .background(
                                     when {
-                                        isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                        isToday -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                        isSelected && !isToday -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                        isSelected && isToday -> MaterialTheme.colorScheme.surfaceContainerHighest
                                         else -> Color.Transparent
                                     }
                                 )
-                                .clickable { onSelectDate(day) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${day.dayOfMonth}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = when {
-                                        isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                        !isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                            shape = ShapeTokens.Small
+                                        )
+                                    } else Modifier
                                 )
-                                if (count > 0) {
+                                .clickable { onSelectDate(day) },
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // 公历日数字：当日以蓝色圆形徽章高亮
+                                if (isToday) {
                                     Box(
                                         modifier = Modifier
-                                            .size(4.dp)
-                                            .clip(ShapeTokens.Full)
-                                            .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${day.dayOfMonth}",
+                                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "${day.dayOfMonth}",
+                                            style = TextStyle(
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            ),
+                                            color = when {
+                                                !isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                                else -> MaterialTheme.colorScheme.onSurface
+                                            }
+                                        )
+                                    }
+                                }
+
+                                // 任务彩色横向小胶囊条（Task Bars）
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 2.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    val displayTasks = tasks.take(3)
+                                    displayTasks.forEach { task ->
+                                        val colorKey = getProjectColor(task.projectId)
+                                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(11.dp)
+                                                .clip(ShapeTokens.ExtraSmall)
+                                                .background(accent.copy(alpha = if (task.done) 0.25f else 0.45f))
+                                                .padding(horizontal = 2.dp),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            Text(
+                                                text = task.name,
+                                                style = TextStyle(fontSize = 8.5.sp, fontWeight = FontWeight.Medium),
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
                                             )
-                                    )
+                                        }
+                                    }
+
+                                    if (tasks.size > 3) {
+                                        Text(
+                                            text = "+${tasks.size - 3}",
+                                            style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1323,15 +1761,15 @@ private fun MonthCalendarView(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 当日计划列表
+        // 选中日期的任务清单
         Text(
-            text = "${selectedDate.format(DateTimeFormatter.ofPattern("M月d日"))} 计划 (${plansOfDay.size})",
+            text = "${selectedDate.format(DateTimeFormatter.ofPattern("M月d日"))} 任务 (${tasksOfDay.size})",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
-        if (plansOfDay.isEmpty()) {
+        if (tasksOfDay.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1339,7 +1777,7 @@ private fun MonthCalendarView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "选中的日期没有计划",
+                    text = "选中的日期没有排期任务",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1352,15 +1790,14 @@ private fun MonthCalendarView(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(plansOfDay, key = { it.id }) { plan ->
-                    val colorKey = getProjectColor(plan.projectId)
+                items(tasksOfDay, key = { it.id }) { task ->
+                    val colorKey = getProjectColor(task.projectId)
                     val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
 
                     TaskOrbitCard(
                         modifier = Modifier.fillMaxWidth(),
-                        variant = CardVariant.ELEVATED,
-                        shape = ShapeTokens.Medium,
-                        onClick = { onPlanClick(plan) }
+                        variant = CardVariant.OUTLINED,
+                        shape = ShapeTokens.Medium
                     ) {
                         Row(
                             modifier = Modifier
@@ -1369,32 +1806,34 @@ private fun MonthCalendarView(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TaskOrbitCheckbox(
-                                checked = plan.done,
-                                onCheckedChange = { done -> onToggleDone(plan.id, done) }
+                                checked = task.done,
+                                onCheckedChange = { done -> onToggleTaskDone(task.id, done) }
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(accent)
                             )
 
                             Spacer(modifier = Modifier.width(8.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = plan.name,
+                                    text = task.name,
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
+                                    textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
                                 )
                                 Text(
-                                    text = "${plan.startTime} - ${plan.endTime}",
+                                    text = "${task.startDate} ~ ${task.endDate}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-
-                            TaskOrbitIconButton(
-                                icon = Icons.Outlined.Delete,
-                                contentDescription = "删除",
-                                onClick = { onDeletePlan(plan.id) },
-                                danger = true
-                            )
                         }
                     }
                 }

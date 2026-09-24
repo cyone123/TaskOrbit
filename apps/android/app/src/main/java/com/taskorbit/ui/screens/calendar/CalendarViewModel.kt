@@ -84,6 +84,22 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             counts
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    val tasksByDateInMonth: StateFlow<Map<LocalDate, List<Task>>> = combine(
+        repository.state,
+        monthDays
+    ) { state, days ->
+        CalendarModel.tasksByDate(state.tasks, days)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val tasksOfDay: StateFlow<List<Task>> = combine(
+        repository.state,
+        selectedDate
+    ) { state, selDate ->
+        val iso = selDate.format(dateFormatter)
+        state.tasks.filter { it.startDate <= iso && it.endDate >= iso }
+            .sortedWith(compareBy<Task> { it.done }.thenBy { it.startDate })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // --- 表单状态 ---
     val isPlanFormOpen = MutableStateFlow(false)
     var editingPlanId: String? = null
@@ -212,6 +228,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun togglePlan(id: String, done: Boolean) {
         repository.togglePlan(id, done)
+    }
+
+    fun toggleTask(id: String, done: Boolean) {
+        repository.toggleTask(id, done)
     }
 
     fun reschedulePlan(id: String, newStartTime: String, newEndTime: String, newDate: String? = null) {

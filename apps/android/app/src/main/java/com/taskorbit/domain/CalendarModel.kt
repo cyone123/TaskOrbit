@@ -117,15 +117,23 @@ object CalendarModel {
         return Pair(startHour, endHour)
     }
 
-    fun weekDays(anchor: LocalDate): List<LocalDate> {
-        val monday = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        return (0..6).map { monday.plusDays(it.toLong()) }
+    fun weekDays(anchor: LocalDate, startOfWeek: DayOfWeek = DayOfWeek.SUNDAY): List<LocalDate> {
+        val start = anchor.with(TemporalAdjusters.previousOrSame(startOfWeek))
+        return (0..6).map { start.plusDays(it.toLong()) }
     }
 
-    fun monthGridDays(anchor: LocalDate): List<LocalDate> {
+    fun monthGridDays(anchor: LocalDate, startOfWeek: DayOfWeek = DayOfWeek.SUNDAY): List<LocalDate> {
         val firstDayOfMonth = anchor.withDayOfMonth(1)
-        val gridStart = firstDayOfMonth.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val gridStart = firstDayOfMonth.with(TemporalAdjusters.previousOrSame(startOfWeek))
         return (0 until 42).map { gridStart.plusDays(it.toLong()) }
+    }
+
+    fun tasksByDate(tasks: List<Task>, days: List<LocalDate>): Map<LocalDate, List<Task>> {
+        val map = days.associateWith { day ->
+            val iso = day.format(DATE_FORMATTER)
+            tasks.filter { it.startDate <= iso && it.endDate >= iso }
+        }
+        return map
     }
 
     fun taskRangeInWeek(task: Task, weekDays: List<LocalDate>): Pair<Int, Int>? {
