@@ -1,4 +1,5 @@
 import {
+  DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
   STATE_VERSION,
@@ -236,11 +237,7 @@ export function createDemoState(): AppState {
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
     settings: {
-      theme: "system",
-      focusMinutes: 25,
-      shortBreakMinutes: 5,
-      longBreakMinutes: 15,
-      longBreakInterval: 4,
+      ...DEFAULT_SETTINGS,
     },
   };
 }

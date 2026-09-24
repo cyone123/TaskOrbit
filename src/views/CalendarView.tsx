@@ -34,7 +34,11 @@ import {
   IconButton,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
+  OutlinedSelect,
+  SelectOption,
+  TextButton,
   TonalButton,
+  eventValue,
 } from "../components/material";
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
@@ -46,11 +50,6 @@ import {
 } from "../utils/calendarDrag";
 
 const HOUR_HEIGHT = 44;
-const DAY_START_HOUR = 6;
-const DAY_END_HOUR = 24;
-const DAY_TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR;
-const WEEK_DETAIL_START_HOUR = 6;
-const WEEK_DETAIL_END_HOUR = 24;
 
 type CalendarMode = "month" | "week" | "day";
 type WeekViewMode = "gantt" | "detail";
@@ -84,7 +83,19 @@ export function CalendarView() {
   const [weekView, setWeekView] = useState<WeekViewMode>("gantt");
   const [monthFilter, setMonthFilter] = useState<MonthViewFilter>("all");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
+  const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const weekDetailStartHour = state.settings.weekDetailStartHour ?? 6;
+  const weekDetailEndHour = state.settings.weekDetailEndHour ?? 24;
+  const weekDetailTotalHours = Math.max(1, weekDetailEndHour - weekDetailStartHour);
+
+  const dayStartHour = state.settings.dayStartHour ?? 6;
+  const dayEndHour = state.settings.dayEndHour ?? 24;
+  const dayTotalHours = Math.max(1, dayEndHour - dayStartHour);
+
+  const monthMaxTaskTracks = state.settings.monthMaxTaskTracks ?? 3;
+  const monthMaxDailyPlans = state.settings.monthMaxDailyPlans ?? 4;
 
   const [taskForm, setTaskForm] = useState<{
     open: boolean;
@@ -222,9 +233,10 @@ export function CalendarView() {
 
   useEffect(() => {
     if (mode === "day") {
-      contentRef.current?.parentElement?.scrollTo({ top: (8 - DAY_START_HOUR) * HOUR_HEIGHT });
+      const targetHour = Math.max(dayStartHour, 8);
+      contentRef.current?.parentElement?.scrollTo({ top: (targetHour - dayStartHour) * HOUR_HEIGHT });
     }
-  }, [mode, anchor]);
+  }, [mode, anchor, dayStartHour]);
 
   const colorForProject = (projectId: string | null): string => {
     const project = projectId ? projectById.get(projectId) : null;
@@ -346,8 +358,8 @@ export function CalendarView() {
         }
       }
 
-      const startHour = current.view === "day" ? DAY_START_HOUR : WEEK_DETAIL_START_HOUR;
-      const endHour = current.view === "day" ? DAY_END_HOUR : WEEK_DETAIL_END_HOUR;
+      const startHour = current.view === "day" ? dayStartHour : weekDetailStartHour;
+      const endHour = current.view === "day" ? dayEndHour : weekDetailEndHour;
 
       const computed = computeDraggedPlanTimes({
         mode: current.mode,
@@ -471,6 +483,13 @@ export function CalendarView() {
         </div>
 
         <div className="row gap-8 calendar-toolbar__actions">
+          <IconButton
+            onClick={() => setCalendarSettingsOpen(true)}
+            aria-label="日历设置"
+            title="日历设置"
+          >
+            <Icon name="settings" />
+          </IconButton>
           <FilledButton onClick={() => openNewPlan()}>
             <Icon name="add" size={18} slot="icon" /> 添加计划
           </FilledButton>
@@ -574,7 +593,8 @@ export function CalendarView() {
             {monthWeeks.map((week, weekIdx) => {
               const weekSegments = layoutMonthWeekTasks(state.tasks, week);
               const maxTrack = weekSegments.reduce((m, s) => Math.max(m, s.trackIndex), -1);
-              const trackCount = maxTrack + 1;
+              const trackCount = Math.min(maxTrack + 1, monthMaxTaskTracks);
+              const visibleSegments = weekSegments.filter((s) => s.trackIndex < monthMaxTaskTracks);
 
               return (
                 <div key={`week-${weekIdx}`} className="month-calendar__week-row">
@@ -618,14 +638,14 @@ export function CalendarView() {
                     </div>
 
                     {/* Multi-day Task Bars */}
-                    {showTasks && weekSegments.length > 0 && (
+                    {showTasks && visibleSegments.length > 0 && (
                       <div
                         className="month-calendar__task-tracks"
                         style={{
                           gridTemplateRows: `repeat(${trackCount}, 22px)`,
                         }}
                       >
-                        {weekSegments.map((segment) => {
+                        {visibleSegments.map((segment) => {
                           const { task, startCol, endCol, isStart, isEnd, trackIndex } = segment;
                           const project = projectById.get(task.projectId);
                           const spanCols = endCol - startCol + 1;
@@ -678,13 +698,15 @@ export function CalendarView() {
                               .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
                           : [];
 
-                        const tasksInCol = showTasks
+                        const hiddenTasksInCol = showTasks
                           ? weekSegments.filter(
-                              (s) => s.startCol <= colIdx && s.endCol >= colIdx,
+                              (s) =>
+                                s.startCol <= colIdx &&
+                                s.endCol >= colIdx &&
+                                s.trackIndex >= monthMaxTaskTracks,
                             ).length
                           : 0;
-                        const maxPlans = Math.max(1, 4 - tasksInCol);
-                        const visiblePlans = dayPlans.slice(0, maxPlans);
+                        const visiblePlans = dayPlans.slice(0, monthMaxDailyPlans);
                         const hiddenPlansCount = dayPlans.length - visiblePlans.length;
 
                         return (
@@ -698,6 +720,19 @@ export function CalendarView() {
                               }
                             }}
                           >
+                            {hiddenTasksInCol > 0 && (
+                              <button
+                                type="button"
+                                className="month-calendar__more-tasks"
+                                onClick={() => {
+                                  setAnchor(day);
+                                  setMode("day");
+                                }}
+                                title={`该日还有 ${hiddenTasksInCol} 个任务未在月视图显示，点击查看日视图`}
+                              >
+                                +{hiddenTasksInCol} 任务
+                              </button>
+                            )}
                             {visiblePlans.map((plan) => (
                               <button
                                 key={`plan-${plan.id}`}
@@ -720,7 +755,7 @@ export function CalendarView() {
                                   setMode("day");
                                 }}
                               >
-                                还有 {hiddenPlansCount} 项
+                                还有 {hiddenPlansCount} 项计划
                               </button>
                             )}
                           </div>
@@ -881,9 +916,9 @@ export function CalendarView() {
             <div className="week-detail__body">
               <div className="week-detail__time-axis">
                 {Array.from(
-                  { length: WEEK_DETAIL_END_HOUR - WEEK_DETAIL_START_HOUR },
+                  { length: weekDetailTotalHours },
                   (_, index) => {
-                    const hour = WEEK_DETAIL_START_HOUR + index;
+                    const hour = weekDetailStartHour + index;
                     return (
                       <div key={hour} className="week-detail__time" style={{ height: HOUR_HEIGHT }}>
                         {`${String(hour).padStart(2, "0")}:00`}
@@ -907,13 +942,13 @@ export function CalendarView() {
                       {plansOfWeek[dayIndex].map((plan) => {
                         const start = timeToMinutes(plan.startTime);
                         const end = timeToMinutes(plan.endTime);
-                        const visibleStart = Math.max(start, WEEK_DETAIL_START_HOUR * 60);
-                        const visibleEnd = Math.min(end, WEEK_DETAIL_END_HOUR * 60);
+                        const visibleStart = Math.max(start, weekDetailStartHour * 60);
+                        const visibleEnd = Math.min(end, weekDetailEndHour * 60);
                         const layout = layoutsOfWeek[dayIndex].get(plan.id) ?? {
                           column: 0,
                           columnCount: 1,
                         };
-                        const top = ((visibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                        const top = ((visibleStart - weekDetailStartHour * 60) / 60) * HOUR_HEIGHT;
                         const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                         if (visibleEnd <= visibleStart) return null;
 
@@ -966,9 +1001,9 @@ export function CalendarView() {
                         (() => {
                           const pStart = timeToMinutes(dragPreview.startTime);
                           const pEnd = timeToMinutes(dragPreview.endTime);
-                          const pVisibleStart = Math.max(pStart, WEEK_DETAIL_START_HOUR * 60);
-                          const pVisibleEnd = Math.min(pEnd, WEEK_DETAIL_END_HOUR * 60);
-                          const pTop = ((pVisibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                          const pVisibleStart = Math.max(pStart, weekDetailStartHour * 60);
+                          const pVisibleEnd = Math.min(pEnd, weekDetailEndHour * 60);
+                          const pTop = ((pVisibleStart - weekDetailStartHour * 60) / 60) * HOUR_HEIGHT;
                           const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
 
                           return (
@@ -1010,10 +1045,10 @@ export function CalendarView() {
             <div className="timeline">
               <div
                 className="timeline__time-axis"
-                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
+                style={{ height: dayTotalHours * HOUR_HEIGHT }}
               >
-                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => {
-                  const hour = DAY_START_HOUR + index;
+                {Array.from({ length: dayTotalHours }, (_, index) => {
+                  const hour = dayStartHour + index;
                   return (
                     <div key={hour} className="timeline__hour" style={{ height: HOUR_HEIGHT }}>
                       {`${String(hour).padStart(2, "0")}:00`}
@@ -1024,9 +1059,9 @@ export function CalendarView() {
               <div
                 ref={timelineColRef}
                 className="timeline__col"
-                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
+                style={{ height: dayTotalHours * HOUR_HEIGHT }}
               >
-                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => (
+                {Array.from({ length: dayTotalHours }, (_, index) => (
                   <div
                     key={index}
                     className="timeline__grid-row"
@@ -1045,12 +1080,12 @@ export function CalendarView() {
                 {plansOfDay.map((plan) => {
                   const start = timeToMinutes(plan.startTime);
                   const end = timeToMinutes(plan.endTime);
-                  const visibleStart = Math.max(start, DAY_START_HOUR * 60);
-                  const visibleEnd = Math.min(end, DAY_END_HOUR * 60);
+                  const visibleStart = Math.max(start, dayStartHour * 60);
+                  const visibleEnd = Math.min(end, dayEndHour * 60);
                   if (visibleEnd <= visibleStart) return null;
 
                   const layout = layoutOfDay.get(plan.id) ?? { column: 0, columnCount: 1 };
-                  const top = ((visibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                  const top = ((visibleStart - dayStartHour * 60) / 60) * HOUR_HEIGHT;
                   const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                   const project = plan.projectId ? projectById.get(plan.projectId) : null;
                   const isThisDragging =
@@ -1109,9 +1144,9 @@ export function CalendarView() {
                   (() => {
                     const pStart = timeToMinutes(dragPreview.startTime);
                     const pEnd = timeToMinutes(dragPreview.endTime);
-                    const pVisibleStart = Math.max(pStart, DAY_START_HOUR * 60);
-                    const pVisibleEnd = Math.min(pEnd, DAY_END_HOUR * 60);
-                    const pTop = ((pVisibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                    const pVisibleStart = Math.max(pStart, dayStartHour * 60);
+                    const pVisibleEnd = Math.min(pEnd, dayEndHour * 60);
+                    const pTop = ((pVisibleStart - dayStartHour * 60) / 60) * HOUR_HEIGHT;
                     const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
 
                     return (
@@ -1269,6 +1304,233 @@ export function CalendarView() {
         onCancel={() => setConfirm((current) => ({ ...current, open: false }))}
         onConfirm={confirm.onConfirm}
       />
+
+      <CalendarSettingsDialog
+        open={calendarSettingsOpen}
+        onClose={() => setCalendarSettingsOpen(false)}
+      />
     </div>
+  );
+}
+
+interface CalendarSettingsDialogProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function CalendarSettingsDialog({ open, onClose }: CalendarSettingsDialogProps) {
+  const { state, updateSettings } = useStore();
+  const { show } = useSnackbar();
+  const s = state.settings;
+
+  const [weekDetailStartHour, setWeekDetailStartHour] = useState<number>(s.weekDetailStartHour ?? 6);
+  const [weekDetailEndHour, setWeekDetailEndHour] = useState<number>(s.weekDetailEndHour ?? 24);
+  const [dayStartHour, setDayStartHour] = useState<number>(s.dayStartHour ?? 6);
+  const [dayEndHour, setDayEndHour] = useState<number>(s.dayEndHour ?? 24);
+  const [monthMaxTaskTracks, setMonthMaxTaskTracks] = useState<number>(s.monthMaxTaskTracks ?? 3);
+  const [monthMaxDailyPlans, setMonthMaxDailyPlans] = useState<number>(s.monthMaxDailyPlans ?? 4);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    if (open) {
+      setWeekDetailStartHour(s.weekDetailStartHour ?? 6);
+      setWeekDetailEndHour(s.weekDetailEndHour ?? 24);
+      setDayStartHour(s.dayStartHour ?? 6);
+      setDayEndHour(s.dayEndHour ?? 24);
+      setMonthMaxTaskTracks(s.monthMaxTaskTracks ?? 3);
+      setMonthMaxDailyPlans(s.monthMaxDailyPlans ?? 4);
+      setError("");
+    }
+  }, [
+    open,
+    s.weekDetailStartHour,
+    s.weekDetailEndHour,
+    s.dayStartHour,
+    s.dayEndHour,
+    s.monthMaxTaskTracks,
+    s.monthMaxDailyPlans,
+  ]);
+
+  const handleReset = () => {
+    setWeekDetailStartHour(6);
+    setWeekDetailEndHour(24);
+    setDayStartHour(6);
+    setDayEndHour(24);
+    setMonthMaxTaskTracks(3);
+    setMonthMaxDailyPlans(4);
+    setError("");
+  };
+
+  const handleSave = () => {
+    if (weekDetailEndHour <= weekDetailStartHour) {
+      setError("周视图结束时间必须晚于起始时间");
+      return;
+    }
+    if (dayEndHour <= dayStartHour) {
+      setError("日视图结束时间必须晚于起始时间");
+      return;
+    }
+    updateSettings({
+      weekDetailStartHour,
+      weekDetailEndHour,
+      dayStartHour,
+      dayEndHour,
+      monthMaxTaskTracks,
+      monthMaxDailyPlans,
+    });
+    show("日历设置已保存");
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="日历显示设置"
+      actions={
+        <>
+          <TextButton type="button" onClick={handleReset}>
+            恢复默认
+          </TextButton>
+          <div style={{ flex: 1 }} />
+          <TextButton type="button" onClick={onClose}>
+            取消
+          </TextButton>
+          <FilledButton type="button" onClick={handleSave}>
+            保存
+          </FilledButton>
+        </>
+      }
+    >
+      <div className="calendar-settings-dialog">
+        <div className="calendar-settings-dialog__group">
+          <h4 className="calendar-settings-dialog__subtitle">周视图每日计划时间表</h4>
+          <div className="field__row">
+            <div className="field">
+              <OutlinedSelect
+                label="起始时间"
+                value={String(weekDetailStartHour)}
+                onChange={(e) => {
+                  setWeekDetailStartHour(Number(eventValue(e)));
+                  setError("");
+                }}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <SelectOption key={i} value={String(i)} selected={weekDetailStartHour === i}>
+                    <span slot="headline">
+                      {`${String(i).padStart(2, "0")}:00`}{i === 6 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+            <div className="field">
+              <OutlinedSelect
+                label="结束时间"
+                value={String(weekDetailEndHour)}
+                onChange={(e) => {
+                  setWeekDetailEndHour(Number(eventValue(e)));
+                  setError("");
+                }}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 24 }, (_, i) => i + 1).map((i) => (
+                  <SelectOption key={i} value={String(i)} selected={weekDetailEndHour === i}>
+                    <span slot="headline">
+                      {`${String(i).padStart(2, "0")}:00`}{i === 24 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+          </div>
+        </div>
+
+        <div className="calendar-settings-dialog__group">
+          <h4 className="calendar-settings-dialog__subtitle">日视图时间表</h4>
+          <div className="field__row">
+            <div className="field">
+              <OutlinedSelect
+                label="起始时间"
+                value={String(dayStartHour)}
+                onChange={(e) => {
+                  setDayStartHour(Number(eventValue(e)));
+                  setError("");
+                }}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <SelectOption key={i} value={String(i)} selected={dayStartHour === i}>
+                    <span slot="headline">
+                      {`${String(i).padStart(2, "0")}:00`}{i === 6 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+            <div className="field">
+              <OutlinedSelect
+                label="结束时间"
+                value={String(dayEndHour)}
+                onChange={(e) => {
+                  setDayEndHour(Number(eventValue(e)));
+                  setError("");
+                }}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 24 }, (_, i) => i + 1).map((i) => (
+                  <SelectOption key={i} value={String(i)} selected={dayEndHour === i}>
+                    <span slot="headline">
+                      {`${String(i).padStart(2, "0")}:00`}{i === 24 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+          </div>
+        </div>
+
+        <div className="calendar-settings-dialog__group">
+          <h4 className="calendar-settings-dialog__subtitle">月视图显示上限</h4>
+          <div className="field__row">
+            <div className="field">
+              <OutlinedSelect
+                label="最大任务轨道数"
+                value={String(monthMaxTaskTracks)}
+                onChange={(e) => setMonthMaxTaskTracks(Number(eventValue(e)))}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                  <SelectOption key={num} value={String(num)} selected={monthMaxTaskTracks === num}>
+                    <span slot="headline">
+                      {num} 轨{num === 3 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+            <div className="field">
+              <OutlinedSelect
+                label="最大每日计划数"
+                value={String(monthMaxDailyPlans)}
+                onChange={(e) => setMonthMaxDailyPlans(Number(eventValue(e)))}
+                menuPositioning="fixed"
+              >
+                {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                  <SelectOption key={num} value={String(num)} selected={monthMaxDailyPlans === num}>
+                    <span slot="headline">
+                      {num} 项{num === 4 ? "（默认）" : ""}
+                    </span>
+                  </SelectOption>
+                ))}
+              </OutlinedSelect>
+            </div>
+          </div>
+        </div>
+
+        {error && <p className="error-text body-sm" style={{ margin: "4px 0 0" }}>{error}</p>}
+      </div>
+    </Dialog>
   );
 }

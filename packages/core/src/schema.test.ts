@@ -190,6 +190,50 @@ describe("persisted state schema", () => {
     expect(state.webDavSettings.serverUrl).toBe("");
   });
 
+  it("migrates v7 data with default calendar settings", () => {
+    const state = parsePersistedState({
+      version: 7,
+      projects: [],
+      tasks: [],
+      dailyPlans: [],
+      inboxItems: [],
+      pomodoroSessions: [],
+      settings: {
+        theme: "light",
+        focusMinutes: 25,
+      },
+      vaultSettings: {},
+      webDavSettings: {},
+    });
+
+    expect(state.version).toBe(STATE_VERSION);
+    expect(state.settings.weekDetailStartHour).toBe(6);
+    expect(state.settings.weekDetailEndHour).toBe(24);
+    expect(state.settings.dayStartHour).toBe(6);
+    expect(state.settings.dayEndHour).toBe(24);
+    expect(state.settings.monthMaxTaskTracks).toBe(3);
+    expect(state.settings.monthMaxDailyPlans).toBe(4);
+  });
+
+  it("rejects calendar settings where endHour is not greater than startHour", () => {
+    expect(() =>
+      parsePersistedState({
+        version: STATE_VERSION,
+        projects: [],
+        tasks: [],
+        dailyPlans: [],
+        inboxItems: [],
+        pomodoroSessions: [],
+        settings: {
+          weekDetailStartHour: 10,
+          weekDetailEndHour: 10,
+        },
+        vaultSettings: {},
+        webDavSettings: {},
+      }),
+    ).toThrow("周视图结束时间必须晚于起始时间");
+  });
+
   it("rejects completed notes", () => {
     expect(() =>
       parsePersistedState({

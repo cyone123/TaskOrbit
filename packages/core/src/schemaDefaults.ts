@@ -6,6 +6,12 @@ export const DEFAULT_SETTINGS: Settings = {
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
   longBreakInterval: 4,
+  weekDetailStartHour: 6,
+  weekDetailEndHour: 24,
+  dayStartHour: 6,
+  dayEndHour: 24,
+  monthMaxTaskTracks: 3,
+  monthMaxDailyPlans: 4,
 };
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {

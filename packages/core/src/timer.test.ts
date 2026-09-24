@@ -19,6 +19,12 @@ const settings: Settings = {
   shortBreakMinutes: 1,
   longBreakMinutes: 2,
   longBreakInterval: 2,
+  weekDetailStartHour: 6,
+  weekDetailEndHour: 24,
+  dayStartHour: 6,
+  dayEndHour: 24,
+  monthMaxTaskTracks: 3,
+  monthMaxDailyPlans: 4,
 };
 
 const link: PomodoroLink = {

@@ -107,6 +107,12 @@ export interface Settings {
   shortBreakMinutes: number;
   longBreakMinutes: number;
   longBreakInterval: number; // number of focus sessions before a long break
+  weekDetailStartHour: number; // 0-23
+  weekDetailEndHour: number; // 1-24
+  dayStartHour: number; // 0-23
+  dayEndHour: number; // 1-24
+  monthMaxTaskTracks: number; // 1-10
+  monthMaxDailyPlans: number; // 1-20
 }
 
 export interface VaultSettings {

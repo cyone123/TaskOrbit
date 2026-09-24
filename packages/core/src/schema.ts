@@ -233,13 +233,66 @@ const activeTimerSchema = z
     }
   });
 
-export const settingsSchema = z.object({
-  theme: z.enum(["light", "dark", "system"]).default(DEFAULT_SETTINGS.theme),
-  focusMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.focusMinutes),
-  shortBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.shortBreakMinutes),
-  longBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakMinutes),
-  longBreakInterval: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakInterval),
-});
+export const settingsSchema = z
+  .object({
+    theme: z.enum(["light", "dark", "system"]).default(DEFAULT_SETTINGS.theme),
+    focusMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.focusMinutes),
+    shortBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.shortBreakMinutes),
+    longBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakMinutes),
+    longBreakInterval: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakInterval),
+    weekDetailStartHour: z
+      .number()
+      .int()
+      .min(0)
+      .max(23)
+      .default(DEFAULT_SETTINGS.weekDetailStartHour),
+    weekDetailEndHour: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .default(DEFAULT_SETTINGS.weekDetailEndHour),
+    dayStartHour: z
+      .number()
+      .int()
+      .min(0)
+      .max(23)
+      .default(DEFAULT_SETTINGS.dayStartHour),
+    dayEndHour: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .default(DEFAULT_SETTINGS.dayEndHour),
+    monthMaxTaskTracks: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(DEFAULT_SETTINGS.monthMaxTaskTracks),
+    monthMaxDailyPlans: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(DEFAULT_SETTINGS.monthMaxDailyPlans),
+  })
+  .superRefine((data, ctx) => {
+    if (data.weekDetailEndHour <= data.weekDetailStartHour) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["weekDetailEndHour"],
+        message: "周视图结束时间必须晚于起始时间",
+      });
+    }
+    if (data.dayEndHour <= data.dayStartHour) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dayEndHour"],
+        message: "日视图结束时间必须晚于起始时间",
+      });
+    }
+  });
 
 const vaultSettingsSchema = z.object({
   enabled: z.boolean().default(DEFAULT_VAULT_SETTINGS.enabled),

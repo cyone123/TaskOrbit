@@ -133,8 +133,17 @@ function migrateV5ToV6(input: JsonRecord): JsonRecord {
 function migrateV6ToV7(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 7,
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS, ...asRecord(input.webDavSettings) },
+  };
+}
+
+/** v8 adds calendar display settings to settings. */
+function migrateV7ToV8(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    settings: { ...DEFAULT_SETTINGS, ...asRecord(input.settings) },
   };
 }
 
@@ -157,6 +166,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 4) migrated = migrateV4ToV5(migrated);
   if (version <= 5) migrated = migrateV5ToV6(migrated);
   if (version <= 6) migrated = migrateV6ToV7(migrated);
+  if (version <= 7) migrated = migrateV7ToV8(migrated);
 
   return migrated;
 }
