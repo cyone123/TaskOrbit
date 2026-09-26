@@ -18,6 +18,7 @@ import {
   updateDailyPlanState,
   updateInboxItemState,
   updateTaskState,
+  updateAiSettingsState,
 } from "./domain";
 import { createEmptyState, validateAppState } from "./schema";
 
@@ -571,6 +572,30 @@ describe("domain commands", () => {
 
       const reordered = reorderProjectsState(state, ["non-existent-id"]);
       expect(reordered.projects.map((p) => p.id)).toEqual([p1.id]);
+    });
+  });
+
+  describe("updateAiSettingsState", () => {
+    it("updates AI configuration and validates state", () => {
+      const state = createEmptyState();
+      const updated = updateAiSettingsState(state, {
+        enabled: true,
+        provider: "siliconflow",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sk-test-key",
+        model: "deepseek-ai/DeepSeek-V3",
+        temperature: 0.5,
+      });
+
+      expect(updated.aiSettings).toEqual({
+        enabled: true,
+        provider: "siliconflow",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sk-test-key",
+        model: "deepseek-ai/DeepSeek-V3",
+        temperature: 0.5,
+      });
+      expect(validateAppState(updated)).toBeDefined();
     });
   });
 });

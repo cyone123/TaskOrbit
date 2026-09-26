@@ -13,6 +13,7 @@ import type {
   Settings,
   VaultSettings,
   WebDavSettings,
+  AiSettings,
 } from "./types";
 import { uid } from "./id";
 import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
@@ -934,6 +935,13 @@ export function updateWebDavSettingsState(
   patch: Partial<WebDavSettings>,
 ): AppState {
   return { ...state, webDavSettings: { ...state.webDavSettings, ...patch } };
+}
+
+export function updateAiSettingsState(
+  state: AppState,
+  patch: Partial<AiSettings>,
+): AppState {
+  return { ...state, aiSettings: { ...state.aiSettings, ...patch } };
 }
 
 /**

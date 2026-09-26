@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
@@ -142,8 +143,17 @@ function migrateV6ToV7(input: JsonRecord): JsonRecord {
 function migrateV7ToV8(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 8,
     settings: { ...DEFAULT_SETTINGS, ...asRecord(input.settings) },
+  };
+}
+
+/** v9 adds AI assistant configuration. */
+function migrateV8ToV9(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: STATE_VERSION,
+    aiSettings: { ...DEFAULT_AI_SETTINGS, ...asRecord(input.aiSettings) },
   };
 }
 
@@ -167,6 +177,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 5) migrated = migrateV5ToV6(migrated);
   if (version <= 6) migrated = migrateV6ToV7(migrated);
   if (version <= 7) migrated = migrateV7ToV8(migrated);
+  if (version <= 8) migrated = migrateV8ToV9(migrated);
 
   return migrated;
 }

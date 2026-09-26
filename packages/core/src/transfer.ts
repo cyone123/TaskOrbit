@@ -31,6 +31,7 @@ function parseJsonString(raw: string): unknown {
 export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()): string {
   const { rootPath: _rootPath, vaultName: _vaultName, ...portableVaultSettings } = state.vaultSettings;
   const { password: _password, ...portableWebDavSettings } = state.webDavSettings;
+  const { apiKey: _apiKey, ...portableAiSettings } = state.aiSettings;
   const envelope: TaskOrbitExportEnvelope = {
     format: EXPORT_FORMAT,
     formatVersion: EXPORT_FORMAT_VERSION,
@@ -48,6 +49,11 @@ export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()
         ...portableWebDavSettings,
         enabled: false,
         password: "",
+      },
+      aiSettings: {
+        ...portableAiSettings,
+        enabled: false,
+        apiKey: "",
       },
     },
   };

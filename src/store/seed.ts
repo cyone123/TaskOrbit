@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
@@ -236,6 +237,7 @@ export function createDemoState(): AppState {
     activeTimer: null,
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
+    aiSettings: { ...DEFAULT_AI_SETTINGS },
     settings: {
       ...DEFAULT_SETTINGS,
     },

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { useWindowSizeClass } from "../hooks/useWindowSizeClass";
 import { useStore } from "../store/store";
+import { AiSettingsDialog } from "./ai/AiSettingsDialog";
 import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
 import { IconButton, Ripple } from "./material";
@@ -25,6 +26,7 @@ interface LayoutProps {
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
   const { state, updateSettings } = useStore();
   const [dataDialogOpen, setDataDialogOpen] = useState(false);
+  const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const windowClass = useWindowSizeClass();
   const theme = state.settings.theme;
@@ -83,6 +85,13 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
         <div className="nav-rail__spacer" />
         <div className="nav-rail__utilities">
           <IconButton
+            onClick={() => setAiSettingsDialogOpen(true)}
+            aria-label="AI 助理设置"
+            title="AI 助理设置"
+          >
+            <Icon name="smart_toy" size={22} />
+          </IconButton>
+          <IconButton
             onClick={() => setDataDialogOpen(true)}
             aria-label="数据管理"
             title="数据管理"
@@ -117,6 +126,10 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
       <DataManagementDialog
         open={dataDialogOpen}
         onClose={() => setDataDialogOpen(false)}
+      />
+      <AiSettingsDialog
+        open={aiSettingsDialogOpen}
+        onClose={() => setAiSettingsDialogOpen(false)}
       />
     </div>
   );

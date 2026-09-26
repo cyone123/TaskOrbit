@@ -43,6 +43,7 @@ import {
   updateTimerLink,
   updateVaultSettingsState,
   updateWebDavSettingsState,
+  updateAiSettingsState,
   validateAppState,
   SyncCoordinator,
   recordTombstone,
@@ -68,6 +69,7 @@ import {
   type Task,
   type VaultSettings,
   type WebDavSettings,
+  type AiSettings,
   type Tombstone,
   type SyncStatus,
   type SyncResult,
@@ -94,6 +96,7 @@ export type {
   TaskInput,
   TaskPatch,
   WebDavSettings,
+  AiSettings,
   SyncStatus,
   SyncResult,
   WebDavConnectionTestResult,
@@ -115,6 +118,7 @@ export interface StoreApi {
   syncNow: () => Promise<SyncResult>;
   testWebDavConnection: (settings?: WebDavSettings) => Promise<WebDavConnectionTestResult>;
   updateWebDavSettings: (patch: Partial<WebDavSettings>) => void;
+  updateAiSettings: (patch: Partial<AiSettings>) => void;
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
@@ -504,6 +508,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  const updateAiSettings = useCallback<StoreApi["updateAiSettings"]>(
+    (patch) => {
+      mutate((state) => updateAiSettingsState(state, patch));
+    },
+    [mutate],
+  );
+
   const addProject = useCallback<StoreApi["addProject"]>((input) => {
     const project = createProject(input);
     mutate((state) => appendProject(state, project));
@@ -740,6 +751,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         syncNow,
         testWebDavConnection,
         updateWebDavSettings,
+        updateAiSettings,
         retryLoad,
         addProject,
         updateProject,

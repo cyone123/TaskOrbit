@@ -13,4 +13,5 @@ export * from "./sync/merge";
 export * from "./sync/coordinator";
 export * from "./webdav/types";
 export * from "./webdav/client";
+export * from "./ai";
 export * from "./types";

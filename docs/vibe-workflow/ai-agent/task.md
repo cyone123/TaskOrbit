@@ -33,11 +33,11 @@
   7. `src/components/ai/AiSettingsDialog.tsx`: 实现 MD3 风格的配置弹窗，包含厂商下拉、Base URL、API Key、Model Name、Temperature 及【测试连接】按钮。
   8. `src/components/Layout.tsx`: 导航工具栏接入 AI 设置触发按钮。
 - **验收标准 (Acceptance Criteria)**：
-  - [ ] 现有测试（`migrations.test.ts`、`schema.test.ts`）更新并通过，旧版本数据能平滑升至 v9；
-  - [ ] 打开 AI 设置弹窗，选择不同厂商预设会自动填充默认 Base URL 与模型名；
-  - [ ] 输入 API Key 后点击【测试连接】，能够向指定端点发送验证并反馈连通性结果；
-  - [ ] 导出应用数据，导出的 JSON 文件中 `apiKey` 为空串。
-- **完成门禁 (Gate)**：所有核心 schema/migration 测试通过，配置能正常持久化至 `data.json`。
+  - [x] 现有测试（`migrations.test.ts`、`schema.test.ts`）更新并通过，旧版本数据能平滑升至 v9；
+  - [x] 打开 AI 设置弹窗，选择不同厂商预设会自动填充默认 Base URL 与模型名；
+  - [x] 输入 API Key 后点击【测试连接】，能够向指定端点发送验证并反馈连通性结果；
+  - [x] 导出应用数据，导出的 JSON 文件中 `apiKey` 为空串。
+- **完成门禁 (Gate)**：所有核心 schema/migration 测试通过，配置能正常持久化至 `data.json`。（已通过 ✅）
 
 ---
 

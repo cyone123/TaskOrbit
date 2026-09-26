@@ -100,6 +100,7 @@ describe("sync/coordinator", () => {
         pomodoroSessions: [],
         settings: baseState.settings,
         vaultSettings: baseState.vaultSettings,
+        aiSettings: baseState.aiSettings,
       },
       tombstones: [],
     };

@@ -215,6 +215,30 @@ describe("persisted state schema", () => {
     expect(state.settings.monthMaxDailyPlans).toBe(4);
   });
 
+  it("migrates v8 data with default AI settings", () => {
+    const state = parsePersistedState({
+      version: 8,
+      projects: [],
+      tasks: [],
+      dailyPlans: [],
+      inboxItems: [],
+      pomodoroSessions: [],
+      settings: {},
+      vaultSettings: {},
+      webDavSettings: {},
+    });
+
+    expect(state.version).toBe(STATE_VERSION);
+    expect(state.aiSettings).toEqual({
+      enabled: false,
+      provider: "deepseek",
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: "",
+      model: "deepseek-chat",
+      temperature: 0.7,
+    });
+  });
+
   it("rejects calendar settings where endHour is not greater than startHour", () => {
     expect(() =>
       parsePersistedState({

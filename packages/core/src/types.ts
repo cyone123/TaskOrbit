@@ -134,6 +134,22 @@ export interface WebDavSettings {
   syncIntervalMinutes: number;
 }
 
+export type AiProviderKey =
+  | "deepseek"
+  | "siliconflow"
+  | "openai"
+  | "ollama"
+  | "custom";
+
+export interface AiSettings {
+  enabled: boolean;
+  provider: AiProviderKey;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+}
+
 export type EntityType = "project" | "task" | "dailyPlan" | "inboxItem";
 
 export interface Tombstone {
@@ -153,6 +169,7 @@ export interface AppState {
   vaultSettings: VaultSettings;
   activeTimer: ActiveTimer | null;
   webDavSettings: WebDavSettings;
+  aiSettings: AiSettings;
 }
 
 // ---- Small helper types -----------------------------------------------------

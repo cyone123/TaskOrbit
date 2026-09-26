@@ -1,4 +1,4 @@
-import type { Settings, VaultSettings, WebDavSettings } from "./types";
+import type { AiSettings, Settings, VaultSettings, WebDavSettings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -31,4 +31,13 @@ export const DEFAULT_WEBDAV_SETTINGS: WebDavSettings = {
   remoteDir: "/taskorbit",
   autoSync: true,
   syncIntervalMinutes: 15,
+};
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  enabled: false,
+  provider: "deepseek",
+  baseUrl: "https://api.deepseek.com/v1",
+  apiKey: "",
+  model: "deepseek-chat",
+  temperature: 0.7,
 };

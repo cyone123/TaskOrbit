@@ -3,6 +3,7 @@ import type { AppState } from "./types";
 import { migratePersistedState } from "./migrations";
 import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
@@ -317,6 +318,21 @@ export const webDavSettingsSchema = z.object({
     .default(DEFAULT_WEBDAV_SETTINGS.syncIntervalMinutes),
 });
 
+export const aiSettingsSchema = z.object({
+  enabled: z.boolean().default(DEFAULT_AI_SETTINGS.enabled),
+  provider: z
+    .enum(["deepseek", "siliconflow", "openai", "ollama", "custom"])
+    .default(DEFAULT_AI_SETTINGS.provider),
+  baseUrl: z.string().trim().default(DEFAULT_AI_SETTINGS.baseUrl),
+  apiKey: z.string().default(DEFAULT_AI_SETTINGS.apiKey),
+  model: z.string().trim().default(DEFAULT_AI_SETTINGS.model),
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .default(DEFAULT_AI_SETTINGS.temperature),
+});
+
 export const appStateSchema = z.object({
   version: z.literal(STATE_VERSION),
   projects: z.array(projectSchema),
@@ -328,6 +344,7 @@ export const appStateSchema = z.object({
   vaultSettings: vaultSettingsSchema,
   activeTimer: activeTimerSchema.nullable(),
   webDavSettings: webDavSettingsSchema,
+  aiSettings: aiSettingsSchema,
 });
 
 const persistedEnvelopeSchema = z
@@ -342,6 +359,7 @@ const persistedEnvelopeSchema = z
     vaultSettings: z.unknown().optional(),
     activeTimer: z.unknown().optional(),
     webDavSettings: z.unknown().optional(),
+    aiSettings: z.unknown().optional(),
   })
   .passthrough();
 
@@ -357,6 +375,7 @@ export function createEmptyState(): AppState {
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     activeTimer: null,
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
+    aiSettings: { ...DEFAULT_AI_SETTINGS },
   };
 }
 
