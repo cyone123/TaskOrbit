@@ -19,6 +19,7 @@ import {
 } from "../components/material";
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
+import { useAiChat } from "../store/ai-chat-store";
 
 /** Keep in sync with --sys-motion-selection-duration used by .inbox-item exit. */
 const ITEM_EXIT_MS = 200;
@@ -217,6 +218,19 @@ export function InboxView() {
     captureInputRef.current?.focus();
   };
 
+  const { openDrawer, sendMessage } = useAiChat();
+
+  const handleAiOrganize = () => {
+    if (pendingItems.length === 0) {
+      show("当前收集箱没有待处理的条目");
+      return;
+    }
+    openDrawer();
+    void sendMessage(
+      "请帮我整理当前收集箱中未处理的内容。先获取未处理收集箱条目和已有项目列表，分析它们适合归入哪个项目或转化为具体日程计划，并调用 plan_inbox_organization 提出整理方案。",
+    );
+  };
+
   // Animate the row out before removing it from state.
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -321,6 +335,12 @@ export function InboxView() {
             <SectionHeader
               title="我的收集"
               subtitle="把零散想法变成下一步行动。"
+              actions={
+                <TonalButton onClick={handleAiOrganize} aria-label="AI 智能整理收集箱">
+                  <Icon name="auto_awesome" size={18} slot="icon" />
+                  AI 整理
+                </TonalButton>
+              }
             />
             <ChipSet className="inbox-filters" role="tablist" aria-label="收集箱筛选">
               {(

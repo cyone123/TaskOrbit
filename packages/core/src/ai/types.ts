@@ -1,3 +1,5 @@
+import type { Priority } from "../types";
+
 export interface AiToolCall {
   id: string;
   type: "function";
@@ -7,6 +9,46 @@ export interface AiToolCall {
   };
 }
 
+export type AiProposalStatus = "pending" | "applied" | "cancelled";
+
+export interface InboxOrganizationProposalItem {
+  inboxItemId: string;
+  sourceContent?: string;
+  action: "convert_to_task" | "convert_to_daily_plan" | "mark_done" | "dismiss";
+  targetProjectName?: string;
+  taskData?: {
+    projectId: string;
+    name: string;
+    description?: string;
+    startDate: string;
+    endDate: string;
+    priority?: Priority;
+  };
+  dailyPlanData?: {
+    projectId?: string | null;
+    taskId?: string | null;
+    name: string;
+    description?: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    estimatedMinutes?: number;
+  };
+  reason?: string;
+}
+
+export interface InboxOrganizationProposalPayload {
+  proposals: InboxOrganizationProposalItem[];
+}
+
+export interface AiProposalCardState {
+  id: string;
+  type: "inbox_organization" | "schedule_daily_plans";
+  status: AiProposalStatus;
+  createdAt: number;
+  inboxPayload?: InboxOrganizationProposalPayload;
+}
+
 export interface AiChatMessage {
   id: string;
   role: "system" | "user" | "assistant" | "tool";
@@ -14,6 +56,7 @@ export interface AiChatMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: AiToolCall[];
+  proposal?: AiProposalCardState;
   createdAt?: number;
 }
 

@@ -3,12 +3,15 @@ import type { AiChatMessage } from "@task-orbit/core";
 import { renderMarkdown } from "../../utils/markdown";
 import { Icon } from "../Icon";
 import { CircularProgress } from "../material";
+import { AiProposalCard } from "./AiProposalCard";
 
 export interface AiMessageListProps {
   messages: AiChatMessage[];
   isStreaming: boolean;
   currentToolCall: { name: string; label: string } | null;
   error: string | null;
+  onApplyProposal?: (messageId: string, proposalId: string) => void;
+  onCancelProposal?: (messageId: string, proposalId: string) => void;
 }
 
 export function AiMessageList({
@@ -16,6 +19,8 @@ export function AiMessageList({
   isStreaming,
   currentToolCall,
   error,
+  onApplyProposal,
+  onCancelProposal,
 }: AiMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -71,40 +76,53 @@ export function AiMessageList({
         return (
           <div
             key={msg.id}
-            className={`row ${isUser ? "justify-end" : "justify-start"}`}
+            className={`col ${isUser ? "items-end" : "items-start"} gap-8`}
             style={{ width: "100%" }}
           >
-            <div
-              style={{
-                maxWidth: "88%",
-                padding: "10px 14px",
-                borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                background: isUser
-                  ? "var(--md-primary-container)"
-                  : "var(--md-surface-container-high)",
-                color: isUser
-                  ? "var(--md-on-primary-container)"
-                  : "var(--md-on-surface)",
-                fontSize: 14,
-                lineHeight: 1.5,
-                wordBreak: "break-word",
-                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              }}
-            >
-              {isUser ? (
-                <div>{msg.content}</div>
-              ) : msg.content ? (
-                <div
-                  className="ai-markdown-body"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+            {(msg.content || (!msg.proposal && isStreaming)) && (
+              <div
+                style={{
+                  maxWidth: "88%",
+                  padding: "10px 14px",
+                  borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                  background: isUser
+                    ? "var(--md-primary-container)"
+                    : "var(--md-surface-container-high)",
+                  color: isUser
+                    ? "var(--md-on-primary-container)"
+                    : "var(--md-on-surface)",
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  wordBreak: "break-word",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                }}
+              >
+                {isUser ? (
+                  <div>{msg.content}</div>
+                ) : msg.content ? (
+                  <div
+                    className="ai-markdown-body"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                  />
+                ) : isStreaming ? (
+                  <div className="row items-center gap-8 muted">
+                    <CircularProgress indeterminate style={{ width: 14, height: 14 }} />
+                    <span className="body-xs">正在思考中...</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Proposal card if present on assistant message */}
+            {!isUser && msg.proposal && (
+              <div style={{ width: "100%", maxWidth: "96%" }}>
+                <AiProposalCard
+                  proposal={msg.proposal}
+                  onApply={() => onApplyProposal?.(msg.id, msg.proposal!.id)}
+                  onCancel={() => onCancelProposal?.(msg.id, msg.proposal!.id)}
                 />
-              ) : isStreaming ? (
-                <div className="row items-center gap-8 muted">
-                  <CircularProgress indeterminate style={{ width: 14, height: 14 }} />
-                  <span className="body-xs">正在思考中...</span>
-                </div>
-              ) : null}
-            </div>
+              </div>
+            )}
           </div>
         );
       })}

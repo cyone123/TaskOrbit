@@ -119,6 +119,7 @@ export interface StoreApi {
   testWebDavConnection: (settings?: WebDavSettings) => Promise<WebDavConnectionTestResult>;
   updateWebDavSettings: (patch: Partial<WebDavSettings>) => void;
   updateAiSettings: (patch: Partial<AiSettings>) => void;
+  mutate: (fn: (state: AppState) => AppState) => void;
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
@@ -752,6 +753,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         testWebDavConnection,
         updateWebDavSettings,
         updateAiSettings,
+        mutate,
         retryLoad,
         addProject,
         updateProject,

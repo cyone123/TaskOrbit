@@ -23,7 +23,7 @@ export function AiQuickActions({ onSelect, disabled }: AiQuickActionsProps) {
       icon: "inbox",
       label: "整理收集箱",
       prompt:
-        "请检索当前收集箱中未处理的待办与备忘，并结合我现有的项目结构，帮我归纳整理并给出处理建议。",
+        "请帮我整理当前收集箱中未处理的内容。先获取未处理收集箱条目和已有项目列表，分析它们适合归入哪个项目或转化为具体日程计划，并调用 plan_inbox_organization 提出整理方案。",
     },
   ];
 

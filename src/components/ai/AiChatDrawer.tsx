@@ -3,12 +3,14 @@ import { useStore } from "../../store/store";
 import { useAiChat } from "../../store/ai-chat-store";
 import { Icon } from "../Icon";
 import { IconButton } from "../material";
+import { useSnackbar } from "../ui";
 import { AiMessageList } from "./AiMessageList";
 import { AiQuickActions } from "./AiQuickActions";
 import { AiSettingsDialog } from "./AiSettingsDialog";
 
 export function AiChatDrawer() {
   const store = useStore();
+  const { show } = useSnackbar();
   const {
     isOpen,
     closeDrawer,
@@ -19,6 +21,8 @@ export function AiChatDrawer() {
     sendMessage,
     stopStreaming,
     clearMessages,
+    applyProposal,
+    cancelProposal,
   } = useAiChat();
 
   const [input, setInput] = useState("");
@@ -134,6 +138,14 @@ export function AiChatDrawer() {
           isStreaming={isStreaming}
           currentToolCall={currentToolCall}
           error={error}
+          onApplyProposal={(msgId, propId) => {
+            applyProposal(msgId, propId);
+            show("已成功应用整理方案");
+          }}
+          onCancelProposal={(msgId, propId) => {
+            cancelProposal(msgId, propId);
+            show("已放弃本次建议");
+          }}
         />
 
         {/* Drawer Footer with Input */}

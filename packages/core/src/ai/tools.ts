@@ -109,3 +109,98 @@ export const READ_ONLY_TOOLS: AiToolDefinition[] = [
     },
   },
 ];
+
+export const INBOX_ORGANIZATION_TOOL: AiToolDefinition = {
+  type: "function",
+  function: {
+    name: "plan_inbox_organization",
+    description:
+      "将收集箱中的零散未处理条目整理并提议转化为项目任务、日程每日计划，或直接标记完成/忽略。此工具会向用户呈现结构化确认卡片，待用户确认后才实际执行写入变更。",
+    parameters: {
+      type: "object",
+      properties: {
+        proposals: {
+          type: "array",
+          description: "针对每个收集箱条目的整理建议列表",
+          items: {
+            type: "object",
+            properties: {
+              inboxItemId: {
+                type: "string",
+                description: "对应的收集箱条目 ID",
+              },
+              sourceContent: {
+                type: "string",
+                description: "原收集箱条目内容（可选，用于卡片回显）",
+              },
+              action: {
+                type: "string",
+                enum: [
+                  "convert_to_task",
+                  "convert_to_daily_plan",
+                  "mark_done",
+                  "dismiss",
+                ],
+                description:
+                  "处理动作：convert_to_task（转为任务）、convert_to_daily_plan（转为每日计划）、mark_done（标记完成）、dismiss（仅在收集箱保留）",
+              },
+              targetProjectName: {
+                type: "string",
+                description: "目标项目名称（可选，用于在卡片中向用户直观展示）",
+              },
+              taskData: {
+                type: "object",
+                description: "当 action 为 convert_to_task 时的任务数据",
+                properties: {
+                  projectId: { type: "string", description: "所属项目 ID" },
+                  name: { type: "string", description: "任务标题" },
+                  description: { type: "string", description: "任务描述详情" },
+                  startDate: { type: "string", description: "任务开始日期 YYYY-MM-DD" },
+                  endDate: { type: "string", description: "任务截止日期 YYYY-MM-DD" },
+                  priority: {
+                    type: "string",
+                    enum: ["low", "medium", "high"],
+                    description: "优先级，默认 medium",
+                  },
+                },
+              },
+              dailyPlanData: {
+                type: "object",
+                description: "当 action 为 convert_to_daily_plan 时的计划数据",
+                properties: {
+                  projectId: {
+                    type: "string",
+                    description: "关联项目 ID（可选，传 null 或不传表示无项目）",
+                  },
+                  taskId: {
+                    type: "string",
+                    description: "关联任务 ID（可选，传 null 或不传表示无任务）",
+                  },
+                  name: { type: "string", description: "计划名称" },
+                  description: { type: "string", description: "计划描述" },
+                  date: { type: "string", description: "计划日期 YYYY-MM-DD" },
+                  startTime: { type: "string", description: "起始时间 HH:mm" },
+                  endTime: { type: "string", description: "结束时间 HH:mm" },
+                  estimatedMinutes: {
+                    type: "number",
+                    description: "预计耗时（分钟）",
+                  },
+                },
+              },
+              reason: {
+                type: "string",
+                description: "归类理由简述",
+              },
+            },
+          },
+        },
+      },
+      required: ["proposals"],
+    },
+  },
+};
+
+export const ALL_AI_TOOLS: AiToolDefinition[] = [
+  ...READ_ONLY_TOOLS,
+  INBOX_ORGANIZATION_TOOL,
+];

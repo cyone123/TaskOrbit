@@ -8,13 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import {
-  READ_ONLY_TOOLS,
+  ALL_AI_TOOLS,
+  commitInboxProposal,
   executeReadTool,
   streamChatCompletions,
   todayISO,
   uid,
   type AiChatMessage,
+  type AiProposalCardState,
   type AiToolCall,
+  type InboxOrganizationProposalItem,
 } from "@task-orbit/core";
 import { useStore } from "./store";
 
@@ -27,6 +30,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_projects_and_tasks: "正在查询项目与任务列表...",
   get_daily_plans: "正在检索日程计划时间块...",
   get_pomodoro_stats: "正在统计番茄钟专注记录...",
+  plan_inbox_organization: "正在规划收集箱整理方案...",
 };
 
 export interface AiChatStoreApi {
@@ -41,6 +45,8 @@ export interface AiChatStoreApi {
   sendMessage: (content: string) => Promise<void>;
   stopStreaming: () => void;
   clearMessages: () => void;
+  applyProposal: (messageId: string, proposalId: string) => void;
+  cancelProposal: (messageId: string, proposalId: string) => void;
 }
 
 const AiChatContext = createContext<AiChatStoreApi | null>(null);
@@ -147,7 +153,13 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         content: `你是一个高效、细致的个人效能与任务管理 AI 助理（内置于 Task Orbit 个人生产力套件中）。
 当前日期：${todayISO()}。
 你可以使用工具查询用户当前的工作区概况、项目列表、任务属性、日程计划排期以及番茄钟专注统计。
-在面对任务分析、日程排期和复盘时，请积极调用相关只读工具检索客观事实，并基于真实数据输出条理清晰、切合实际、富有洞察力的中文建议。
+
+核心执行规范：
+1. 收集箱整理：必须先调用 get_inbox_items 获取未处理条目，并调用 get_projects_and_tasks 获取可用项目列表；经过分析后，调用 plan_inbox_organization 提交整理方案。
+2. 日程排期：先调用 get_daily_plans 和 get_projects_and_tasks 查看今日日程与高优待办，分析时间空隙后再给出建议。
+3. 效能复盘：调用 get_pomodoro_stats 分析近期专注会话，结合实际数据给出客观反思与时间分配改进建议。
+
+注意：任何涉及修改或写入数据的操作（如整理收集箱），必须通过调用对应的 plan_* 工具向用户呈现结构化确认卡片，严禁假装已经直接写入。
 支持 Markdown 排版（列表、代码块、加粗等）。`,
       };
 
@@ -183,7 +195,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
             model: aiSettings.model,
             temperature: aiSettings.temperature,
             messages: conversationForApi,
-            tools: READ_ONLY_TOOLS,
+            tools: ALL_AI_TOOLS,
             signal: controller.signal,
           });
 
@@ -232,8 +244,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
             break;
           }
 
-          // Execute read tool calls
-          let hasExecutedReadTool = false;
+          // Execute tool calls
+          let hasExecutedTool = false;
           for (const tc of resolvedToolCalls) {
             const toolName = tc.function.name;
             const label = TOOL_LABELS[toolName] || `正在调用 ${toolName}...`;
@@ -248,11 +260,75 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
               args = {};
             }
 
+            // Handle write proposal tool: plan_inbox_organization
+            if (toolName === "plan_inbox_organization") {
+              const rawProposals = Array.isArray(args.proposals)
+                ? (args.proposals as InboxOrganizationProposalItem[])
+                : [];
+
+              const enrichedProposals: InboxOrganizationProposalItem[] = rawProposals.map(
+                (p) => {
+                  const originalItem = store.state.inboxItems.find(
+                    (i) => i.id === p.inboxItemId,
+                  );
+                  const targetProject = p.taskData?.projectId
+                    ? store.state.projects.find(
+                        (proj) => proj.id === p.taskData?.projectId,
+                      )?.name
+                    : undefined;
+
+                  return {
+                    ...p,
+                    sourceContent:
+                      p.sourceContent || originalItem?.content || `条目 ${p.inboxItemId}`,
+                    targetProjectName: p.targetProjectName || targetProject,
+                  };
+                },
+              );
+
+              const proposalState: AiProposalCardState = {
+                id: uid("prop_"),
+                type: "inbox_organization",
+                status: "pending",
+                createdAt: Date.now(),
+                inboxPayload: { proposals: enrichedProposals },
+              };
+
+              finalAssistantMsg.proposal = proposalState;
+              const updatedHistory = history.map((m) =>
+                m.id === assistantMsgId ? { ...m, proposal: proposalState } : m,
+              );
+              history = updatedHistory;
+              setMessages(updatedHistory);
+              saveMessages(updatedHistory);
+
+              const toolResponseMsg: AiChatMessage = {
+                id: uid("msg_"),
+                role: "tool",
+                name: toolName,
+                tool_call_id: tc.id,
+                content: JSON.stringify({
+                  status: "proposal_rendered",
+                  count: enrichedProposals.length,
+                  message:
+                    "整理方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
+                }),
+                createdAt: Date.now(),
+              };
+
+              conversationForApi.push(toolResponseMsg);
+              hasExecutedTool = true;
+              continue;
+            }
+
+            // Handle read tools
             let toolResult: unknown;
             try {
               toolResult = executeReadTool(store.state, toolName, args);
             } catch (toolErr) {
-              toolResult = { error: toolErr instanceof Error ? toolErr.message : String(toolErr) };
+              toolResult = {
+                error: toolErr instanceof Error ? toolErr.message : String(toolErr),
+              };
             }
 
             const toolResponseMsg: AiChatMessage = {
@@ -265,11 +341,11 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
             };
 
             conversationForApi.push(toolResponseMsg);
-            hasExecutedReadTool = true;
+            hasExecutedTool = true;
           }
 
           setCurrentToolCall(null);
-          if (!hasExecutedReadTool) {
+          if (!hasExecutedTool) {
             break;
           }
         }
@@ -286,8 +362,71 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         abortControllerRef.current = null;
       }
     },
-    [store.state],
+    [store],
   );
+
+  const applyProposal = useCallback(
+    (messageId: string, proposalId: string) => {
+      const targetMsg = messagesRef.current.find((m) => m.id === messageId);
+      if (!targetMsg || !targetMsg.proposal || targetMsg.proposal.id !== proposalId) {
+        return;
+      }
+      if (targetMsg.proposal.status !== "pending") {
+        return;
+      }
+
+      if (
+        targetMsg.proposal.type === "inbox_organization" &&
+        targetMsg.proposal.inboxPayload
+      ) {
+        try {
+          store.mutate((currentState) =>
+            commitInboxProposal(currentState, targetMsg.proposal!.inboxPayload!),
+          );
+          const updated = messagesRef.current.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  proposal: {
+                    ...m.proposal!,
+                    status: "applied" as const,
+                  },
+                }
+              : m,
+          );
+          setMessages(updated);
+          saveMessages(updated);
+        } catch (err) {
+          console.error("Failed to commit inbox proposal:", err);
+        }
+      }
+    },
+    [store],
+  );
+
+  const cancelProposal = useCallback((messageId: string, proposalId: string) => {
+    const targetMsg = messagesRef.current.find((m) => m.id === messageId);
+    if (!targetMsg || !targetMsg.proposal || targetMsg.proposal.id !== proposalId) {
+      return;
+    }
+    if (targetMsg.proposal.status !== "pending") {
+      return;
+    }
+
+    const updated = messagesRef.current.map((m) =>
+      m.id === messageId
+        ? {
+            ...m,
+            proposal: {
+              ...m.proposal!,
+              status: "cancelled" as const,
+            },
+          }
+        : m,
+    );
+    setMessages(updated);
+    saveMessages(updated);
+  }, []);
 
   return (
     <AiChatContext.Provider
@@ -303,6 +442,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         sendMessage,
         stopStreaming,
         clearMessages,
+        applyProposal,
+        cancelProposal,
       }}
     >
       {children}
