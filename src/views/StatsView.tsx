@@ -9,10 +9,11 @@ import {
   toISODate,
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
-import { LinearProgress } from "../components/material";
+import { LinearProgress, TonalButton } from "../components/material";
 import { EmptyState, SectionHeader, StatCard } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import { useAiChat } from "../store/ai-chat-store";
 
 function isoOfTimestamp(ts: number): string {
   const d = new Date(ts);
@@ -21,7 +22,15 @@ function isoOfTimestamp(ts: number): string {
 
 export function StatsView() {
   const { state } = useStore();
+  const { openDrawer, sendMessage } = useAiChat();
   const sessions = state.pomodoroSessions;
+
+  const handleAiReflect = () => {
+    openDrawer();
+    void sendMessage(
+      "请分析我过去 7 天的番茄钟专注会话与每日计划完成情况，评估时间分配偏差与专注节奏，并给出改进建议。",
+    );
+  };
 
   const focusSessions = useMemo(() => selectFocusSessions(state), [sessions, state]);
 
@@ -142,6 +151,11 @@ export function StatsView() {
         <SectionHeader
           title="近 7 天专注时长"
           subtitle={selectedDay ? `${selectedDay} · 专注 ${formatDurationMinutes(selectedMins)}` : "点击柱形查看某天的专注时长"}
+          actions={
+            <TonalButton onClick={handleAiReflect} title="使用 AI 深度分析专注记录与效能">
+              <Icon name="smart_toy" size={18} slot="icon" /> AI 效能反思
+            </TonalButton>
+          }
         />
         {!weekHasData ? (
           <EmptyState

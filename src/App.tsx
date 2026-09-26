@@ -7,6 +7,7 @@ import { SnackbarProvider } from "./components/ui";
 import { PomodoroNotifier } from "./desktop/PomodoroNotifier";
 import { PomodoroWindowBridge } from "./desktop/PomodoroWindowBridge";
 import { StoreProvider, useStore } from "./store/store";
+import { AiChatProvider } from "./store/ai-chat-store";
 import { ThemeManager } from "./theme/theme";
 import { CalendarView } from "./views/CalendarView";
 import { PomodoroView } from "./views/PomodoroView";
@@ -114,7 +115,9 @@ export default function App() {
   return (
     <StoreProvider>
       <SnackbarProvider>
-        <BootstrapGate />
+        <AiChatProvider>
+          <BootstrapGate />
+        </AiChatProvider>
       </SnackbarProvider>
     </StoreProvider>
   );

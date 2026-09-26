@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { useWindowSizeClass } from "../hooks/useWindowSizeClass";
 import { useStore } from "../store/store";
+import { useAiChat } from "../store/ai-chat-store";
+import { AiChatDrawer } from "./ai/AiChatDrawer";
 import { AiSettingsDialog } from "./ai/AiSettingsDialog";
 import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
@@ -25,6 +27,7 @@ interface LayoutProps {
 
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
   const { state, updateSettings } = useStore();
+  const { isOpen: aiDrawerOpen, toggleDrawer: toggleAiDrawer } = useAiChat();
   const [dataDialogOpen, setDataDialogOpen] = useState(false);
   const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -38,6 +41,18 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
     updateSettings({ theme: isDark ? "light" : "dark" });
   };
   const isProjectWorkspace = view === "projects";
+
+  // Global shortcut (Ctrl+J or Cmd+J) to toggle AI Assistant
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        toggleAiDrawer();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleAiDrawer]);
 
   // The content region owns scrolling for every view. Listening in the capture
   // phase also catches inner scrollers (e.g. the project detail pane).
@@ -85,11 +100,16 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
         <div className="nav-rail__spacer" />
         <div className="nav-rail__utilities">
           <IconButton
-            onClick={() => setAiSettingsDialogOpen(true)}
-            aria-label="AI 助理设置"
-            title="AI 助理设置"
+            onClick={toggleAiDrawer}
+            aria-label={aiDrawerOpen ? "收起 AI 助理 (Ctrl+J)" : "打开 AI 助理 (Ctrl+J)"}
+            title={aiDrawerOpen ? "收起 AI 助理 (Ctrl+J)" : "打开 AI 助理 (Ctrl+J)"}
           >
-            <Icon name="smart_toy" size={22} />
+            <Icon
+              name="smart_toy"
+              size={22}
+              fill={aiDrawerOpen}
+              style={{ color: aiDrawerOpen ? "var(--md-primary)" : undefined }}
+            />
           </IconButton>
           <IconButton
             onClick={() => setDataDialogOpen(true)}
@@ -113,7 +133,21 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           <header className={`top-bar ${scrolled ? "top-bar--scrolled" : ""}`}>
             <h1 className="top-bar__title">{title}</h1>
             <div className="ml-auto" />
-            {actions}
+            <div className="row items-center gap-4">
+              {actions}
+              <IconButton
+                onClick={toggleAiDrawer}
+                aria-label={aiDrawerOpen ? "收起 AI 助理" : "展开 AI 助理"}
+                title="AI 助理 (Ctrl+J)"
+              >
+                <Icon
+                  name="smart_toy"
+                  size={22}
+                  fill={aiDrawerOpen}
+                  style={{ color: aiDrawerOpen ? "var(--md-primary)" : undefined }}
+                />
+              </IconButton>
+            </div>
           </header>
         )}
         <div
@@ -123,6 +157,7 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           {children}
         </div>
       </div>
+      <AiChatDrawer />
       <DataManagementDialog
         open={dataDialogOpen}
         onClose={() => setDataDialogOpen(false)}

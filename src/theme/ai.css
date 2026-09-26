@@ -1,0 +1,86 @@
+/* ============================================================================
+   Task Orbit — AI Assistant Styles
+   ========================================================================== */
+
+/* Markdown typography inside AI chat bubbles */
+.ai-markdown-body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--md-on-surface);
+}
+
+.ai-markdown-body p {
+  margin: 0 0 8px 0;
+}
+
+.ai-markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-markdown-body ul,
+.ai-markdown-body ol {
+  padding-left: 20px;
+  margin: 0 0 8px 0;
+}
+
+.ai-markdown-body li {
+  margin-bottom: 4px;
+}
+
+.ai-markdown-body code {
+  background: var(--md-surface-container-highest);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.ai-markdown-body pre {
+  background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+.ai-markdown-body strong {
+  font-weight: 600;
+  color: var(--md-primary);
+}
+
+.ai-markdown-body h1,
+.ai-markdown-body h2,
+.ai-markdown-body h3,
+.ai-markdown-body h4 {
+  margin: 10px 0 6px 0;
+  color: var(--md-on-surface);
+  font-weight: 600;
+}
+
+.ai-markdown-body h1 { font-size: 1.25em; }
+.ai-markdown-body h2 { font-size: 1.15em; }
+.ai-markdown-body h3 { font-size: 1.05em; }
+
+.ai-markdown-body blockquote {
+  border-left: 3px solid var(--md-primary);
+  margin: 6px 0;
+  padding-left: 10px;
+  color: var(--md-on-surface-variant);
+}
+
+/* AI Chat Drawer animation and layout */
+.ai-chat-drawer {
+  animation: slideInRight 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
