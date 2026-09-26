@@ -4,6 +4,8 @@ import { renderMarkdown } from "../../utils/markdown";
 import { Icon } from "../Icon";
 import { CircularProgress } from "../material";
 import { AiProposalCard } from "./AiProposalCard";
+import { AiReasoningAccordion } from "./AiReasoningAccordion";
+import { AiToolCallAccordion } from "./AiToolCallAccordion";
 
 export interface AiMessageListProps {
   messages: AiChatMessage[];
@@ -41,13 +43,20 @@ export function AiMessageList({
     : null;
   const activeThinkingMsgId = lastStreamingAssistant?.id;
 
-  // Filter messages to prevent redundant empty "thinking" placeholders:
-  // An assistant message without content or proposal is only displayed
-  // if it is the currently active streaming message.
+  // Filter messages:
+  // An assistant message is displayed if it has content, proposal, reasoning,
+  // tool executions, or is the currently active streaming message.
   const displayMessages = messages.filter((m) => {
     if (m.role === "user") return true;
     if (m.role === "assistant") {
-      if (m.content.trim() || m.proposal) return true;
+      if (
+        m.content.trim() ||
+        m.proposal ||
+        (m.reasoningContent && m.reasoningContent.trim()) ||
+        (m.toolExecutions && m.toolExecutions.length > 0)
+      ) {
+        return true;
+      }
       if (isStreaming && m.id === activeThinkingMsgId) return true;
       return false;
     }
@@ -115,13 +124,21 @@ export function AiMessageList({
 
       {displayMessages.map((msg) => {
         const isUser = msg.role === "user";
-        const isThinking =
+        const isStreamingThisMsg = Boolean(isStreaming && msg.id === activeThinkingMsgId);
+        const hasReasoning = Boolean(msg.reasoningContent && msg.reasoningContent.trim());
+        const hasTools = Boolean(msg.toolExecutions && msg.toolExecutions.length > 0);
+
+        // Only show generic thinking spinner if no reasoning accordion is currently showing
+        const isThinkingWithoutReasoning =
           !isUser &&
           !msg.content.trim() &&
           !msg.proposal &&
-          isStreaming &&
-          msg.id === activeThinkingMsgId;
-        const shouldRenderBubble = Boolean(msg.content.trim() || isThinking);
+          !hasReasoning &&
+          isStreamingThisMsg;
+
+        const shouldRenderBubble = Boolean(
+          isUser ? msg.content : (msg.content.trim() || isThinkingWithoutReasoning),
+        );
 
         const isUnconfiguredWarning =
           !isUser && msg.content.includes("AI 助理尚未配置或未启用");
@@ -132,6 +149,24 @@ export function AiMessageList({
             className={`col ${isUser ? "items-end" : "items-start"} gap-8`}
             style={{ width: "100%" }}
           >
+            {/* 1. DeepSeek-R1 / Reasoning Thought Accordion (Distinct Mind Flow Style) */}
+            {!isUser && hasReasoning && (
+              <div style={{ width: "100%", maxWidth: "96%" }}>
+                <AiReasoningAccordion
+                  reasoning={msg.reasoningContent!}
+                  isThinking={isStreamingThisMsg && !msg.content.trim()}
+                />
+              </div>
+            )}
+
+            {/* 2. Tool Calling Inspector Accordion (Distinct Engineering Terminal Style) */}
+            {!isUser && hasTools && (
+              <div style={{ width: "100%", maxWidth: "96%" }}>
+                <AiToolCallAccordion executions={msg.toolExecutions!} />
+              </div>
+            )}
+
+            {/* 3. Text content / thinking bubble / warning */}
             {shouldRenderBubble && (
               <div
                 style={{
@@ -183,7 +218,7 @@ export function AiMessageList({
                       </div>
                     )}
                   </>
-                ) : isThinking ? (
+                ) : isThinkingWithoutReasoning ? (
                   <div className="row items-center gap-8 muted">
                     <CircularProgress indeterminate style={{ width: 14, height: 14 }} />
                     <span className="body-xs">正在思考中...</span>
@@ -192,7 +227,7 @@ export function AiMessageList({
               </div>
             )}
 
-            {/* Proposal card if present on assistant message */}
+            {/* 4. Proposal card if present on assistant message */}
             {!isUser && msg.proposal && (
               <div style={{ width: "100%", maxWidth: "96%" }}>
                 <AiProposalCard

@@ -77,10 +77,21 @@ export interface AiProposalCardState {
   schedulePayload?: DailyPlanScheduleProposalPayload;
 }
 
+export interface AiToolExecution {
+  id: string;
+  name: string;
+  label?: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  timestamp?: number;
+}
+
 export interface AiChatMessage {
   id: string;
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  reasoningContent?: string;
+  toolExecutions?: AiToolExecution[];
   name?: string;
   tool_call_id?: string;
   tool_calls?: AiToolCall[];
@@ -114,6 +125,7 @@ export interface AiToolDefinition {
 
 export interface StreamDelta {
   content?: string;
+  reasoning_content?: string;
   tool_calls?: Array<{
     index: number;
     id?: string;

@@ -129,6 +129,7 @@ export function parseSseBuffer(buffer: string): {
         choices?: Array<{
           delta?: {
             content?: string;
+            reasoning_content?: string;
             tool_calls?: Array<{
               index: number;
               id?: string;

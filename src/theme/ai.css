@@ -230,3 +230,139 @@
 .ai-proposal-card__footer {
   border-top: 1px solid var(--md-outline-variant);
 }
+
+/* ============================================================================
+   DeepSeek-R1 / Reasoning Thought Accordion
+   ========================================================================== */
+
+.ai-reasoning-panel {
+  width: 100%;
+  border: 1px solid var(--md-outline-variant);
+  background: var(--md-surface-container-low);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 180ms ease;
+  margin-bottom: 6px;
+}
+
+.ai-reasoning-panel__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  font-size: 12px;
+  user-select: none;
+}
+
+.ai-reasoning-panel__header:hover {
+  background: var(--md-surface-container-high);
+}
+
+.ai-reasoning-panel__body {
+  padding: 8px 12px 10px 14px;
+  border-top: 1px solid var(--md-outline-variant);
+  border-left: 3px solid var(--md-primary);
+  margin: 4px 8px 8px 8px;
+  border-radius: 4px;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* ============================================================================
+   Tool Calling Inspector Accordion (Distinct Engineering/Terminal Style)
+   ========================================================================== */
+
+.ai-tool-panel {
+  width: 100%;
+  border: 1px dashed var(--md-outline);
+  background: var(--md-surface-container);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ai-tool-panel__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--md-surface-container-high);
+  border: none;
+  cursor: pointer;
+  color: var(--md-on-surface);
+  font-size: 12px;
+  user-select: none;
+}
+
+.ai-tool-panel__header:hover {
+  background: var(--md-surface-container-highest);
+}
+
+.ai-tool-panel__body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px dashed var(--md-outline-variant);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ai-tool-item {
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 6px;
+  background: var(--md-surface-container-low);
+  overflow: hidden;
+}
+
+.ai-tool-item__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--md-surface-container-highest);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.ai-tool-item__section {
+  padding: 6px 8px;
+}
+
+.ai-tool-item__section-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--md-outline);
+  margin-bottom: 4px;
+}
+
+.ai-tool-code-block {
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--md-surface-container-lowest);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--md-on-surface);
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+

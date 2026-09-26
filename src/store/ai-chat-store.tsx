@@ -12,12 +12,14 @@ import {
   commitInboxProposal,
   commitScheduleProposal,
   executeReadTool,
+  extractReasoningAndContent,
   streamChatCompletions,
   todayISO,
   uid,
   type AiChatMessage,
   type AiProposalCardState,
   type AiToolCall,
+  type AiToolExecution,
   type DailyPlanScheduleProposalItem,
   type InboxOrganizationProposalItem,
 } from "@task-orbit/core";
@@ -179,6 +181,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           iteration += 1;
           const assistantMsgId = uid("msg_");
           let accumulatedContent = "";
+          let accumulatedReasoning = "";
           const toolCallsMap = new Map<number, AiToolCall>();
 
           // Add empty assistant message placeholder to UI
@@ -203,11 +206,32 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           });
 
           for await (const chunk of stream) {
-            if (chunk.delta.content) {
-              accumulatedContent += chunk.delta.content;
+            if (chunk.delta.reasoning_content) {
+              accumulatedReasoning += chunk.delta.reasoning_content;
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantMsgId ? { ...m, content: accumulatedContent } : m,
+                  m.id === assistantMsgId
+                    ? { ...m, reasoningContent: accumulatedReasoning }
+                    : m,
+                ),
+              );
+            }
+
+            if (chunk.delta.content) {
+              accumulatedContent += chunk.delta.content;
+              const parsed = extractReasoningAndContent(
+                accumulatedContent,
+                accumulatedReasoning,
+              );
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: parsed.content,
+                        reasoningContent: parsed.reasoning || undefined,
+                      }
+                    : m,
                 ),
               );
             }
@@ -228,11 +252,17 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           }
 
           const resolvedToolCalls = Array.from(toolCallsMap.values());
+          const parsed = extractReasoningAndContent(
+            accumulatedContent,
+            accumulatedReasoning,
+          );
           const finalAssistantMsg: AiChatMessage = {
             id: assistantMsgId,
             role: "assistant",
-            content: accumulatedContent,
+            content: parsed.content,
+            reasoningContent: parsed.reasoning || undefined,
             tool_calls: resolvedToolCalls.length > 0 ? resolvedToolCalls : undefined,
+            toolExecutions: [],
             createdAt: Date.now(),
           };
 
@@ -297,9 +327,27 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                 inboxPayload: { proposals: enrichedProposals },
               };
 
+              const proposalResult = {
+                status: "proposal_rendered",
+                count: enrichedProposals.length,
+                message:
+                  "整理方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
+              };
+
               finalAssistantMsg.proposal = proposalState;
+              finalAssistantMsg.toolExecutions = [
+                ...(finalAssistantMsg.toolExecutions || []),
+                {
+                  id: tc.id,
+                  name: toolName,
+                  label,
+                  args,
+                  result: proposalResult,
+                  timestamp: Date.now(),
+                },
+              ];
               const updatedHistory = history.map((m) =>
-                m.id === assistantMsgId ? { ...m, proposal: proposalState } : m,
+                m.id === assistantMsgId ? { ...finalAssistantMsg } : m,
               );
               history = updatedHistory;
               setMessages(updatedHistory);
@@ -310,12 +358,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                 role: "tool",
                 name: toolName,
                 tool_call_id: tc.id,
-                content: JSON.stringify({
-                  status: "proposal_rendered",
-                  count: enrichedProposals.length,
-                  message:
-                    "整理方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
-                }),
+                content: JSON.stringify(proposalResult),
                 createdAt: Date.now(),
               };
 
@@ -365,9 +408,28 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                 },
               };
 
+              const proposalResult = {
+                status: "proposal_rendered",
+                targetDate,
+                count: enrichedProposals.length,
+                message:
+                  "日程排期方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
+              };
+
               finalAssistantMsg.proposal = proposalState;
+              finalAssistantMsg.toolExecutions = [
+                ...(finalAssistantMsg.toolExecutions || []),
+                {
+                  id: tc.id,
+                  name: toolName,
+                  label,
+                  args,
+                  result: proposalResult,
+                  timestamp: Date.now(),
+                },
+              ];
               const updatedHistory = history.map((m) =>
-                m.id === assistantMsgId ? { ...m, proposal: proposalState } : m,
+                m.id === assistantMsgId ? { ...finalAssistantMsg } : m,
               );
               history = updatedHistory;
               setMessages(updatedHistory);
@@ -378,12 +440,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                 role: "tool",
                 name: toolName,
                 tool_call_id: tc.id,
-                content: JSON.stringify({
-                  status: "proposal_rendered",
-                  count: enrichedProposals.length,
-                  message:
-                    "日程排期方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
-                }),
+                content: JSON.stringify(proposalResult),
                 createdAt: Date.now(),
               };
 
@@ -401,6 +458,24 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                 error: toolErr instanceof Error ? toolErr.message : String(toolErr),
               };
             }
+
+            finalAssistantMsg.toolExecutions = [
+              ...(finalAssistantMsg.toolExecutions || []),
+              {
+                id: tc.id,
+                name: toolName,
+                label,
+                args,
+                result: toolResult,
+                timestamp: Date.now(),
+              },
+            ];
+            const updatedHistory = history.map((m) =>
+              m.id === assistantMsgId ? { ...finalAssistantMsg } : m,
+            );
+            history = updatedHistory;
+            setMessages(updatedHistory);
+            saveMessages(updatedHistory);
 
             const toolResponseMsg: AiChatMessage = {
               id: uid("msg_"),
