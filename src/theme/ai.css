@@ -71,18 +71,37 @@
 
 /* AI Chat Drawer animation and layout */
 .ai-chat-drawer {
-  animation: slideInRight 200ms cubic-bezier(0.2, 0, 0, 1);
+  animation: drawerFadeIn 150ms ease-out;
 }
 
-@keyframes slideInRight {
+@keyframes drawerFadeIn {
   from {
-    transform: translateX(100%);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
     opacity: 1;
   }
+}
+
+/* Left edge resizer for AI Chat Drawer */
+.ai-chat-drawer__resizer {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 50;
+  transition: background-color 150ms ease;
+}
+
+.ai-chat-drawer__resizer:hover,
+.ai-chat-drawer__resizer.is-resizing {
+  background-color: var(--md-primary);
+}
+
+.ai-chat-drawer.is-resizing {
+  user-select: none;
 }
 
 /* ============================================================================

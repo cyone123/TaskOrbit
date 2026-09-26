@@ -30,11 +30,13 @@ export function AiMessageList({
   onOpenSettings,
   isAiConfigured = true,
 }: AiMessageListProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom as new content streams in
+  // Auto-scroll to bottom as new content streams in (scoped to container, avoiding ancestor shift)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
   }, [messages, currentToolCall, error]);
 
   // Identify the single active streaming assistant message
@@ -65,6 +67,7 @@ export function AiMessageList({
 
   return (
     <div
+      ref={listRef}
       className="col gap-12"
       style={{
         flex: 1,
@@ -297,7 +300,6 @@ export function AiMessageList({
         </div>
       )}
 
-      <div ref={bottomRef} style={{ height: 1 }} />
     </div>
   );
 }

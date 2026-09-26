@@ -1,4 +1,4 @@
-import { useState, useRef, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { useStore } from "../../store/store";
 import { useAiChat } from "../../store/ai-chat-store";
 import { Icon } from "../Icon";
@@ -7,6 +7,10 @@ import { useSnackbar } from "../ui";
 import { AiMessageList } from "./AiMessageList";
 import { AiQuickActions } from "./AiQuickActions";
 import { AiSettingsDialog } from "./AiSettingsDialog";
+
+const DEFAULT_DRAWER_WIDTH = 380;
+const MIN_DRAWER_WIDTH = 300;
+const LS_DRAWER_WIDTH_KEY = "task-orbit-ai-drawer-width";
 
 export function AiChatDrawer() {
   const store = useStore();
@@ -28,6 +32,68 @@ export function AiChatDrawer() {
   const [input, setInput] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [drawerWidth, setDrawerWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_DRAWER_WIDTH;
+    try {
+      const saved = localStorage.getItem(LS_DRAWER_WIDTH_KEY);
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= MIN_DRAWER_WIDTH) {
+          return val;
+        }
+      }
+    } catch {}
+    return DEFAULT_DRAWER_WIDTH;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const isResizingRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_DRAWER_WIDTH_KEY, String(drawerWidth));
+    } catch {}
+  }, [drawerWidth]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
+
+  const handleMouseDownResizer = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    isResizingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const newWidth = window.innerWidth - moveEvent.clientX;
+      const maxWidth = Math.max(MIN_DRAWER_WIDTH, window.innerWidth - 380);
+      const clamped = Math.min(Math.max(newWidth, MIN_DRAWER_WIDTH), maxWidth);
+      setDrawerWidth(clamped);
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      isResizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  const handleDoubleClickResizer = () => {
+    setDrawerWidth(DEFAULT_DRAWER_WIDTH);
+  };
 
   const aiSettings = store.state.aiSettings;
 
@@ -71,12 +137,13 @@ export function AiChatDrawer() {
   return (
     <>
       <aside
-        className="ai-chat-drawer col"
+        className={`ai-chat-drawer col ${isResizing ? "is-resizing" : ""}`}
         style={{
-          width: 380,
-          minWidth: 320,
-          maxWidth: "90vw",
+          width: drawerWidth,
+          minWidth: MIN_DRAWER_WIDTH,
+          maxWidth: "85vw",
           height: "100%",
+          flexShrink: 0,
           background: "var(--md-surface-container-low)",
           borderLeft: "1px solid var(--md-outline-variant)",
           display: "flex",
@@ -85,6 +152,14 @@ export function AiChatDrawer() {
           zIndex: 40,
         }}
       >
+        {/* Left edge drag handle to resize width */}
+        <div
+          className={`ai-chat-drawer__resizer ${isResizing ? "is-resizing" : ""}`}
+          onMouseDown={handleMouseDownResizer}
+          onDoubleClick={handleDoubleClickResizer}
+          title="按住拖拽调整宽度，双击恢复默认 (380px)"
+          aria-label="拖拽调整侧边栏宽度"
+        />
         {/* Drawer Header */}
         <header
           className="row items-center justify-between"
