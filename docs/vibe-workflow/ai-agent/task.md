@@ -57,9 +57,9 @@
   4. `packages/core/src/ai/executor.ts`: 实现只读工具执行器，基于当前 `AppState` 纯内存查询过滤并返回紧凑 JSON。
   5. `packages/core/src/ai/executor.test.ts` & `client.test.ts`: 编写单元测试验证各工具输出准确性与流式解析。
 - **验收标准 (Acceptance Criteria)**：
-  - [ ] 运行 `vitest`，只读工具针对 Mock AppState 查询出的任务列表、番茄钟统计与计划时间块准确无误；
-  - [ ] 流式客户端能正确分块解析 SSE 数据，并能正确触发中止信号。
-- **完成门禁 (Gate)**：所有核心 AI 测试用例 100% 通过。
+  - [x] 运行 `vitest`，只读工具针对 Mock AppState 查询出的任务列表、番茄钟统计与计划时间块准确无误；
+  - [x] 流式客户端能正确分块解析 SSE 数据，并能正确触发中止信号。
+- **完成门禁 (Gate)**：所有核心 AI 测试用例 100% 通过。（已通过 ✅）
 
 ---
 

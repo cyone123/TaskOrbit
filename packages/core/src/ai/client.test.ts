@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testAiConnection } from "./client";
+import {
+  parseSseBuffer,
+  streamChatCompletions,
+  testAiConnection,
+} from "./client";
 import { AI_PROVIDER_PRESETS, getAiProviderPreset } from "./presets";
+import type { AiChatMessage, StreamChunk } from "./types";
 
 describe("AI presets", () => {
   it("includes presets for deepseek, siliconflow, openai, and ollama", () => {
@@ -101,5 +106,132 @@ describe("testAiConnection", () => {
 
     expect(res.ok).toBe(false);
     expect(res.message).toContain("404");
+  });
+});
+
+describe("parseSseBuffer", () => {
+  it("parses single data line with content delta", () => {
+    const buffer = 'data: {"id":"1","model":"test","choices":[{"delta":{"content":"Hello"}}]}\n';
+    const result = parseSseBuffer(buffer);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].delta.content).toBe("Hello");
+    expect(result.isDone).toBe(false);
+    expect(result.remaining).toBe("");
+  });
+
+  it("retains partial line in remaining", () => {
+    const buffer = 'data: {"id":"1","choices":[{"delta":{"content":"A"}}]}\ndata: {"id":"2"';
+    const result = parseSseBuffer(buffer);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].delta.content).toBe("A");
+    expect(result.remaining).toBe('data: {"id":"2"');
+    expect(result.isDone).toBe(false);
+  });
+
+  it("detects [DONE] message", () => {
+    const buffer = "data: [DONE]\n";
+    const result = parseSseBuffer(buffer);
+
+    expect(result.isDone).toBe(true);
+    expect(result.events).toHaveLength(0);
+  });
+
+  it("parses tool calls delta", () => {
+    const raw = JSON.stringify({
+      id: "call_chunk",
+      model: "deepseek",
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_abc",
+                type: "function",
+                function: { name: "get_workspace_summary", arguments: "{}" },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const buffer = `data: ${raw}\n`;
+    const result = parseSseBuffer(buffer);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].delta.tool_calls?.[0].function?.name).toBe("get_workspace_summary");
+  });
+});
+
+describe("streamChatCompletions", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("streams chunks from response body", async () => {
+    const encoder = new TextEncoder();
+    const chunk1 = 'data: {"id":"1","model":"m","choices":[{"delta":{"content":"Hi"}}]}\n\n';
+    const chunk2 = 'data: {"id":"2","model":"m","choices":[{"delta":{"content":" there"}}]}\n\ndata: [DONE]\n\n';
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(chunk1));
+        controller.enqueue(encoder.encode(chunk2));
+        controller.close();
+      },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        body: stream,
+      }),
+    );
+
+    const messages: AiChatMessage[] = [{ id: "m1", role: "user", content: "Hello" }];
+    const chunks: StreamChunk[] = [];
+
+    for await (const chunk of streamChatCompletions({
+      baseUrl: "https://api.test/v1",
+      apiKey: "sk-test",
+      model: "test-model",
+      messages,
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0].delta.content).toBe("Hi");
+    expect(chunks[1].delta.content).toBe(" there");
+  });
+
+  it("throws error when API returns error status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => ({ error: { message: "Server overloaded" } }),
+      }),
+    );
+
+    const messages: AiChatMessage[] = [{ id: "m1", role: "user", content: "Hello" }];
+
+    await expect(async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of streamChatCompletions({
+        baseUrl: "https://api.test/v1",
+        apiKey: "sk-test",
+        model: "test-model",
+        messages,
+      })) {
+        // do nothing
+      }
+    }).rejects.toThrow("Server overloaded");
   });
 });
