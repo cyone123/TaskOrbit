@@ -160,12 +160,9 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
 你可以使用工具查询用户当前的工作区概况、项目列表、任务属性、日程计划排期以及番茄钟专注统计。
 
 核心执行规范：
-1. 收集箱整理：必须先调用 get_inbox_items 获取未处理条目，并调用 get_projects_and_tasks 获取可用项目列表；经过分析后，调用 plan_inbox_organization 提交整理方案。
+1. 收集箱整理：先调用 get_inbox_items 获取未处理条目，并调用 get_projects_and_tasks 获取可用项目列表；经过分析后，调用 plan_inbox_organization 提交整理方案。
 2. 日程排期：先调用 get_daily_plans 和 get_projects_and_tasks 查看今日日程与高优待办，分析时间空隙后再给出建议。
-3. 效能复盘：调用 get_pomodoro_stats 分析近期专注会话，结合实际数据给出客观反思与时间分配改进建议。
-
-注意：任何涉及修改或写入数据的操作（如整理收集箱），必须通过调用对应的 plan_* 工具向用户呈现结构化确认卡片，严禁假装已经直接写入。
-支持 Markdown 排版（列表、代码块、加粗等）。`,
+3. 效能复盘：调用 get_pomodoro_stats 分析近期专注会话，结合实际数据给出客观反思与时间分配改进建议。`,
       };
 
       setIsStreaming(true);
@@ -278,6 +275,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           }
 
           // Execute tool calls
+          let hasRenderedProposal = false;
           let hasExecutedTool = false;
           for (const tc of resolvedToolCalls) {
             const toolName = tc.function.name;
@@ -363,6 +361,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
               };
 
               conversationForApi.push(toolResponseMsg);
+              hasRenderedProposal = true;
               hasExecutedTool = true;
               continue;
             }
@@ -445,6 +444,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
               };
 
               conversationForApi.push(toolResponseMsg);
+              hasRenderedProposal = true;
               hasExecutedTool = true;
               continue;
             }
@@ -491,7 +491,10 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           }
 
           setCurrentToolCall(null);
-          if (!hasExecutedTool) {
+          // If a write proposal card has been rendered, stop the conversation turn immediately.
+          // The interactive card is already presented to the user with action buttons,
+          // so there is no need for the model to generate a redundant follow-up message.
+          if (hasRenderedProposal || !hasExecutedTool) {
             break;
           }
         }

@@ -115,7 +115,7 @@ export const INBOX_ORGANIZATION_TOOL: AiToolDefinition = {
   function: {
     name: "plan_inbox_organization",
     description:
-      "将收集箱中的零散未处理条目整理并提议转化为项目任务、日程每日计划，或直接标记完成/忽略。此工具会向用户呈现结构化确认卡片，待用户确认后才实际执行写入变更。",
+      "将收集箱中的零散未处理条目整理并提议转化为项目任务、日程每日计划，或直接标记完成/忽略。调用此工具后，前端会向用户呈现结构化确认卡片。",
     parameters: {
       type: "object",
       properties: {
