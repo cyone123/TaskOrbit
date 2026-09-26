@@ -57,6 +57,17 @@ export function AiChatDrawer() {
     target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
   };
 
+  const handleRetry = () => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMsg && !isStreaming) {
+      void sendMessage(lastUserMsg.content);
+    }
+  };
+
+  const isAiConfigured = Boolean(
+    aiSettings.enabled && aiSettings.baseUrl.trim() && aiSettings.model.trim(),
+  );
+
   return (
     <>
       <aside
@@ -140,12 +151,15 @@ export function AiChatDrawer() {
           error={error}
           onApplyProposal={(msgId, propId) => {
             applyProposal(msgId, propId);
-            show("已成功应用整理方案");
+            show("已成功应用建议方案");
           }}
           onCancelProposal={(msgId, propId) => {
             cancelProposal(msgId, propId);
             show("已放弃本次建议");
           }}
+          onRetry={handleRetry}
+          onOpenSettings={() => setSettingsOpen(true)}
+          isAiConfigured={isAiConfigured}
         />
 
         {/* Drawer Footer with Input */}

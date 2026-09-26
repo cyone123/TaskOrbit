@@ -129,7 +129,7 @@
   3. 无障碍（A11y）：所有图标按钮配齐 `aria-label` 与 `title`，键盘焦点移动合理。
   4. 最终测试与构建验证：运行 `pnpm test` 和 `pnpm build`，确保 core、desktop 类型检查与生产构建零错误。
 - **验收标准 (Acceptance Criteria)**：
-  - [ ] `pnpm test` 全部通过（包括所有新增的 AI 测试与旧有的核心测试）；
-  - [ ] `pnpm build`（含 tsc 类型检查）构建成功；
-  - [ ] [prd.md](file:///d:/CS/TaskOrbit/docs/vibe-workflow/ai-agent/prd.md) 中全部 6 项验收标准全部满足。
-- **完成门禁 (Gate)**：全流程测试与构建完全绿灯。
+  - [x] `pnpm test` 全部通过（包括所有新增的 AI 测试与旧有的核心测试）；
+  - [x] `pnpm build`（含 tsc 类型检查）构建成功；
+  - [x] [prd.md](file:///d:/CS/TaskOrbit/docs/vibe-workflow/ai-agent/prd.md) 中全部 6 项验收标准全部满足。
+- **完成门禁 (Gate)**：全流程测试与构建完全绿灯。（已通过 ✅）

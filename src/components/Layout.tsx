@@ -4,7 +4,6 @@ import { useWindowSizeClass } from "../hooks/useWindowSizeClass";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
 import { AiChatDrawer } from "./ai/AiChatDrawer";
-import { AiSettingsDialog } from "./ai/AiSettingsDialog";
 import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
 import { IconButton, Ripple } from "./material";
@@ -29,7 +28,6 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
   const { state, updateSettings } = useStore();
   const { isOpen: aiDrawerOpen, toggleDrawer: toggleAiDrawer } = useAiChat();
   const [dataDialogOpen, setDataDialogOpen] = useState(false);
-  const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const windowClass = useWindowSizeClass();
   const theme = state.settings.theme;
@@ -161,10 +159,6 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
       <DataManagementDialog
         open={dataDialogOpen}
         onClose={() => setDataDialogOpen(false)}
-      />
-      <AiSettingsDialog
-        open={aiSettingsDialogOpen}
-        onClose={() => setAiSettingsDialogOpen(false)}
       />
     </div>
   );

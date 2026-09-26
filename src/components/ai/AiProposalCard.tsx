@@ -253,11 +253,11 @@ export function AiProposalCard({ proposal, onApply, onCancel }: AiProposalCardPr
       <div className="ai-proposal-card__footer row items-center justify-end gap-8 mt-12 pt-8">
         {isPending ? (
           <>
-            <TextButton onClick={onCancel}>
+            <TextButton onClick={onCancel} aria-label="放弃建议">
               <Icon name="close" size={16} slot="icon" />
               放弃
             </TextButton>
-            <FilledButton onClick={onApply}>
+            <FilledButton onClick={onApply} aria-label="确认应用此方案">
               <Icon name="check" size={16} slot="icon" />
               确认应用
             </FilledButton>
