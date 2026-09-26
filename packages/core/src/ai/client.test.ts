@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  fetchAiModels,
   parseSseBuffer,
   streamChatCompletions,
   testAiConnection,
@@ -233,5 +234,84 @@ describe("streamChatCompletions", () => {
         // do nothing
       }
     }).rejects.toThrow("Server overloaded");
+  });
+});
+
+describe("fetchAiModels", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fails if baseUrl is empty", async () => {
+    const res = await fetchAiModels({ baseUrl: "", apiKey: "sk-test" });
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain("Base URL");
+  });
+
+  it("fetches and parses models from standard OpenAI format", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          object: "list",
+          data: [
+            { id: "deepseek-chat", object: "model" },
+            { id: "deepseek-reasoner", object: "model" },
+          ],
+        }),
+      }),
+    );
+
+    const res = await fetchAiModels({
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: "sk-test",
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.models).toEqual(["deepseek-chat", "deepseek-reasoner"]);
+    expect(res.message).toContain("2 个可用模型");
+  });
+
+  it("handles alternative array or object format and sorts results", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          models: [{ name: "llama3:8b" }, { name: "qwen2.5:7b" }],
+        }),
+      }),
+    );
+
+    const res = await fetchAiModels({
+      baseUrl: "http://localhost:11434/v1",
+      apiKey: "",
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.models).toEqual(["llama3:8b", "qwen2.5:7b"]);
+  });
+
+  it("handles error response from endpoint", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        json: async () => ({ error: { message: "Invalid API Key" } }),
+      }),
+    );
+
+    const res = await fetchAiModels({
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "invalid-key",
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain("Invalid API Key");
   });
 });

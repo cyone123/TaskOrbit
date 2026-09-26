@@ -236,6 +236,8 @@ describe("persisted state schema", () => {
       apiKey: "",
       model: "deepseek-chat",
       temperature: 0.7,
+      customProviders: [],
+      providersConfig: {},
     });
   });
 

@@ -318,11 +318,25 @@ export const webDavSettingsSchema = z.object({
     .default(DEFAULT_WEBDAV_SETTINGS.syncIntervalMinutes),
 });
 
+const customAiProviderSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1),
+  baseUrl: z.string().trim(),
+  apiKey: z.string().default(""),
+  model: z.string().trim().default(""),
+  temperature: z.number().min(0).max(2).default(0.7),
+});
+
+const aiProviderConfigSchema = z.object({
+  baseUrl: z.string().trim().default(""),
+  apiKey: z.string().default(""),
+  model: z.string().trim().default(""),
+  temperature: z.number().min(0).max(2).optional(),
+});
+
 export const aiSettingsSchema = z.object({
   enabled: z.boolean().default(DEFAULT_AI_SETTINGS.enabled),
-  provider: z
-    .enum(["deepseek", "siliconflow", "openai", "ollama", "custom"])
-    .default(DEFAULT_AI_SETTINGS.provider),
+  provider: z.string().default(DEFAULT_AI_SETTINGS.provider),
   baseUrl: z.string().trim().default(DEFAULT_AI_SETTINGS.baseUrl),
   apiKey: z.string().default(DEFAULT_AI_SETTINGS.apiKey),
   model: z.string().trim().default(DEFAULT_AI_SETTINGS.model),
@@ -331,6 +345,8 @@ export const aiSettingsSchema = z.object({
     .min(0)
     .max(2)
     .default(DEFAULT_AI_SETTINGS.temperature),
+  customProviders: z.array(customAiProviderSchema).default([]),
+  providersConfig: z.record(z.string(), aiProviderConfigSchema).default({}),
 });
 
 export const appStateSchema = z.object({

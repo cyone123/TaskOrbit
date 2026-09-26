@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AI_PROVIDER_PRESETS,
+  BUILTIN_PROVIDER_CANDIDATE_MODELS,
+  fetchAiModels,
   getAiProviderPreset,
   testAiConnection,
   todayISO,
+  type AiProviderConfig,
   type AiProviderKey,
+  type CustomAiProvider,
   type TestAiConnectionResult,
   type WebDavSettings,
 } from "@task-orbit/core";
@@ -24,7 +28,7 @@ import {
   TonalButton,
   eventValue,
 } from "../components/material";
-import { ConfirmDialog, useSnackbar } from "../components/ui";
+import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
 
 type SettingsTab = "all" | "appearance" | "calendar" | "pomodoro" | "ai" | "data";
@@ -37,6 +41,188 @@ const TABS: { key: SettingsTab; label: string; icon: string }[] = [
   { key: "ai", label: "AI 助理", icon: "smart_toy" },
   { key: "data", label: "数据与同步", icon: "cloud_sync" },
 ];
+
+interface AiModelComboboxProps {
+  value: string;
+  onChange: (val: string) => void;
+  baseUrl: string;
+  apiKey: string;
+  provider: string;
+  onNotice?: (msg: string) => void;
+}
+
+function AiModelCombobox({
+  value,
+  onChange,
+  baseUrl,
+  apiKey,
+  provider,
+  onNotice,
+}: AiModelComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setFetchedModels([]);
+    setFetchError(null);
+  }, [provider]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const handleFetchModels = async () => {
+    if (!baseUrl.trim()) {
+      setFetchError("请先填写接口地址 (Base URL)");
+      return;
+    }
+    setFetching(true);
+    setFetchError(null);
+    try {
+      const res = await fetchAiModels({
+        baseUrl: baseUrl.trim(),
+        apiKey: apiKey.trim(),
+      });
+      if (res.ok) {
+        setFetchedModels(res.models);
+        onNotice?.(res.message);
+      } else {
+        setFetchError(res.message);
+      }
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const presetCandidates = BUILTIN_PROVIDER_CANDIDATE_MODELS[provider] ?? [];
+  const allCandidates = Array.from(new Set([...fetchedModels, ...presetCandidates]));
+
+  const query = value.trim().toLowerCase();
+  const filteredCandidates = query
+    ? allCandidates.filter((m) => m.toLowerCase().includes(query))
+    : allCandidates;
+
+  return (
+    <div className="model-combobox" ref={containerRef}>
+      <div style={{ position: "relative" }}>
+        <OutlinedTextField
+          label="模型名称 (Model Name)"
+          value={value}
+          onInput={(e) => {
+            onChange(eventValue(e));
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+          placeholder="可直接输入或展开下拉选择，例如 deepseek-chat"
+          supportingText="支持手动输入与搜索，展开列表可在线获取服务商支持的模型"
+          style={{ width: "100%" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            right: 8,
+            top: 8,
+            zIndex: 2,
+          }}
+        >
+          <IconButton
+            onClick={() => setOpen((prev) => !prev)}
+            title={open ? "收起模型列表" : "展开模型列表"}
+            aria-label={open ? "收起模型列表" : "展开模型列表"}
+          >
+            <Icon name={open ? "arrow_drop_up" : "arrow_drop_down"} size={22} />
+          </IconButton>
+        </div>
+      </div>
+
+      {open && (
+        <div className="model-combobox__dropdown">
+          <div className="model-combobox__actions">
+            <span className="body-xs muted">
+              {fetchedModels.length > 0
+                ? `已获取 ${fetchedModels.length} 个在线模型`
+                : "可点击右侧按钮在线拉取："}
+            </span>
+            <button
+              type="button"
+              className="model-combobox__actions-btn"
+              onClick={handleFetchModels}
+              disabled={fetching || !baseUrl.trim()}
+              title={!baseUrl.trim() ? "请先填写 Base URL" : "调用 /models 接口拉取可用模型"}
+            >
+              {fetching ? (
+                <CircularProgress indeterminate style={{ width: 14, height: 14 }} />
+              ) : (
+                <Icon name="sync" size={16} />
+              )}
+              {fetching ? "正在获取..." : "获取在线模型"}
+            </button>
+          </div>
+
+          {fetchError && (
+            <div
+              className="settings-notice settings-notice--error"
+              style={{ margin: "4px 8px", padding: "4px 8px" }}
+            >
+              <Icon name="error" size={16} />
+              <span className="body-xs">{fetchError}</span>
+            </div>
+          )}
+
+          <div className="model-combobox__list">
+            {filteredCandidates.length > 0 ? (
+              filteredCandidates.map((m) => {
+                const isSelected = m === value;
+                const isOnline = fetchedModels.includes(m);
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`model-combobox__item ${isSelected ? "is-selected" : ""}`}
+                    onClick={() => {
+                      onChange(m);
+                      setOpen(false);
+                    }}
+                  >
+                    <span>{m}</span>
+                    <div className="row items-center gap-4">
+                      {isOnline && (
+                        <span className="model-combobox__item-badge">在线</span>
+                      )}
+                      {isSelected && <Icon name="check" size={16} />}
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="model-combobox__empty">
+                {allCandidates.length === 0 ? (
+                  <span>暂无候选模型。可点击上方「获取在线模型」，或直接在输入框手动填写。</span>
+                ) : (
+                  <span>未找到匹配模型，可直接按回车或保留当前输入作为自定义模型。</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SettingsView() {
   const store = useStore();
@@ -188,7 +374,7 @@ export function SettingsView() {
   // ---------------------------------------------------------------------------
   const ai = state.aiSettings;
   const [aiEnabled, setAiEnabled] = useState(ai.enabled);
-  const [aiProvider, setAiProvider] = useState<AiProviderKey>(ai.provider);
+  const [aiProvider, setAiProvider] = useState<string>(ai.provider);
   const [aiBaseUrl, setAiBaseUrl] = useState(ai.baseUrl);
   const [aiApiKey, setAiApiKey] = useState(ai.apiKey);
   const [aiModel, setAiModel] = useState(ai.model);
@@ -198,6 +384,39 @@ export function SettingsView() {
   const [aiTestResult, setAiTestResult] = useState<TestAiConnectionResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  // Custom providers list
+  const [customProviders, setCustomProviders] = useState<CustomAiProvider[]>(
+    () => ai.customProviders ?? [],
+  );
+
+  // Independent provider configs memory
+  const [providerConfigs, setProviderConfigs] = useState<Record<string, AiProviderConfig>>(() => {
+    const init: Record<string, AiProviderConfig> = { ...(ai.providersConfig ?? {}) };
+    if (ai.provider) {
+      init[ai.provider] = {
+        baseUrl: ai.baseUrl,
+        apiKey: ai.apiKey,
+        model: ai.model,
+        temperature: ai.temperature,
+      };
+    }
+    return init;
+  });
+
+  // Modal dialog states for custom providers
+  const [addCustomDialogOpen, setAddCustomDialogOpen] = useState(false);
+  const [newCustomName, setNewCustomName] = useState("");
+  const [newCustomBaseUrl, setNewCustomBaseUrl] = useState("");
+  const [newCustomModel, setNewCustomModel] = useState("");
+
+  const [renameCustomDialogOpen, setRenameCustomDialogOpen] = useState(false);
+  const [renameCustomTarget, setRenameCustomTarget] = useState<CustomAiProvider | null>(null);
+  const [renameCustomName, setRenameCustomName] = useState("");
+
+  const [deleteCustomTarget, setDeleteCustomTarget] = useState<CustomAiProvider | null>(null);
+
+  const currentCustomProvider = customProviders.find((cp) => cp.id === aiProvider);
+
   useEffect(() => {
     setAiEnabled(ai.enabled);
     setAiProvider(ai.provider);
@@ -205,16 +424,183 @@ export function SettingsView() {
     setAiApiKey(ai.apiKey);
     setAiModel(ai.model);
     setAiTemperature(ai.temperature);
+    if (ai.customProviders) setCustomProviders(ai.customProviders);
+    if (ai.providersConfig) setProviderConfigs(ai.providersConfig);
   }, [ai]);
 
-  const handleAiProviderChange = (newProvider: AiProviderKey) => {
-    setAiProvider(newProvider);
+  const handleAiProviderChange = (newProviderId: string) => {
+    // 1. 暂存当前正在编辑的提供商配置，防止切换后被冲掉
+    const updatedConfigs: Record<string, AiProviderConfig> = {
+      ...providerConfigs,
+      [aiProvider]: {
+        baseUrl: aiBaseUrl,
+        apiKey: aiApiKey,
+        model: aiModel,
+        temperature: aiTemperature,
+      },
+    };
+    setProviderConfigs(updatedConfigs);
+
+    // 若当前正在编辑某自定义提供商，也同步暂存回 customProviders
+    setCustomProviders((prev) =>
+      prev.map((cp) =>
+        cp.id === aiProvider
+          ? {
+              ...cp,
+              baseUrl: aiBaseUrl,
+              apiKey: aiApiKey,
+              model: aiModel,
+              temperature: aiTemperature,
+            }
+          : cp,
+      ),
+    );
+
+    // 2. 切换当前 provider ID
+    setAiProvider(newProviderId);
     setAiTestResult(null);
-    const preset = getAiProviderPreset(newProvider);
-    if (preset && newProvider !== "custom") {
+    setAiError(null);
+
+    // 3. 读取目标提供商的历史暂存/已存值（优先读取，绝对不覆盖用户输入）
+    const savedTarget = updatedConfigs[newProviderId];
+    if (savedTarget && (savedTarget.baseUrl || savedTarget.apiKey || savedTarget.model)) {
+      setAiBaseUrl(savedTarget.baseUrl);
+      setAiApiKey(savedTarget.apiKey);
+      setAiModel(savedTarget.model);
+      if (typeof savedTarget.temperature === "number") {
+        setAiTemperature(savedTarget.temperature);
+      }
+      return;
+    }
+
+    // 4. 若为 customProviders 列表里的自定义提供商且暂无 config 缓存
+    const customItem = customProviders.find((cp) => cp.id === newProviderId);
+    if (customItem) {
+      setAiBaseUrl(customItem.baseUrl);
+      setAiApiKey(customItem.apiKey);
+      setAiModel(customItem.model);
+      setAiTemperature(customItem.temperature);
+      return;
+    }
+
+    // 5. 若为内置预设且未曾配置过，读取预设默认值
+    const preset = getAiProviderPreset(newProviderId as AiProviderKey);
+    if (preset && newProviderId !== "custom") {
       setAiBaseUrl(preset.baseUrl);
       setAiModel(preset.defaultModel);
+      setAiApiKey("");
+      setAiTemperature(0.7);
+    } else if (newProviderId === "custom") {
+      setAiBaseUrl("");
+      setAiApiKey("");
+      setAiModel("");
+      setAiTemperature(0.7);
     }
+  };
+
+  const handleAddCustomProvider = () => {
+    const name = newCustomName.trim();
+    if (!name) return;
+    const newId = `custom_${Date.now()}`;
+    const newProvider: CustomAiProvider = {
+      id: newId,
+      name,
+      baseUrl: newCustomBaseUrl.trim(),
+      apiKey: "",
+      model: newCustomModel.trim(),
+      temperature: 0.7,
+    };
+
+    // 1. 暂存当前正在编辑的提供商，同时加入新提供商配置
+    const nextConfigs: Record<string, AiProviderConfig> = {
+      ...providerConfigs,
+      [aiProvider]: {
+        baseUrl: aiBaseUrl,
+        apiKey: aiApiKey,
+        model: aiModel,
+        temperature: aiTemperature,
+      },
+      [newId]: {
+        baseUrl: newProvider.baseUrl,
+        apiKey: "",
+        model: newProvider.model,
+        temperature: 0.7,
+      },
+    };
+
+    const nextCustomProviders = [
+      ...customProviders.map((cp) =>
+        cp.id === aiProvider
+          ? {
+              ...cp,
+              baseUrl: aiBaseUrl,
+              apiKey: aiApiKey,
+              model: aiModel,
+              temperature: aiTemperature,
+            }
+          : cp,
+      ),
+      newProvider,
+    ];
+
+    setCustomProviders(nextCustomProviders);
+    setProviderConfigs(nextConfigs);
+
+    // 2. 立即切换到新添加的自定义提供商
+    setAiProvider(newId);
+    setAiBaseUrl(newProvider.baseUrl);
+    setAiApiKey("");
+    setAiModel(newProvider.model);
+    setAiTemperature(0.7);
+    setAiTestResult(null);
+    setAiError(null);
+
+    setAddCustomDialogOpen(false);
+    setNewCustomName("");
+    setNewCustomBaseUrl("");
+    setNewCustomModel("");
+
+    show(`已添加自定义服务商「${name}」`);
+  };
+
+  const handleRenameCustomProvider = () => {
+    if (!renameCustomTarget || !renameCustomName.trim()) return;
+    const newName = renameCustomName.trim();
+    setCustomProviders((prev) =>
+      prev.map((cp) => (cp.id === renameCustomTarget.id ? { ...cp, name: newName } : cp)),
+    );
+    setRenameCustomDialogOpen(false);
+    setRenameCustomTarget(null);
+    setRenameCustomName("");
+    show(`自定义服务商已重命名为「${newName}」`);
+  };
+
+  const handleDeleteCustomProvider = (target: CustomAiProvider) => {
+    const nextCustom = customProviders.filter((cp) => cp.id !== target.id);
+    const nextConfigs = { ...providerConfigs };
+    delete nextConfigs[target.id];
+
+    setCustomProviders(nextCustom);
+    setProviderConfigs(nextConfigs);
+    setDeleteCustomTarget(null);
+
+    if (aiProvider === target.id) {
+      setAiProvider("deepseek");
+      const dsConfig = nextConfigs["deepseek"];
+      if (dsConfig) {
+        setAiBaseUrl(dsConfig.baseUrl);
+        setAiApiKey(dsConfig.apiKey);
+        setAiModel(dsConfig.model);
+        setAiTemperature(dsConfig.temperature ?? 0.7);
+      } else {
+        const preset = getAiProviderPreset("deepseek");
+        setAiBaseUrl(preset?.baseUrl ?? "");
+        setAiApiKey("");
+        setAiModel(preset?.defaultModel ?? "");
+        setAiTemperature(0.7);
+      }
+    }
+    show(`已删除自定义服务商「${target.name}」`);
   };
 
   const handleTestAiConnection = async () => {
@@ -260,6 +646,32 @@ export function SettingsView() {
       return;
     }
     setAiError(null);
+
+    const updatedCustomProviders = customProviders.map((cp) =>
+      cp.id === aiProvider
+        ? {
+            ...cp,
+            baseUrl: aiBaseUrl.trim(),
+            apiKey: aiApiKey.trim(),
+            model: aiModel.trim(),
+            temperature: aiTemperature,
+          }
+        : cp,
+    );
+
+    const updatedConfigs: Record<string, AiProviderConfig> = {
+      ...providerConfigs,
+      [aiProvider]: {
+        baseUrl: aiBaseUrl.trim(),
+        apiKey: aiApiKey.trim(),
+        model: aiModel.trim(),
+        temperature: aiTemperature,
+      },
+    };
+
+    setCustomProviders(updatedCustomProviders);
+    setProviderConfigs(updatedConfigs);
+
     updateAiSettings({
       enabled: aiEnabled,
       provider: aiProvider,
@@ -267,6 +679,8 @@ export function SettingsView() {
       apiKey: aiApiKey.trim(),
       model: aiModel.trim(),
       temperature: aiTemperature,
+      customProviders: updatedCustomProviders,
+      providersConfig: updatedConfigs,
     });
     show("AI 助理配置已保存");
   };
@@ -531,7 +945,6 @@ export function SettingsView() {
                         setWeekDetailStartHour(Number(eventValue(e)));
                         setCalError("");
                       }}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 24 }, (_, i) => (
                         <SelectOption key={i} value={String(i)} selected={weekDetailStartHour === i}>
@@ -550,7 +963,6 @@ export function SettingsView() {
                         setWeekDetailEndHour(Number(eventValue(e)));
                         setCalError("");
                       }}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 24 }, (_, i) => i + 1).map((i) => (
                         <SelectOption key={i} value={String(i)} selected={weekDetailEndHour === i}>
@@ -575,7 +987,6 @@ export function SettingsView() {
                         setDayStartHour(Number(eventValue(e)));
                         setCalError("");
                       }}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 24 }, (_, i) => (
                         <SelectOption key={i} value={String(i)} selected={dayStartHour === i}>
@@ -594,7 +1005,6 @@ export function SettingsView() {
                         setDayEndHour(Number(eventValue(e)));
                         setCalError("");
                       }}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 24 }, (_, i) => i + 1).map((i) => (
                         <SelectOption key={i} value={String(i)} selected={dayEndHour === i}>
@@ -616,7 +1026,6 @@ export function SettingsView() {
                       label="最大任务轨道数"
                       value={String(monthMaxTaskTracks)}
                       onChange={(e) => setMonthMaxTaskTracks(Number(eventValue(e)))}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
                         <SelectOption key={num} value={String(num)} selected={monthMaxTaskTracks === num}>
@@ -632,7 +1041,6 @@ export function SettingsView() {
                       label="最大每日计划数"
                       value={String(monthMaxDailyPlans)}
                       onChange={(e) => setMonthMaxDailyPlans(Number(eventValue(e)))}
-                      menuPositioning="fixed"
                     >
                       {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
                         <SelectOption key={num} value={String(num)} selected={monthMaxDailyPlans === num}>
@@ -791,18 +1199,64 @@ export function SettingsView() {
 
             <div className="col gap-12">
               <div className="field">
-                <OutlinedSelect
-                  label="服务提供商 / 快捷预设"
-                  value={aiProvider}
-                  onChange={(e) => handleAiProviderChange(eventValue(e) as AiProviderKey)}
-                  menuPositioning="fixed"
-                >
-                  {AI_PROVIDER_PRESETS.map((p) => (
-                    <SelectOption key={p.id} value={p.id} selected={aiProvider === p.id}>
-                      <span slot="headline">{p.name}</span>
-                    </SelectOption>
-                  ))}
-                </OutlinedSelect>
+                <div className="row items-center gap-8">
+                  <div style={{ flex: 1 }}>
+                    <OutlinedSelect
+                      label="服务提供商 / 快捷预设"
+                      value={aiProvider}
+                      onChange={(e) => handleAiProviderChange(eventValue(e))}
+                      style={{ width: "100%" }}
+                    >
+                      {AI_PROVIDER_PRESETS.map((p) => (
+                        <SelectOption key={p.id} value={p.id} selected={aiProvider === p.id}>
+                          <span slot="headline">{p.name}</span>
+                        </SelectOption>
+                      ))}
+                      {customProviders.map((cp) => (
+                        <SelectOption key={cp.id} value={cp.id} selected={aiProvider === cp.id}>
+                          <span slot="headline">{cp.name} (自定义)</span>
+                        </SelectOption>
+                      ))}
+                    </OutlinedSelect>
+                  </div>
+                  <TonalButton
+                    type="button"
+                    onClick={() => {
+                      setNewCustomName("");
+                      setNewCustomBaseUrl("");
+                      setNewCustomModel("");
+                      setAddCustomDialogOpen(true);
+                    }}
+                    title="添加自定义服务提供商"
+                  >
+                    <Icon name="add" size={18} slot="icon" />
+                    添加服务商
+                  </TonalButton>
+                  {currentCustomProvider && (
+                    <>
+                      <IconButton
+                        type="button"
+                        title="重命名服务商"
+                        aria-label="重命名服务商"
+                        onClick={() => {
+                          setRenameCustomTarget(currentCustomProvider);
+                          setRenameCustomName(currentCustomProvider.name);
+                          setRenameCustomDialogOpen(true);
+                        }}
+                      >
+                        <Icon name="edit" size={18} />
+                      </IconButton>
+                      <IconButton
+                        type="button"
+                        title="删除服务商"
+                        aria-label="删除服务商"
+                        onClick={() => setDeleteCustomTarget(currentCustomProvider)}
+                      >
+                        <Icon name="delete" size={18} />
+                      </IconButton>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="field">
@@ -853,14 +1307,16 @@ export function SettingsView() {
 
               <div className="field__row">
                 <div className="field" style={{ flex: 2 }}>
-                  <OutlinedTextField
-                    label="模型名称 (Model Name)"
+                  <AiModelCombobox
                     value={aiModel}
-                    onInput={(e) => {
-                      setAiModel(eventValue(e));
+                    onChange={(val) => {
+                      setAiModel(val);
                       setAiError(null);
                     }}
-                    placeholder="例如 deepseek-chat 或 gpt-4o-mini"
+                    baseUrl={aiBaseUrl}
+                    apiKey={aiApiKey}
+                    provider={aiProvider}
+                    onNotice={show}
                   />
                 </div>
                 <div className="field" style={{ flex: 1 }}>
@@ -1148,6 +1604,109 @@ export function SettingsView() {
         confirmLabel="确认清空并重置"
         onCancel={() => setResetDialogOpen(false)}
         onConfirm={() => void handleResetAll()}
+      />
+
+      {/* 添加自定义服务商弹窗 */}
+      <Dialog
+        open={addCustomDialogOpen}
+        onClose={() => setAddCustomDialogOpen(false)}
+        title="添加自定义 AI 服务商"
+        icon="add_circle"
+        actions={
+          <div className="row items-center gap-8">
+            <TextButton onClick={() => setAddCustomDialogOpen(false)}>取消</TextButton>
+            <FilledButton
+              disabled={!newCustomName.trim()}
+              onClick={handleAddCustomProvider}
+            >
+              <Icon name="check" size={18} slot="icon" />
+              添加并切换
+            </FilledButton>
+          </div>
+        }
+      >
+        <div className="col gap-12" style={{ minWidth: 320, paddingTop: 8 }}>
+          <OutlinedTextField
+            label="服务商名称"
+            value={newCustomName}
+            onInput={(e) => setNewCustomName(eventValue(e))}
+            placeholder="例如 Groq、通义千问、公司内网大模型"
+            required
+            autoFocus
+          />
+          <OutlinedTextField
+            label="接口地址 (Base URL)"
+            value={newCustomBaseUrl}
+            onInput={(e) => setNewCustomBaseUrl(eventValue(e))}
+            placeholder="例如 https://api.groq.com/openai/v1"
+            supportingText="必须支持 OpenAI /chat/completions 兼容格式"
+          />
+          <OutlinedTextField
+            label="默认模型名称 (可选)"
+            value={newCustomModel}
+            onInput={(e) => setNewCustomModel(eventValue(e))}
+            placeholder="例如 llama-3.3-70b-versatile"
+          />
+        </div>
+      </Dialog>
+
+      {/* 重命名自定义服务商弹窗 */}
+      <Dialog
+        open={renameCustomDialogOpen}
+        onClose={() => {
+          setRenameCustomDialogOpen(false);
+          setRenameCustomTarget(null);
+          setRenameCustomName("");
+        }}
+        title="重命名自定义服务商"
+        icon="edit"
+        actions={
+          <div className="row items-center gap-8">
+            <TextButton
+              onClick={() => {
+                setRenameCustomDialogOpen(false);
+                setRenameCustomTarget(null);
+                setRenameCustomName("");
+              }}
+            >
+              取消
+            </TextButton>
+            <FilledButton
+              disabled={!renameCustomName.trim()}
+              onClick={handleRenameCustomProvider}
+            >
+              <Icon name="check" size={18} slot="icon" />
+              保存
+            </FilledButton>
+          </div>
+        }
+      >
+        <div className="col gap-12" style={{ minWidth: 320, paddingTop: 8 }}>
+          <OutlinedTextField
+            label="服务商名称"
+            value={renameCustomName}
+            onInput={(e) => setRenameCustomName(eventValue(e))}
+            placeholder="请输入服务商名称"
+            required
+            autoFocus
+          />
+        </div>
+      </Dialog>
+
+      {/* 删除自定义服务商确认弹窗 */}
+      <ConfirmDialog
+        open={deleteCustomTarget !== null}
+        title="删除自定义服务商"
+        message={`确定要删除自定义服务商「${deleteCustomTarget?.name ?? ""}」吗？其已保存的接口地址与密钥配置也将被移除。`}
+        confirmLabel="确认删除"
+        danger
+        icon="delete"
+        onCancel={() => setDeleteCustomTarget(null)}
+        onConfirm={() => {
+          if (deleteCustomTarget) {
+            handleDeleteCustomProvider(deleteCustomTarget);
+          }
+        }}
       />
     </div>
   );

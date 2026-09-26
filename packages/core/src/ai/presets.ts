@@ -40,6 +40,35 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   },
 ];
 
-export function getAiProviderPreset(id: AiProviderKey): AiProviderPreset | undefined {
+export function getAiProviderPreset(id: string): AiProviderPreset | undefined {
   return AI_PROVIDER_PRESETS.find((preset) => preset.id === id);
 }
+
+export const BUILTIN_PROVIDER_CANDIDATE_MODELS: Record<string, string[]> = {
+  deepseek: ["deepseek-chat", "deepseek-reasoner"],
+  siliconflow: [
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-R1",
+    "Qwen/Qwen2.5-72B-Instruct",
+    "Qwen/Qwen2.5-32B-Instruct",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "THUDM/glm-4-9b-chat",
+  ],
+  openai: [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "o1-mini",
+    "o1-preview",
+    "gpt-4-turbo",
+    "gpt-3.5-turbo",
+  ],
+  ollama: [
+    "qwen2.5:7b",
+    "qwen2.5:14b",
+    "deepseek-r1:7b",
+    "deepseek-r1:8b",
+    "llama3.3:70b",
+    "llama3.1:8b",
+  ],
+  custom: [],
+};

@@ -40,4 +40,6 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   apiKey: "",
   model: "deepseek-chat",
   temperature: 0.7,
+  customProviders: [],
+  providersConfig: {},
 };

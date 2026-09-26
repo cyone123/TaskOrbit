@@ -44,6 +44,7 @@ describe("SettingsView", () => {
 
     // Check Section 4: AI Assistant
     expect(html).toContain("AI 任务助理配置");
+    expect(html).toContain("添加服务商");
     expect(html).toContain("测试连通性");
     expect(html).toContain("保存 AI 配置");
 

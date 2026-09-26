@@ -99,6 +99,113 @@ export async function testAiConnection(
   }
 }
 
+export interface FetchAiModelsOptions {
+  baseUrl: string;
+  apiKey: string;
+  timeoutMs?: number;
+}
+
+export interface FetchAiModelsResult {
+  ok: boolean;
+  models: string[];
+  message: string;
+}
+
+export async function fetchAiModels(
+  options: FetchAiModelsOptions,
+): Promise<FetchAiModelsResult> {
+  const { baseUrl, apiKey, timeoutMs = 15000 } = options;
+  if (!baseUrl.trim()) {
+    return { ok: false, models: [], message: "接口地址 (Base URL) 不能为空" };
+  }
+
+  const endpoint = `${baseUrl.replace(/\/+$/, "")}/models`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (apiKey.trim()) {
+      headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+    }
+
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let errorDetail = "";
+      try {
+        const json = (await response.json()) as { error?: { message?: string } };
+        errorDetail = json?.error?.message || JSON.stringify(json);
+      } catch {
+        errorDetail = await response.text().catch(() => "");
+      }
+      return {
+        ok: false,
+        models: [],
+        message: `获取模型失败 (${response.status})：${errorDetail || response.statusText}`,
+      };
+    }
+
+    const json = (await response.json()) as Record<string, unknown>;
+    const rawList = Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json?.models)
+        ? json.models
+        : Array.isArray(json)
+          ? json
+          : [];
+
+    const models: string[] = [];
+    for (const item of rawList) {
+      if (typeof item === "string" && item.trim()) {
+        models.push(item.trim());
+      } else if (typeof item === "object" && item !== null) {
+        const id =
+          (item as { id?: string; name?: string; model?: string }).id ??
+          (item as { name?: string }).name ??
+          (item as { model?: string }).model;
+        if (typeof id === "string" && id.trim()) {
+          models.push(id.trim());
+        }
+      }
+    }
+
+    const unique = Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
+
+    if (unique.length === 0) {
+      return {
+        ok: true,
+        models: [],
+        message: "接口返回成功，但未解析到模型列表数据",
+      };
+    }
+
+    return {
+      ok: true,
+      models: unique,
+      message: `成功获取到 ${unique.length} 个可用模型`,
+    };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return {
+        ok: false,
+        models: [],
+        message: `请求超时（超过 ${timeoutMs / 1000} 秒），请检查网络`,
+      };
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, models: [], message: `无法连接服务器：${msg}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Parses accumulated SSE buffer lines and extracts StreamChunks.
  */

@@ -54,6 +54,16 @@ export function serializeExportSnapshot(state: AppState, exportedAt = Date.now()
         ...portableAiSettings,
         enabled: false,
         apiKey: "",
+        customProviders: (portableAiSettings.customProviders ?? []).map((cp) => ({
+          ...cp,
+          apiKey: "",
+        })),
+        providersConfig: Object.fromEntries(
+          Object.entries(portableAiSettings.providersConfig ?? {}).map(([key, cfg]) => [
+            key,
+            { ...cfg, apiKey: "" },
+          ]),
+        ),
       },
     },
   };

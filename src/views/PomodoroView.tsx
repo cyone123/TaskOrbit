@@ -280,7 +280,6 @@ export function PomodoroView() {
             label="本次专注对象"
             value={linkValue}
             onChange={(event) => onChangeLink(eventValue(event))}
-            menuPositioning="fixed"
           >
             {linkOptions.map((option) => (
               <SelectOption

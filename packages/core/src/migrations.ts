@@ -152,8 +152,26 @@ function migrateV7ToV8(input: JsonRecord): JsonRecord {
 function migrateV8ToV9(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 9,
     aiSettings: { ...DEFAULT_AI_SETTINGS, ...asRecord(input.aiSettings) },
+  };
+}
+
+/** v10 adds customProviders and per-provider config memory to aiSettings. */
+function migrateV9ToV10(input: JsonRecord): JsonRecord {
+  const oldAi = asRecord(input.aiSettings);
+  return {
+    ...input,
+    version: STATE_VERSION,
+    aiSettings: {
+      ...DEFAULT_AI_SETTINGS,
+      ...oldAi,
+      customProviders: Array.isArray(oldAi.customProviders) ? oldAi.customProviders : [],
+      providersConfig:
+        typeof oldAi.providersConfig === "object" && oldAi.providersConfig !== null
+          ? oldAi.providersConfig
+          : {},
+    },
   };
 }
 
@@ -178,6 +196,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 6) migrated = migrateV6ToV7(migrated);
   if (version <= 7) migrated = migrateV7ToV8(migrated);
   if (version <= 8) migrated = migrateV8ToV9(migrated);
+  if (version <= 9) migrated = migrateV9ToV10(migrated);
 
   return migrated;
 }

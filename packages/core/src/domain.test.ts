@@ -594,7 +594,50 @@ describe("domain commands", () => {
         apiKey: "sk-test-key",
         model: "deepseek-ai/DeepSeek-V3",
         temperature: 0.5,
+        customProviders: [],
+        providersConfig: {},
       });
+      expect(validateAppState(updated)).toBeDefined();
+    });
+
+    it("persists customProviders and providersConfig cleanly", () => {
+      const state = createEmptyState();
+      const updated = updateAiSettingsState(state, {
+        enabled: true,
+        provider: "custom_1",
+        baseUrl: "https://my-llm.corp.internal/v1",
+        apiKey: "sk-internal-key",
+        model: "llama-3-custom",
+        temperature: 0.8,
+        customProviders: [
+          {
+            id: "custom_1",
+            name: "公司内网大模型",
+            baseUrl: "https://my-llm.corp.internal/v1",
+            apiKey: "sk-internal-key",
+            model: "llama-3-custom",
+            temperature: 0.8,
+          },
+        ],
+        providersConfig: {
+          deepseek: {
+            baseUrl: "https://api.deepseek.com/v1",
+            apiKey: "sk-deepseek-key",
+            model: "deepseek-chat",
+            temperature: 0.7,
+          },
+          custom_1: {
+            baseUrl: "https://my-llm.corp.internal/v1",
+            apiKey: "sk-internal-key",
+            model: "llama-3-custom",
+            temperature: 0.8,
+          },
+        },
+      });
+
+      expect(updated.aiSettings.customProviders).toHaveLength(1);
+      expect(updated.aiSettings.customProviders?.[0]?.name).toBe("公司内网大模型");
+      expect(updated.aiSettings.providersConfig?.["deepseek"]?.apiKey).toBe("sk-deepseek-key");
       expect(validateAppState(updated)).toBeDefined();
     });
   });

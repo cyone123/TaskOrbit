@@ -134,12 +134,30 @@ export interface WebDavSettings {
   syncIntervalMinutes: number;
 }
 
-export type AiProviderKey =
+export type BuiltinAiProviderKey =
   | "deepseek"
   | "siliconflow"
   | "openai"
   | "ollama"
   | "custom";
+
+export type AiProviderKey = BuiltinAiProviderKey | (string & {});
+
+export interface CustomAiProvider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+}
+
+export interface AiProviderConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature?: number;
+}
 
 export interface AiSettings {
   enabled: boolean;
@@ -148,6 +166,8 @@ export interface AiSettings {
   apiKey: string;
   model: string;
   temperature: number;
+  customProviders?: CustomAiProvider[];
+  providersConfig?: Record<string, AiProviderConfig>;
 }
 
 export type EntityType = "project" | "task" | "dailyPlan" | "inboxItem";
