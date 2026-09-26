@@ -195,6 +195,16 @@
   color: var(--md-on-surface-variant);
 }
 
+.ai-action-chip--reschedule {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.ai-action-chip--delete {
+  background: rgba(211, 47, 47, 0.15);
+  color: var(--md-error, #ba1a1a);
+}
+
 .ai-priority-badge {
   font-size: 10px;
   font-weight: 600;

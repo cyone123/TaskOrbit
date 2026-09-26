@@ -41,12 +41,40 @@ export interface InboxOrganizationProposalPayload {
   proposals: InboxOrganizationProposalItem[];
 }
 
+export interface DailyPlanScheduleProposalItem {
+  action: "create" | "reschedule" | "delete";
+  planId?: string;
+  originalPlanName?: string;
+  originalTime?: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  };
+  newPlan?: {
+    projectId?: string | null;
+    taskId?: string | null;
+    name: string;
+    description?: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    estimatedMinutes?: number;
+  };
+  reason?: string;
+}
+
+export interface DailyPlanScheduleProposalPayload {
+  targetDate: string;
+  proposals: DailyPlanScheduleProposalItem[];
+}
+
 export interface AiProposalCardState {
   id: string;
   type: "inbox_organization" | "schedule_daily_plans";
   status: AiProposalStatus;
   createdAt: number;
   inboxPayload?: InboxOrganizationProposalPayload;
+  schedulePayload?: DailyPlanScheduleProposalPayload;
 }
 
 export interface AiChatMessage {
@@ -67,6 +95,7 @@ export interface AiToolParameterProperty {
   items?: {
     type: string;
     properties?: Record<string, unknown>;
+    required?: string[];
   };
 }
 

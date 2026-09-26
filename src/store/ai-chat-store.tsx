@@ -10,6 +10,7 @@ import {
 import {
   ALL_AI_TOOLS,
   commitInboxProposal,
+  commitScheduleProposal,
   executeReadTool,
   streamChatCompletions,
   todayISO,
@@ -17,6 +18,7 @@ import {
   type AiChatMessage,
   type AiProposalCardState,
   type AiToolCall,
+  type DailyPlanScheduleProposalItem,
   type InboxOrganizationProposalItem,
 } from "@task-orbit/core";
 import { useStore } from "./store";
@@ -31,6 +33,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_daily_plans: "正在检索日程计划时间块...",
   get_pomodoro_stats: "正在统计番茄钟专注记录...",
   plan_inbox_organization: "正在规划收集箱整理方案...",
+  plan_schedule_daily_plans: "正在计算最佳日程排期...",
 };
 
 export interface AiChatStoreApi {
@@ -321,6 +324,74 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
               continue;
             }
 
+            // Handle write proposal tool: plan_schedule_daily_plans
+            if (toolName === "plan_schedule_daily_plans") {
+              const targetDate =
+                typeof args.targetDate === "string" ? args.targetDate : todayISO();
+              const rawProposals = Array.isArray(args.proposals)
+                ? (args.proposals as DailyPlanScheduleProposalItem[])
+                : [];
+
+              const enrichedProposals: DailyPlanScheduleProposalItem[] = rawProposals.map(
+                (p) => {
+                  const existingPlan = p.planId
+                    ? store.state.dailyPlans.find((plan) => plan.id === p.planId)
+                    : undefined;
+
+                  return {
+                    ...p,
+                    originalPlanName: p.originalPlanName || existingPlan?.name,
+                    originalTime:
+                      p.originalTime ||
+                      (existingPlan
+                        ? {
+                            date: existingPlan.date,
+                            startTime: existingPlan.startTime,
+                            endTime: existingPlan.endTime,
+                          }
+                        : undefined),
+                  };
+                },
+              );
+
+              const proposalState: AiProposalCardState = {
+                id: uid("prop_"),
+                type: "schedule_daily_plans",
+                status: "pending",
+                createdAt: Date.now(),
+                schedulePayload: {
+                  targetDate,
+                  proposals: enrichedProposals,
+                },
+              };
+
+              finalAssistantMsg.proposal = proposalState;
+              const updatedHistory = history.map((m) =>
+                m.id === assistantMsgId ? { ...m, proposal: proposalState } : m,
+              );
+              history = updatedHistory;
+              setMessages(updatedHistory);
+              saveMessages(updatedHistory);
+
+              const toolResponseMsg: AiChatMessage = {
+                id: uid("msg_"),
+                role: "tool",
+                name: toolName,
+                tool_call_id: tc.id,
+                content: JSON.stringify({
+                  status: "proposal_rendered",
+                  count: enrichedProposals.length,
+                  message:
+                    "日程排期方案卡片已成功生成并呈现给用户，等待用户在卡片上确认操作后才会应用入库。",
+                }),
+                createdAt: Date.now(),
+              };
+
+              conversationForApi.push(toolResponseMsg);
+              hasExecutedTool = true;
+              continue;
+            }
+
             // Handle read tools
             let toolResult: unknown;
             try {
@@ -398,6 +469,30 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           saveMessages(updated);
         } catch (err) {
           console.error("Failed to commit inbox proposal:", err);
+        }
+      } else if (
+        targetMsg.proposal.type === "schedule_daily_plans" &&
+        targetMsg.proposal.schedulePayload
+      ) {
+        try {
+          store.mutate((currentState) =>
+            commitScheduleProposal(currentState, targetMsg.proposal!.schedulePayload!),
+          );
+          const updated = messagesRef.current.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  proposal: {
+                    ...m.proposal!,
+                    status: "applied" as const,
+                  },
+                }
+              : m,
+          );
+          setMessages(updated);
+          saveMessages(updated);
+        } catch (err) {
+          console.error("Failed to commit schedule proposal:", err);
         }
       }
     },

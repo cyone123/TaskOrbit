@@ -1,4 +1,8 @@
-import type { AiProposalCardState, InboxOrganizationProposalItem } from "@task-orbit/core";
+import type {
+  AiProposalCardState,
+  DailyPlanScheduleProposalItem,
+  InboxOrganizationProposalItem,
+} from "@task-orbit/core";
 import { Icon } from "../Icon";
 import { FilledButton, TextButton } from "../material";
 
@@ -9,13 +13,12 @@ export interface AiProposalCardProps {
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "紧迫",
   high: "高优",
   medium: "中优",
   low: "低优",
 };
 
-function ProposalItemRow({ item }: { item: InboxOrganizationProposalItem }) {
+function InboxProposalItemRow({ item }: { item: InboxOrganizationProposalItem }) {
   const isTask = item.action === "convert_to_task";
   const isPlan = item.action === "convert_to_daily_plan";
   const isDone = item.action === "mark_done";
@@ -119,12 +122,92 @@ function ProposalItemRow({ item }: { item: InboxOrganizationProposalItem }) {
   );
 }
 
+function ScheduleProposalItemRow({ item }: { item: DailyPlanScheduleProposalItem }) {
+  const isCreate = item.action === "create";
+  const isReschedule = item.action === "reschedule";
+  const isDelete = item.action === "delete";
+
+  const displayName = item.newPlan?.name || item.originalPlanName || "日程计划";
+
+  return (
+    <div className="ai-proposal-item">
+      <div className="row items-start gap-8">
+        <div className="ai-proposal-item__result col gap-4" style={{ flex: 1, minWidth: 0 }}>
+          {isCreate && item.newPlan && (
+            <>
+              <div className="row items-center gap-6 flex-wrap">
+                <span className="ai-action-chip ai-action-chip--plan">新增计划</span>
+                <span className="ai-proposal-item__name font-medium">{displayName}</span>
+              </div>
+              <div className="row items-center gap-8 body-xs muted flex-wrap mt-2">
+                <span className="row items-center gap-4">
+                  <Icon name="schedule" size={14} />
+                  <span>
+                    {item.newPlan.date} {item.newPlan.startTime} - {item.newPlan.endTime}
+                  </span>
+                </span>
+                {item.newPlan.estimatedMinutes && (
+                  <span>({item.newPlan.estimatedMinutes} 分钟)</span>
+                )}
+              </div>
+            </>
+          )}
+
+          {isReschedule && item.newPlan && (
+            <>
+              <div className="row items-center gap-6 flex-wrap">
+                <span className="ai-action-chip ai-action-chip--reschedule">时间调整</span>
+                <span className="ai-proposal-item__name font-medium">{displayName}</span>
+              </div>
+              <div className="row items-center gap-6 body-xs mt-2 flex-wrap">
+                {item.originalTime && (
+                  <span className="muted line-through">
+                    {item.originalTime.startTime} - {item.originalTime.endTime}
+                  </span>
+                )}
+                <Icon name="arrow_forward" size={14} style={{ color: "var(--md-primary)" }} />
+                <span className="font-medium" style={{ color: "var(--md-primary)" }}>
+                  {item.newPlan.startTime} - {item.newPlan.endTime}
+                </span>
+                {item.newPlan.estimatedMinutes && (
+                  <span className="muted">({item.newPlan.estimatedMinutes} 分钟)</span>
+                )}
+              </div>
+            </>
+          )}
+
+          {isDelete && (
+            <div className="row items-center gap-6">
+              <span className="ai-action-chip ai-action-chip--delete">取消计划</span>
+              <span className="ai-proposal-item__name line-through muted">
+                {displayName}
+              </span>
+            </div>
+          )}
+
+          {item.reason && (
+            <div className="ai-proposal-item__reason body-xs muted mt-4">
+              💡 {item.reason}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AiProposalCard({ proposal, onApply, onCancel }: AiProposalCardProps) {
   const isPending = proposal.status === "pending";
   const isApplied = proposal.status === "applied";
   const isCancelled = proposal.status === "cancelled";
 
+  const isSchedule = proposal.type === "schedule_daily_plans";
   const inboxItems = proposal.inboxPayload?.proposals || [];
+  const scheduleItems = proposal.schedulePayload?.proposals || [];
+
+  const title = isSchedule
+    ? `建议的日程排期方案 (${proposal.schedulePayload?.targetDate || "今日"})`
+    : "建议的收集箱整理方案";
 
   return (
     <div className={`ai-proposal-card ai-proposal-card--${proposal.status}`}>
@@ -132,11 +215,11 @@ export function AiProposalCard({ proposal, onApply, onCancel }: AiProposalCardPr
       <div className="ai-proposal-card__header row items-center justify-between">
         <div className="row items-center gap-6">
           <Icon
-            name="auto_awesome"
+            name={isSchedule ? "calendar_month" : "auto_awesome"}
             size={18}
             style={{ color: "var(--md-primary)" }}
           />
-          <span className="title-sm font-medium">建议的收集箱整理方案</span>
+          <span className="title-sm font-medium">{title}</span>
         </div>
 
         {isPending && (
@@ -152,9 +235,18 @@ export function AiProposalCard({ proposal, onApply, onCancel }: AiProposalCardPr
 
       {/* Body / Items Diff */}
       <div className="ai-proposal-card__body col gap-10 mt-8">
-        {inboxItems.map((item, idx) => (
-          <ProposalItemRow key={`${item.inboxItemId}_${idx}`} item={item} />
-        ))}
+        {!isSchedule &&
+          inboxItems.map((item, idx) => (
+            <InboxProposalItemRow key={`${item.inboxItemId}_${idx}`} item={item} />
+          ))}
+
+        {isSchedule &&
+          scheduleItems.map((item, idx) => (
+            <ScheduleProposalItemRow
+              key={`${item.planId || item.newPlan?.name}_${idx}`}
+              item={item}
+            />
+          ))}
       </div>
 
       {/* Footer Actions */}
@@ -171,7 +263,10 @@ export function AiProposalCard({ proposal, onApply, onCancel }: AiProposalCardPr
             </FilledButton>
           </>
         ) : isApplied ? (
-          <div className="row items-center gap-6 body-xs" style={{ color: "var(--color-success, #2e7d32)" }}>
+          <div
+            className="row items-center gap-6 body-xs"
+            style={{ color: "var(--color-success, #2e7d32)" }}
+          >
             <Icon name="check_circle" size={16} />
             <span>已成功应用到您的任务与日程</span>
           </div>

@@ -43,6 +43,7 @@ import {
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import { useAiChat } from "../store/ai-chat-store";
 import {
   type PlanDragMode,
   computeDraggedPlanTimes,
@@ -140,6 +141,15 @@ export function CalendarView() {
 
   const days = useMemo(() => weekDays(anchor), [anchor]);
   const selectedISO = toISODate(anchor);
+  const { openDrawer, sendMessage } = useAiChat();
+
+  const handleAiSchedule = () => {
+    openDrawer();
+    void sendMessage(
+      `请查看我 ${selectedISO} 的已有日程与未完成任务，识别出空闲时间段，帮我推荐最合理的每日计划时间块排期，并调用 plan_schedule_daily_plans 工具提交排期方案。`,
+    );
+  };
+
   const monthDays = useMemo(() => monthGridDays(anchor), [anchor]);
   const monthStart = useMemo(
     () => new Date(anchor.getFullYear(), anchor.getMonth(), 1),
@@ -490,6 +500,9 @@ export function CalendarView() {
           >
             <Icon name="settings" />
           </IconButton>
+          <TonalButton onClick={handleAiSchedule} aria-label="AI 智能排期">
+            <Icon name="auto_awesome" size={18} slot="icon" /> AI 排期
+          </TonalButton>
           <FilledButton onClick={() => openNewPlan()}>
             <Icon name="add" size={18} slot="icon" /> 添加计划
           </FilledButton>

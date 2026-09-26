@@ -200,7 +200,88 @@ export const INBOX_ORGANIZATION_TOOL: AiToolDefinition = {
   },
 };
 
+export const DAILY_PLAN_SCHEDULE_TOOL: AiToolDefinition = {
+  type: "function",
+  function: {
+    name: "plan_schedule_daily_plans",
+    description:
+      "针对指定日期提议创建、调整或顺延每日日程计划时间块。此工具会向用户呈现原时间段 vs 新时间段的结构化确认卡片，待用户确认后才实际执行写入变更。",
+    parameters: {
+      type: "object",
+      properties: {
+        targetDate: {
+          type: "string",
+          description: "排期目标日期，格式 YYYY-MM-DD",
+        },
+        proposals: {
+          type: "array",
+          description: "计划创建、调整或删除的时间块排期项列表",
+          items: {
+            type: "object",
+            properties: {
+              action: {
+                type: "string",
+                enum: ["create", "reschedule", "delete"],
+                description:
+                  "排期动作：create（新建计划时间块）、reschedule（调整既有计划时间块）、delete（删除/取消计划）",
+              },
+              planId: {
+                type: "string",
+                description: "当 action 为 reschedule 或 delete 时的既有计划 ID",
+              },
+              originalPlanName: {
+                type: "string",
+                description: "原计划名称（可选，用于卡片回显）",
+              },
+              originalTime: {
+                type: "object",
+                description: "原计划的时间信息（可选，用于 Diff 回显）",
+                properties: {
+                  date: { type: "string", description: "原日期 YYYY-MM-DD" },
+                  startTime: { type: "string", description: "原起始时间 HH:mm" },
+                  endTime: { type: "string", description: "原结束时间 HH:mm" },
+                },
+              },
+              newPlan: {
+                type: "object",
+                description: "新建或调整后的每日计划属性",
+                properties: {
+                  projectId: {
+                    type: "string",
+                    description: "关联项目 ID（可选，传 null 或不传表示无项目）",
+                  },
+                  taskId: {
+                    type: "string",
+                    description: "关联任务 ID（可选，传 null 或不传表示无任务）",
+                  },
+                  name: { type: "string", description: "计划名称" },
+                  description: { type: "string", description: "计划描述" },
+                  date: { type: "string", description: "排期日期 YYYY-MM-DD" },
+                  startTime: { type: "string", description: "起始时间 HH:mm" },
+                  endTime: { type: "string", description: "结束时间 HH:mm" },
+                  estimatedMinutes: {
+                    type: "number",
+                    description: "预计耗时（分钟）",
+                  },
+                },
+                required: ["name", "date", "startTime", "endTime"],
+              },
+              reason: {
+                type: "string",
+                description: "排期调整或推荐该时间段的理由简述",
+              },
+            },
+            required: ["action"],
+          },
+        },
+      },
+      required: ["targetDate", "proposals"],
+    },
+  },
+};
+
 export const ALL_AI_TOOLS: AiToolDefinition[] = [
   ...READ_ONLY_TOOLS,
   INBOX_ORGANIZATION_TOOL,
+  DAILY_PLAN_SCHEDULE_TOOL,
 ];
