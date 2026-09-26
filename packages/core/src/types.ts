@@ -174,7 +174,7 @@ export interface AppState {
 
 // ---- Small helper types -----------------------------------------------------
 
-export type ViewKey = "inbox" | "projects" | "calendar" | "pomodoro" | "stats";
+export type ViewKey = "inbox" | "projects" | "calendar" | "pomodoro" | "stats" | "settings";
 
 export interface ColorOption {
   key: string;

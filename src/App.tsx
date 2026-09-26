@@ -14,6 +14,7 @@ import { PomodoroView } from "./views/PomodoroView";
 import { ProjectsView } from "./views/ProjectsView";
 import { StatsView } from "./views/StatsView";
 import { InboxView } from "./views/InboxView";
+import { SettingsView } from "./views/SettingsView";
 
 const TITLES: Record<ViewKey, string> = {
   inbox: "收集箱",
@@ -21,6 +22,7 @@ const TITLES: Record<ViewKey, string> = {
   calendar: "日历",
   pomodoro: "番茄钟",
   stats: "统计",
+  settings: "应用设置",
 };
 
 function Shell() {
@@ -34,6 +36,7 @@ function Shell() {
         {view === "calendar" && <CalendarView />}
         {view === "pomodoro" && <PomodoroView />}
         {view === "stats" && <StatsView />}
+        {view === "settings" && <SettingsView />}
       </div>
     </Layout>
   );

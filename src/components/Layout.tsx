@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { useWindowSizeClass } from "../hooks/useWindowSizeClass";
-import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
 import { AiChatDrawer } from "./ai/AiChatDrawer";
-import { DataManagementDialog } from "./DataManagementDialog";
 import { Icon } from "./Icon";
 import { IconButton, Ripple } from "./material";
 
@@ -25,19 +23,9 @@ interface LayoutProps {
 }
 
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
-  const { state, updateSettings } = useStore();
   const { isOpen: aiDrawerOpen, toggleDrawer: toggleAiDrawer } = useAiChat();
-  const [dataDialogOpen, setDataDialogOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const windowClass = useWindowSizeClass();
-  const theme = state.settings.theme;
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-  const toggleTheme = () => {
-    updateSettings({ theme: isDark ? "light" : "dark" });
-  };
   const isProjectWorkspace = view === "projects";
 
   // Global shortcut (Ctrl+J or Cmd+J) to toggle AI Assistant
@@ -110,18 +98,24 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
             />
           </IconButton>
           <IconButton
-            onClick={() => setDataDialogOpen(true)}
-            aria-label="数据管理"
-            title="数据管理"
+            onClick={() => onNavigate("settings")}
+            aria-label="应用设置"
+            title="应用设置"
+            style={
+              view === "settings"
+                ? {
+                    background: "var(--md-secondary-container)",
+                    borderRadius: "var(--shape-full)",
+                  }
+                : undefined
+            }
           >
-            <Icon name="import_export" size={22} />
-          </IconButton>
-          <IconButton
-            onClick={toggleTheme}
-            aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
-            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
-          >
-            <Icon name={isDark ? "light_mode" : "dark_mode"} size={22} />
+            <Icon
+              name="settings"
+              size={22}
+              fill={view === "settings"}
+              style={{ color: view === "settings" ? "var(--md-on-secondary-container)" : undefined }}
+            />
           </IconButton>
         </div>
       </nav>
@@ -155,11 +149,8 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           {children}
         </div>
       </div>
-      <AiChatDrawer />
-      <DataManagementDialog
-        open={dataDialogOpen}
-        onClose={() => setDataDialogOpen(false)}
-      />
+      <AiChatDrawer onNavigateToSettings={() => onNavigate("settings")} />
     </div>
   );
 }
+

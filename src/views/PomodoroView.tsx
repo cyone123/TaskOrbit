@@ -79,7 +79,6 @@ export function PomodoroView() {
   const phase = timer?.phase ?? "focus";
   const [now, setNow] = useState(() => Date.now());
   const [linkValue, setLinkValue] = useState(() => linkValueOf(timer));
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const linkRef = useRef<PomodoroLink>(linkOfTimer(timer));
 
   useEffect(() => {
@@ -213,9 +212,6 @@ export function PomodoroView() {
               <Icon name="picture_in_picture_alt" size={20} />
             </IconButton>
           )}
-          <IconButton onClick={() => setSettingsOpen(true)} aria-label="设置" title="设置">
-            <Icon name="settings" size={20} />
-          </IconButton>
         </div>
       </div>
 
@@ -336,107 +332,7 @@ export function PomodoroView() {
           </div>
         </div>
       )}
-
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onSave={(patch) => {
-          store.updateSettings(patch);
-          setSettingsOpen(false);
-          show("设置已保存");
-        }}
-      />
     </div>
   );
 }
 
-function SettingsDialog({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (patch: { focusMinutes: number; shortBreakMinutes: number; longBreakMinutes: number; longBreakInterval: number }) => void;
-}) {
-  const { state } = useStore();
-  const s = state.settings;
-  const [focus, setFocus] = useState(String(s.focusMinutes));
-  const [short, setShort] = useState(String(s.shortBreakMinutes));
-  const [long, setLong] = useState(String(s.longBreakMinutes));
-  const [interval, setIntervalVal] = useState(String(s.longBreakInterval));
-  const [error, setError] = useState("");
-
-  const submit = () => {
-    const f = Number(focus);
-    const sh = Number(short);
-    const lo = Number(long);
-    const it = Number(interval);
-    if (!f || !sh || !lo || !it || f < 1 || sh < 1 || lo < 1 || it < 1) {
-      setError("请输入大于 0 的有效数值");
-      return;
-    }
-    onSave({
-      focusMinutes: Math.round(f),
-      shortBreakMinutes: Math.round(sh),
-      longBreakMinutes: Math.round(lo),
-      longBreakInterval: Math.round(it),
-    });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="番茄钟设置"
-      actions={
-        <>
-          <TextButton onClick={onClose}>取消</TextButton>
-          <FilledButton onClick={submit}>保存</FilledButton>
-        </>
-      }
-    >
-      <div className="field__row">
-        <div className="field">
-          <OutlinedTextField
-            label="专注时长（分钟）"
-            type="number"
-            min="1"
-            value={focus}
-            onInput={(event) => setFocus(eventValue(event))}
-          />
-        </div>
-        <div className="field">
-          <OutlinedTextField
-            label="短休息（分钟）"
-            type="number"
-            min="1"
-            value={short}
-            onInput={(event) => setShort(eventValue(event))}
-          />
-        </div>
-      </div>
-      <div className="field__row">
-        <div className="field">
-          <OutlinedTextField
-            label="长休息（分钟）"
-            type="number"
-            min="1"
-            value={long}
-            onInput={(event) => setLong(eventValue(event))}
-          />
-        </div>
-        <div className="field">
-          <OutlinedTextField
-            label="长休息间隔（个）"
-            type="number"
-            min="1"
-            value={interval}
-            onInput={(event) => setIntervalVal(eventValue(event))}
-          />
-        </div>
-      </div>
-      {error && <p className="error-text body-sm">{error}</p>}
-    </Dialog>
-  );
-}

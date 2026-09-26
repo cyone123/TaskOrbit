@@ -12,7 +12,11 @@ const DEFAULT_DRAWER_WIDTH = 380;
 const MIN_DRAWER_WIDTH = 300;
 const LS_DRAWER_WIDTH_KEY = "task-orbit-ai-drawer-width";
 
-export function AiChatDrawer() {
+export interface AiChatDrawerProps {
+  onNavigateToSettings?: () => void;
+}
+
+export function AiChatDrawer({ onNavigateToSettings }: AiChatDrawerProps = {}) {
   const store = useStore();
   const { show } = useSnackbar();
   const {
@@ -198,9 +202,15 @@ export function AiChatDrawer() {
 
           <div className="row items-center gap-4">
             <IconButton
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => {
+                if (onNavigateToSettings) {
+                  onNavigateToSettings();
+                } else {
+                  setSettingsOpen(true);
+                }
+              }}
               aria-label="设置"
-              title="AI 助理配置"
+              title="前往应用设置"
             >
               <Icon name="settings" size={18} />
             </IconButton>
