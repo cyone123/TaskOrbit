@@ -6,7 +6,7 @@ Task Orbit 是一个个人任务与日程管理项目，包含 Tauri 2 桌面端
 
 ## 常用命令
 
-```bash
+```powershell
 pnpm install                # 安装依赖
 pnpm dev                    # 仅启动 Vite 开发服务器（浏览器模式，http://localhost:1420，端口固定）
 pnpm tauri dev              # 启动带桌面壳的完整应用
@@ -48,8 +48,8 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
 
 ### 数据版本与迁移
 
-- `packages/core/src/version.ts` 的 `STATE_VERSION`（当前为 7）随持久化 JSON 存储。**修改状态结构时必须递增它并在 `packages/core/src/migrations.ts` 添加对应迁移**，`packages/core/src/schema.ts` 的 `appStateSchema` 用 `z.literal(STATE_VERSION)` 严格锁定。
-- 导入/导出走 `transfer.ts` 的 `task-orbit-export` 信封格式；导出会剔除 `activeTimer` 和机器相关的 vault 路径（`rootPath`/`vaultName`）。
+- `packages/core/src/version.ts` 的 `STATE_VERSION`（当前为 9）随持久化 JSON 存储。**修改状态结构时必须递增它并在 `packages/core/src/migrations.ts` 添加对应迁移**，`packages/core/src/schema.ts` 的 `appStateSchema` 用 `z.literal(STATE_VERSION)` 严格锁定。
+- 导入/导出走 `transfer.ts` 的 `task-orbit-export` 信封格式；导出会剔除 `activeTimer`、`aiSettings.apiKey` 和机器相关的 vault 路径（`rootPath`/`vaultName`）。
 
 ### 数据同步（WebDAV）
 
@@ -61,6 +61,17 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
 
 - `src-tauri/src/vault.rs` 提供笔记命令（`scan_notes`、`read_note`、`write_note`、`delete_note` 等），用 YAML frontmatter 存储笔记元数据（id、projectId、taskIds 等）并做内容哈希乐观并发控制。前端封装在 `src/store/vault.ts`，仅在桌面环境可用（浏览器模式会抛错）。命令在 `src-tauri/src/lib.rs` 注册。
 - 前端笔记编辑器（`LiveMarkdownEditor`）支持 Markdown 实时预览渲染与内联编辑，扩展支持 GFM 表格解析与渲染。
+
+### AI 任务助理（Agent）
+
+`packages/core/src/ai` 与前端 `src/components/ai/`、`src/store/ai-chat-store.tsx` 构建了辅助任务规划与效能分析的内置 Agent：
+- **模型接入与流式通信**：兼容 OpenAI 标准 `/chat/completions` SSE 流式接口，内置 DeepSeek、Ollama、SiliconFlow 等预设；支持思维链（`reasoning_content` 及 `<think>` 标签）流式捕获与剥离。配置持久化于 `AppState.aiSettings`，导出备份时自动脱敏密钥。
+- **Function Calling 工具链**：
+  - **只读分析工具**：`get_workspace_summary`、`get_inbox_items`、`get_projects_and_tasks`、`get_daily_plans`、`get_pomodoro_stats`，为 Agent 提供工作区全貌、待办列表与专注数据。
+  - **写入提案工具**：`plan_inbox_organization`（收集箱整理）、`plan_schedule_daily_plans`（日程时间块排期）。
+- **交互范式（Human-in-the-Loop）**：
+  - 严禁未经确认直接篡改数据：写入操作一律由 Agent 输出包含 Diff 明细的 `AiProposalCard`，用户点击【确认应用】后才经 store 纯函数原子生效；方案卡片生成后会话立即收敛，避免多余回复。
+  - 交互界面：右侧抽屉式侧边栏（`AiChatDrawer`，支持快捷键 `Ctrl+J` / `Cmd+J`、自由拖拽调整宽度并持久化），集成深度思考折叠面板（`AiReasoningAccordion`）与终端式工具调用明细卡片（`AiToolCallAccordion`）。
 
 ### UI 层（Material Design 3 规范）
 
@@ -98,7 +109,7 @@ cargo test --manifest-path src-tauri/Cargo.toml    # 运行 Rust 测试（如 st
 
 ### 测试
 
-前端测试为 `*.test.ts`（vitest，与源码同目录），重点覆盖 domain/timer/recurrence/schema/transfer/persistence/markdown 的纯函数逻辑。Rust 侧测试内联在源文件（`#[cfg(test)]`）。
+前端测试为 `*.test.ts`（vitest，与源码同目录），重点覆盖 domain/timer/recurrence/schema/transfer/persistence/markdown/ai 的纯函数逻辑。Rust 侧测试内联在源文件（`#[cfg(test)]`）。
 
 ## 其他约定
 
