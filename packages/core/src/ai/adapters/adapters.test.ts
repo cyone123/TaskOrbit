@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAiAdapter, registerAiAdapter } from "./registry";
 import { resolveAiProtocol, type AiProtocolAdapter } from "./base";
 import { OpenAiChatAdapter } from "./openai-chat";
+import { OpenAiResponsesAdapter } from "./openai-responses";
 import { AnthropicAdapter } from "./anthropic";
 import { GeminiAdapter } from "./gemini";
 import { streamAiChat } from "../client";
@@ -426,3 +427,140 @@ describe("GeminiAdapter", () => {
     expect(sentBody.tools[0].functionDeclarations[0].name).toBe("get_workspace_summary");
   });
 });
+
+describe("OpenAiResponsesAdapter", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("testConnection sends POST to /v1/responses with Authorization header", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "resp_123" }),
+    } as any);
+
+    const adapter = new OpenAiResponsesAdapter();
+    const res = await adapter.testConnection({
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai-test",
+      model: "gpt-4o",
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.message).toContain("OpenAI Responses 端点可用");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-openai-test",
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+  });
+
+  it("fetchModels retrieves models from /v1/models", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: "gpt-4o" }, { id: "o3-mini" }, { id: "gpt-4o-mini" }],
+      }),
+    } as any);
+
+    const adapter = new OpenAiResponsesAdapter();
+    const res = await adapter.fetchModels({
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-test",
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.models).toContain("gpt-4o");
+    expect(res.models).toContain("o3-mini");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/models",
+      expect.anything(),
+    );
+  });
+
+  it("streams reasoning deltas, text deltas, and function calls", async () => {
+    const sseLines = [
+      'event: response.reasoning.delta\ndata: {"type":"response.reasoning.delta","delta":"正在分析日程冲突..."}',
+      'event: response.text.delta\ndata: {"type":"response.text.delta","delta":"已为您规划好明天的时间块："}',
+      'event: response.output_item.added\ndata: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"call_resp_999","name":"plan_schedule_daily_plans"}}',
+      'event: response.function_call_arguments.delta\ndata: {"type":"response.function_call_arguments.delta","output_index":0,"call_id":"call_resp_999","delta":"{\\"date\\":\\"2026-09-28\\"}"}',
+      'event: response.function_call_arguments.done\ndata: {"type":"response.function_call_arguments.done","output_index":0,"call_id":"call_resp_999"}',
+      'event: response.completed\ndata: {"type":"response.completed"}',
+    ].join("\n\n");
+
+    const encoder = new TextEncoder();
+    const mockStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(sseLines));
+        controller.close();
+      },
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: mockStream,
+    } as any);
+
+    const adapter = new OpenAiResponsesAdapter();
+    const events: UnifiedStreamEvent[] = [];
+
+    for await (const ev of adapter.streamChat({
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai-test",
+      model: "o3-mini",
+      messages: [
+        { id: "s1", role: "system", content: "You are an assistant." },
+        { id: "u1", role: "user", content: "Schedule for tomorrow" },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "plan_schedule_daily_plans",
+            description: "Plan schedule",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+    })) {
+      events.push(ev);
+    }
+
+    expect(events).toEqual([
+      { type: "reasoning_delta", text: "正在分析日程冲突..." },
+      { type: "text_delta", text: "已为您规划好明天的时间块：" },
+      { type: "tool_call_start", id: "call_resp_999", name: "plan_schedule_daily_plans" },
+      { type: "tool_call_args_delta", id: "call_resp_999", delta: '{"date":"2026-09-28"}' },
+      { type: "tool_call_end", id: "call_resp_999" },
+      { type: "finish", reason: "tool_calls" },
+    ]);
+
+    // Check payload structure: instructions, input array, tools with top-level name/description
+    const fetchCall = (globalThis.fetch as any).mock.calls[0];
+    const sentBody = JSON.parse(fetchCall[1].body);
+    expect(sentBody.instructions).toBe("You are an assistant.");
+    expect(sentBody.input).toEqual([
+      { type: "message", role: "user", content: "Schedule for tomorrow" },
+    ]);
+    expect(sentBody.tools).toEqual([
+      {
+        type: "function",
+        name: "plan_schedule_daily_plans",
+        description: "Plan schedule",
+        parameters: { type: "object", properties: {} },
+      },
+    ]);
+  });
+});
+

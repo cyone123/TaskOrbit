@@ -47,6 +47,8 @@ describe("SettingsView", () => {
     expect(html).toContain("添加服务商");
     expect(html).toContain("测试连通性");
     expect(html).toContain("保存 AI 配置");
+    expect(html).toContain("Anthropic Claude");
+    expect(html).toContain("Google Gemini");
 
     // Check Section 5: Data & WebDAV
     expect(html).toContain("WebDAV 云端同步");

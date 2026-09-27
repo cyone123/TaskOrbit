@@ -1,10 +1,11 @@
-import type { AiProviderKey } from "../types";
+import type { AiProtocolType, AiProviderKey } from "../types";
 
 export interface AiProviderPreset {
   id: AiProviderKey;
   name: string;
   baseUrl: string;
   defaultModel: string;
+  protocol?: AiProtocolType;
 }
 
 export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
@@ -13,42 +14,49 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     name: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
     defaultModel: "deepseek-chat",
+    protocol: "openai_chat",
   },
   {
     id: "siliconflow",
     name: "SiliconFlow (硅基流动)",
     baseUrl: "https://api.siliconflow.cn/v1",
     defaultModel: "deepseek-ai/DeepSeek-V3",
+    protocol: "openai_chat",
   },
   {
     id: "openai",
     name: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
     defaultModel: "gpt-4o-mini",
+    protocol: "openai_chat",
   },
   {
     id: "anthropic",
     name: "Anthropic Claude",
     baseUrl: "https://api.anthropic.com",
     defaultModel: "claude-3-7-sonnet-20250219",
+    protocol: "anthropic",
   },
   {
     id: "gemini",
     name: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com",
     defaultModel: "gemini-2.0-flash",
+    protocol: "gemini",
   },
   {
     id: "ollama",
     name: "Ollama (本地私有)",
     baseUrl: "http://localhost:11434/v1",
     defaultModel: "qwen2.5:7b",
+    protocol: "openai_chat",
   },
   {
     id: "custom",
-    name: "自定义 (OpenAI 兼容)",
+    name: "自定义提供商",
     baseUrl: "",
     defaultModel: "",
+    protocol: "openai_chat",
   },
 ];
 

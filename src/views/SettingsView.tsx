@@ -6,6 +6,7 @@ import {
   getAiProviderPreset,
   testAiConnection,
   todayISO,
+  type AiProtocolType,
   type AiProviderConfig,
   type AiProviderKey,
   type CustomAiProvider,
@@ -42,12 +43,40 @@ const TABS: { key: SettingsTab; label: string; icon: string }[] = [
   { key: "data", label: "数据与同步", icon: "cloud_sync" },
 ];
 
+export const AI_PROTOCOLS: { key: AiProtocolType; label: string; desc: string; defaultBaseUrl: string }[] = [
+  {
+    key: "openai_chat",
+    label: "OpenAI 兼容 (Chat Completions)",
+    desc: "通用 /chat/completions 规范（DeepSeek, Ollama, Qwen, Moonshot, SiliconFlow 等）",
+    defaultBaseUrl: "https://api.openai.com/v1",
+  },
+  {
+    key: "anthropic",
+    label: "Anthropic (Messages API)",
+    desc: "Claude 原生 /v1/messages 接口（支持 Claude 3.7 Extended Thinking 与工具调用）",
+    defaultBaseUrl: "https://api.anthropic.com",
+  },
+  {
+    key: "gemini",
+    label: "Google Gemini (REST API)",
+    desc: "Gemini 原生 models:streamGenerateContent 接口（支持 2.0 Thinking 与 Function Calling）",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+  },
+  {
+    key: "openai_responses",
+    label: "OpenAI Responses (新版规范)",
+    desc: "OpenAI 新一代 /v1/responses 接口规范（输入指令分离、流式工具调用）",
+    defaultBaseUrl: "https://api.openai.com/v1",
+  },
+];
+
 interface AiModelComboboxProps {
   value: string;
   onChange: (val: string) => void;
   baseUrl: string;
   apiKey: string;
   provider: string;
+  protocol?: AiProtocolType;
   onNotice?: (msg: string) => void;
 }
 
@@ -57,6 +86,7 @@ function AiModelCombobox({
   baseUrl,
   apiKey,
   provider,
+  protocol,
   onNotice,
 }: AiModelComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -92,6 +122,7 @@ function AiModelCombobox({
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
         provider,
+        protocol,
       });
       if (res.ok) {
         setFetchedModels(res.models);
@@ -106,7 +137,15 @@ function AiModelCombobox({
     }
   };
 
-  const presetCandidates = BUILTIN_PROVIDER_CANDIDATE_MODELS[provider] ?? [];
+  const presetCandidates =
+    BUILTIN_PROVIDER_CANDIDATE_MODELS[provider] ??
+    (protocol === "anthropic"
+      ? BUILTIN_PROVIDER_CANDIDATE_MODELS.anthropic
+      : protocol === "gemini"
+        ? BUILTIN_PROVIDER_CANDIDATE_MODELS.gemini
+        : protocol === "openai_responses"
+          ? BUILTIN_PROVIDER_CANDIDATE_MODELS.openai
+          : []);
   const allCandidates = Array.from(new Set([...fetchedModels, ...presetCandidates]));
 
   const query = value.trim().toLowerCase();
@@ -376,6 +415,7 @@ export function SettingsView() {
   const ai = state.aiSettings;
   const [aiEnabled, setAiEnabled] = useState(ai.enabled);
   const [aiProvider, setAiProvider] = useState<string>(ai.provider);
+  const [aiProtocol, setAiProtocol] = useState<AiProtocolType | undefined>(ai.protocol);
   const [aiBaseUrl, setAiBaseUrl] = useState(ai.baseUrl);
   const [aiApiKey, setAiApiKey] = useState(ai.apiKey);
   const [aiModel, setAiModel] = useState(ai.model);
@@ -395,6 +435,7 @@ export function SettingsView() {
     const init: Record<string, AiProviderConfig> = { ...(ai.providersConfig ?? {}) };
     if (ai.provider) {
       init[ai.provider] = {
+        protocol: ai.protocol,
         baseUrl: ai.baseUrl,
         apiKey: ai.apiKey,
         model: ai.model,
@@ -407,6 +448,7 @@ export function SettingsView() {
   // Modal dialog states for custom providers
   const [addCustomDialogOpen, setAddCustomDialogOpen] = useState(false);
   const [newCustomName, setNewCustomName] = useState("");
+  const [newCustomProtocol, setNewCustomProtocol] = useState<AiProtocolType>("openai_chat");
   const [newCustomBaseUrl, setNewCustomBaseUrl] = useState("");
   const [newCustomModel, setNewCustomModel] = useState("");
 
@@ -421,6 +463,7 @@ export function SettingsView() {
   useEffect(() => {
     setAiEnabled(ai.enabled);
     setAiProvider(ai.provider);
+    setAiProtocol(ai.protocol);
     setAiBaseUrl(ai.baseUrl);
     setAiApiKey(ai.apiKey);
     setAiModel(ai.model);
@@ -434,6 +477,7 @@ export function SettingsView() {
     const updatedConfigs: Record<string, AiProviderConfig> = {
       ...providerConfigs,
       [aiProvider]: {
+        protocol: aiProtocol,
         baseUrl: aiBaseUrl,
         apiKey: aiApiKey,
         model: aiModel,
@@ -448,6 +492,7 @@ export function SettingsView() {
         cp.id === aiProvider
           ? {
               ...cp,
+              protocol: aiProtocol,
               baseUrl: aiBaseUrl,
               apiKey: aiApiKey,
               model: aiModel,
@@ -465,6 +510,7 @@ export function SettingsView() {
     // 3. 读取目标提供商的历史暂存/已存值（优先读取，绝对不覆盖用户输入）
     const savedTarget = updatedConfigs[newProviderId];
     if (savedTarget && (savedTarget.baseUrl || savedTarget.apiKey || savedTarget.model)) {
+      setAiProtocol(savedTarget.protocol);
       setAiBaseUrl(savedTarget.baseUrl);
       setAiApiKey(savedTarget.apiKey);
       setAiModel(savedTarget.model);
@@ -477,6 +523,7 @@ export function SettingsView() {
     // 4. 若为 customProviders 列表里的自定义提供商且暂无 config 缓存
     const customItem = customProviders.find((cp) => cp.id === newProviderId);
     if (customItem) {
+      setAiProtocol(customItem.protocol ?? "openai_chat");
       setAiBaseUrl(customItem.baseUrl);
       setAiApiKey(customItem.apiKey);
       setAiModel(customItem.model);
@@ -487,11 +534,13 @@ export function SettingsView() {
     // 5. 若为内置预设且未曾配置过，读取预设默认值
     const preset = getAiProviderPreset(newProviderId as AiProviderKey);
     if (preset && newProviderId !== "custom") {
+      setAiProtocol(preset.protocol ?? "openai_chat");
       setAiBaseUrl(preset.baseUrl);
       setAiModel(preset.defaultModel);
       setAiApiKey("");
       setAiTemperature(0.7);
     } else if (newProviderId === "custom") {
+      setAiProtocol("openai_chat");
       setAiBaseUrl("");
       setAiApiKey("");
       setAiModel("");
@@ -506,6 +555,7 @@ export function SettingsView() {
     const newProvider: CustomAiProvider = {
       id: newId,
       name,
+      protocol: newCustomProtocol,
       baseUrl: newCustomBaseUrl.trim(),
       apiKey: "",
       model: newCustomModel.trim(),
@@ -516,12 +566,14 @@ export function SettingsView() {
     const nextConfigs: Record<string, AiProviderConfig> = {
       ...providerConfigs,
       [aiProvider]: {
+        protocol: aiProtocol,
         baseUrl: aiBaseUrl,
         apiKey: aiApiKey,
         model: aiModel,
         temperature: aiTemperature,
       },
       [newId]: {
+        protocol: newCustomProtocol,
         baseUrl: newProvider.baseUrl,
         apiKey: "",
         model: newProvider.model,
@@ -534,6 +586,7 @@ export function SettingsView() {
         cp.id === aiProvider
           ? {
               ...cp,
+              protocol: aiProtocol,
               baseUrl: aiBaseUrl,
               apiKey: aiApiKey,
               model: aiModel,
@@ -549,6 +602,7 @@ export function SettingsView() {
 
     // 2. 立即切换到新添加的自定义提供商
     setAiProvider(newId);
+    setAiProtocol(newCustomProtocol);
     setAiBaseUrl(newProvider.baseUrl);
     setAiApiKey("");
     setAiModel(newProvider.model);
@@ -558,6 +612,7 @@ export function SettingsView() {
 
     setAddCustomDialogOpen(false);
     setNewCustomName("");
+    setNewCustomProtocol("openai_chat");
     setNewCustomBaseUrl("");
     setNewCustomModel("");
 
@@ -589,12 +644,14 @@ export function SettingsView() {
       setAiProvider("deepseek");
       const dsConfig = nextConfigs["deepseek"];
       if (dsConfig) {
+        setAiProtocol(dsConfig.protocol ?? "openai_chat");
         setAiBaseUrl(dsConfig.baseUrl);
         setAiApiKey(dsConfig.apiKey);
         setAiModel(dsConfig.model);
         setAiTemperature(dsConfig.temperature ?? 0.7);
       } else {
         const preset = getAiProviderPreset("deepseek");
+        setAiProtocol(preset?.protocol ?? "openai_chat");
         setAiBaseUrl(preset?.baseUrl ?? "");
         setAiApiKey("");
         setAiModel(preset?.defaultModel ?? "");
@@ -623,6 +680,7 @@ export function SettingsView() {
         apiKey: aiApiKey.trim(),
         model: aiModel.trim(),
         provider: aiProvider,
+        protocol: aiProtocol,
       });
       setAiTestResult(res);
       if (res.ok) {
@@ -653,6 +711,7 @@ export function SettingsView() {
       cp.id === aiProvider
         ? {
             ...cp,
+            protocol: aiProtocol,
             baseUrl: aiBaseUrl.trim(),
             apiKey: aiApiKey.trim(),
             model: aiModel.trim(),
@@ -664,6 +723,7 @@ export function SettingsView() {
     const updatedConfigs: Record<string, AiProviderConfig> = {
       ...providerConfigs,
       [aiProvider]: {
+        protocol: aiProtocol,
         baseUrl: aiBaseUrl.trim(),
         apiKey: aiApiKey.trim(),
         model: aiModel.trim(),
@@ -677,6 +737,7 @@ export function SettingsView() {
     updateAiSettings({
       enabled: aiEnabled,
       provider: aiProvider,
+      protocol: aiProtocol,
       baseUrl: aiBaseUrl.trim(),
       apiKey: aiApiKey.trim(),
       model: aiModel.trim(),
@@ -1225,6 +1286,7 @@ export function SettingsView() {
                     type="button"
                     onClick={() => {
                       setNewCustomName("");
+                      setNewCustomProtocol("openai_chat");
                       setNewCustomBaseUrl("");
                       setNewCustomModel("");
                       setAddCustomDialogOpen(true);
@@ -1261,6 +1323,33 @@ export function SettingsView() {
                 </div>
               </div>
 
+              {(currentCustomProvider || aiProvider === "custom") && (
+                <div className="field">
+                  <OutlinedSelect
+                    label="协议规范 (API Protocol)"
+                    value={aiProtocol || "openai_chat"}
+                    onChange={(e) => {
+                      const nextProto = eventValue(e) as AiProtocolType;
+                      setAiProtocol(nextProto);
+                    }}
+                    supportingText={
+                      AI_PROTOCOLS.find((p) => p.key === (aiProtocol || "openai_chat"))?.desc
+                    }
+                    style={{ width: "100%" }}
+                  >
+                    {AI_PROTOCOLS.map((p) => (
+                      <SelectOption
+                        key={p.key}
+                        value={p.key}
+                        selected={(aiProtocol || "openai_chat") === p.key}
+                      >
+                        <span slot="headline">{p.label}</span>
+                      </SelectOption>
+                    ))}
+                  </OutlinedSelect>
+                </div>
+              )}
+
               <div className="field">
                 <OutlinedTextField
                   label="接口地址 (Base URL)"
@@ -1269,8 +1358,22 @@ export function SettingsView() {
                     setAiBaseUrl(eventValue(e));
                     setAiError(null);
                   }}
-                  placeholder="例如 https://api.deepseek.com/v1 或 http://localhost:11434/v1"
-                  supportingText="必须支持 OpenAI /chat/completions 兼容格式"
+                  placeholder={
+                    aiProtocol === "anthropic"
+                      ? "https://api.anthropic.com"
+                      : aiProtocol === "gemini"
+                        ? "https://generativelanguage.googleapis.com"
+                        : "例如 https://api.deepseek.com/v1 或 http://localhost:11434/v1"
+                  }
+                  supportingText={
+                    aiProtocol === "anthropic"
+                      ? "Anthropic Messages 端点，例如 https://api.anthropic.com"
+                      : aiProtocol === "gemini"
+                        ? "Google Gemini REST 端点，例如 https://generativelanguage.googleapis.com"
+                        : aiProtocol === "openai_responses"
+                          ? "OpenAI Responses 端点，例如 https://api.openai.com/v1"
+                          : "必须支持 OpenAI /chat/completions 兼容格式"
+                  }
                 />
               </div>
 
@@ -1318,6 +1421,7 @@ export function SettingsView() {
                     baseUrl={aiBaseUrl}
                     apiKey={aiApiKey}
                     provider={aiProvider}
+                    protocol={aiProtocol}
                     onNotice={show}
                   />
                 </div>
@@ -1627,7 +1731,7 @@ export function SettingsView() {
           </div>
         }
       >
-        <div className="col gap-12" style={{ minWidth: 320, paddingTop: 8 }}>
+        <div className="col gap-12" style={{ minWidth: 360, paddingTop: 8 }}>
           <OutlinedTextField
             label="服务商名称"
             value={newCustomName}
@@ -1636,18 +1740,65 @@ export function SettingsView() {
             required
             autoFocus
           />
+          <OutlinedSelect
+            label="协议规范 (API Protocol)"
+            value={newCustomProtocol}
+            onChange={(e) => {
+              const nextProto = eventValue(e) as AiProtocolType;
+              const prevDef = AI_PROTOCOLS.find((p) => p.key === newCustomProtocol)?.defaultBaseUrl;
+              setNewCustomProtocol(nextProto);
+              if (!newCustomBaseUrl.trim() || newCustomBaseUrl === prevDef) {
+                const nextDef = AI_PROTOCOLS.find((p) => p.key === nextProto)?.defaultBaseUrl;
+                if (nextDef) setNewCustomBaseUrl(nextDef);
+              }
+            }}
+            supportingText={
+              AI_PROTOCOLS.find((p) => p.key === newCustomProtocol)?.desc
+            }
+            style={{ width: "100%" }}
+          >
+            {AI_PROTOCOLS.map((p) => (
+              <SelectOption
+                key={p.key}
+                value={p.key}
+                selected={newCustomProtocol === p.key}
+              >
+                <span slot="headline">{p.label}</span>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
           <OutlinedTextField
             label="接口地址 (Base URL)"
             value={newCustomBaseUrl}
             onInput={(e) => setNewCustomBaseUrl(eventValue(e))}
-            placeholder="例如 https://api.groq.com/openai/v1"
-            supportingText="必须支持 OpenAI /chat/completions 兼容格式"
+            placeholder={
+              newCustomProtocol === "anthropic"
+                ? "https://api.anthropic.com"
+                : newCustomProtocol === "gemini"
+                  ? "https://generativelanguage.googleapis.com"
+                  : "例如 https://api.groq.com/openai/v1"
+            }
+            supportingText={
+              newCustomProtocol === "anthropic"
+                ? "Anthropic Messages 端点，例如 https://api.anthropic.com"
+                : newCustomProtocol === "gemini"
+                  ? "Google Gemini REST 端点，例如 https://generativelanguage.googleapis.com"
+                  : newCustomProtocol === "openai_responses"
+                    ? "OpenAI Responses 端点，例如 https://api.openai.com/v1"
+                    : "必须支持 OpenAI /chat/completions 兼容格式"
+            }
           />
           <OutlinedTextField
             label="默认模型名称 (可选)"
             value={newCustomModel}
             onInput={(e) => setNewCustomModel(eventValue(e))}
-            placeholder="例如 llama-3.3-70b-versatile"
+            placeholder={
+              newCustomProtocol === "anthropic"
+                ? "claude-3-7-sonnet-20250219"
+                : newCustomProtocol === "gemini"
+                  ? "gemini-2.0-flash"
+                  : "例如 llama-3.3-70b-versatile"
+            }
           />
         </div>
       </Dialog>
