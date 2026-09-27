@@ -138,6 +138,8 @@ export type BuiltinAiProviderKey =
   | "deepseek"
   | "siliconflow"
   | "openai"
+  | "anthropic"
+  | "gemini"
   | "ollama"
   | "custom";
 

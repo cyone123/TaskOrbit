@@ -91,6 +91,7 @@ function AiModelCombobox({
       const res = await fetchAiModels({
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
+        provider,
       });
       if (res.ok) {
         setFetchedModels(res.models);
@@ -621,6 +622,7 @@ export function SettingsView() {
         baseUrl: aiBaseUrl.trim(),
         apiKey: aiApiKey.trim(),
         model: aiModel.trim(),
+        provider: aiProvider,
       });
       setAiTestResult(res);
       if (res.ok) {

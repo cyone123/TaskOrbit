@@ -9,11 +9,13 @@ import { AI_PROVIDER_PRESETS, getAiProviderPreset } from "./presets";
 import type { AiChatMessage, StreamChunk } from "./types";
 
 describe("AI presets", () => {
-  it("includes presets for deepseek, siliconflow, openai, and ollama", () => {
+  it("includes presets for deepseek, siliconflow, openai, anthropic, gemini, and ollama", () => {
     expect(AI_PROVIDER_PRESETS.map((p) => p.id)).toEqual([
       "deepseek",
       "siliconflow",
       "openai",
+      "anthropic",
+      "gemini",
       "ollama",
       "custom",
     ]);
@@ -21,6 +23,14 @@ describe("AI presets", () => {
     const deepseek = getAiProviderPreset("deepseek");
     expect(deepseek?.baseUrl).toBe("https://api.deepseek.com/v1");
     expect(deepseek?.defaultModel).toBe("deepseek-chat");
+
+    const anthropic = getAiProviderPreset("anthropic");
+    expect(anthropic?.baseUrl).toBe("https://api.anthropic.com");
+    expect(anthropic?.defaultModel).toBe("claude-3-7-sonnet-20250219");
+
+    const gemini = getAiProviderPreset("gemini");
+    expect(gemini?.baseUrl).toBe("https://generativelanguage.googleapis.com");
+    expect(gemini?.defaultModel).toBe("gemini-2.0-flash");
   });
 });
 
