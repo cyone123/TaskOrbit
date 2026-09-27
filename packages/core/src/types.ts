@@ -143,9 +143,12 @@ export type BuiltinAiProviderKey =
 
 export type AiProviderKey = BuiltinAiProviderKey | (string & {});
 
+export type AiProtocolType = "openai_chat" | "openai_responses" | "anthropic" | "gemini";
+
 export interface CustomAiProvider {
   id: string;
   name: string;
+  protocol?: AiProtocolType;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -153,6 +156,7 @@ export interface CustomAiProvider {
 }
 
 export interface AiProviderConfig {
+  protocol?: AiProtocolType;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -162,6 +166,7 @@ export interface AiProviderConfig {
 export interface AiSettings {
   enabled: boolean;
   provider: AiProviderKey;
+  protocol?: AiProtocolType;
   baseUrl: string;
   apiKey: string;
   model: string;

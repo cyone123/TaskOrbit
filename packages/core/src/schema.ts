@@ -318,9 +318,12 @@ export const webDavSettingsSchema = z.object({
     .default(DEFAULT_WEBDAV_SETTINGS.syncIntervalMinutes),
 });
 
+export const aiProtocolSchema = z.enum(["openai_chat", "openai_responses", "anthropic", "gemini"]);
+
 const customAiProviderSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
+  protocol: aiProtocolSchema.optional(),
   baseUrl: z.string().trim(),
   apiKey: z.string().default(""),
   model: z.string().trim().default(""),
@@ -328,6 +331,7 @@ const customAiProviderSchema = z.object({
 });
 
 const aiProviderConfigSchema = z.object({
+  protocol: aiProtocolSchema.optional(),
   baseUrl: z.string().trim().default(""),
   apiKey: z.string().default(""),
   model: z.string().trim().default(""),
@@ -337,6 +341,7 @@ const aiProviderConfigSchema = z.object({
 export const aiSettingsSchema = z.object({
   enabled: z.boolean().default(DEFAULT_AI_SETTINGS.enabled),
   provider: z.string().default(DEFAULT_AI_SETTINGS.provider),
+  protocol: aiProtocolSchema.optional(),
   baseUrl: z.string().trim().default(DEFAULT_AI_SETTINGS.baseUrl),
   apiKey: z.string().default(DEFAULT_AI_SETTINGS.apiKey),
   model: z.string().trim().default(DEFAULT_AI_SETTINGS.model),

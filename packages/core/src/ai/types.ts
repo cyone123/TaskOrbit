@@ -143,3 +143,14 @@ export interface StreamChunk {
   delta: StreamDelta;
   finish_reason: string | null;
 }
+
+export type { AiProtocolType } from "../types";
+
+export type UnifiedStreamEvent =
+  | { type: "text_delta"; text: string }
+  | { type: "reasoning_delta"; text: string }
+  | { type: "tool_call_start"; id: string; name: string }
+  | { type: "tool_call_args_delta"; id: string; delta: string }
+  | { type: "tool_call_end"; id: string }
+  | { type: "finish"; reason: "stop" | "tool_calls" | "length" | "error"; rawMessage?: string };
+

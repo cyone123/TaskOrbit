@@ -13,7 +13,7 @@ import {
   commitScheduleProposal,
   executeReadTool,
   extractReasoningAndContent,
-  streamChatCompletions,
+  streamAiChat,
   todayISO,
   uid,
   type AiChatMessage,
@@ -179,7 +179,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
           const assistantMsgId = uid("msg_");
           let accumulatedContent = "";
           let accumulatedReasoning = "";
-          const toolCallsMap = new Map<number, AiToolCall>();
+          const toolCallsMap = new Map<string, AiToolCall>();
 
           // Add empty assistant message placeholder to UI
           setMessages((prev) => [
@@ -192,7 +192,9 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
             },
           ]);
 
-          const stream = streamChatCompletions({
+          const stream = streamAiChat({
+            protocol: aiSettings.protocol,
+            provider: aiSettings.provider,
             baseUrl: aiSettings.baseUrl,
             apiKey: aiSettings.apiKey,
             model: aiSettings.model,
@@ -202,9 +204,9 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
             signal: controller.signal,
           });
 
-          for await (const chunk of stream) {
-            if (chunk.delta.reasoning_content) {
-              accumulatedReasoning += chunk.delta.reasoning_content;
+          for await (const event of stream) {
+            if (event.type === "reasoning_delta") {
+              accumulatedReasoning += event.text;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantMsgId
@@ -212,10 +214,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                     : m,
                 ),
               );
-            }
-
-            if (chunk.delta.content) {
-              accumulatedContent += chunk.delta.content;
+            } else if (event.type === "text_delta") {
+              accumulatedContent += event.text;
               const parsed = extractReasoningAndContent(
                 accumulatedContent,
                 accumulatedReasoning,
@@ -231,20 +231,26 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
                     : m,
                 ),
               );
-            }
-
-            if (chunk.delta.tool_calls) {
-              for (const tc of chunk.delta.tool_calls) {
-                const existing = toolCallsMap.get(tc.index) || {
-                  id: tc.id || `call_${tc.index}`,
-                  type: "function" as const,
-                  function: { name: "", arguments: "" },
-                };
-                if (tc.id) existing.id = tc.id;
-                if (tc.function?.name) existing.function.name += tc.function.name;
-                if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
-                toolCallsMap.set(tc.index, existing);
+            } else if (event.type === "tool_call_start") {
+              const existing = toolCallsMap.get(event.id) || {
+                id: event.id,
+                type: "function" as const,
+                function: { name: "", arguments: "" },
+              };
+              if (event.name) {
+                existing.function.name = existing.function.name
+                  ? existing.function.name + event.name
+                  : event.name;
               }
+              toolCallsMap.set(event.id, existing);
+            } else if (event.type === "tool_call_args_delta") {
+              const existing = toolCallsMap.get(event.id) || {
+                id: event.id,
+                type: "function" as const,
+                function: { name: "", arguments: "" },
+              };
+              existing.function.arguments += event.delta;
+              toolCallsMap.set(event.id, existing);
             }
           }
 

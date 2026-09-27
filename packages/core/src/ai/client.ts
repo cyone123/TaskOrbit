@@ -1,269 +1,59 @@
-import type { AiChatMessage, AiToolDefinition, StreamChunk } from "./types";
+import type {
+  AiChatMessage,
+  AiProtocolType,
+  AiToolDefinition,
+  StreamChunk,
+  UnifiedStreamEvent,
+} from "./types";
+import {
+  resolveAiProtocol,
+  type AdapterChatOptions,
+  type FetchAiModelsOptions,
+  type FetchAiModelsResult,
+  type TestAiConnectionOptions,
+  type TestAiConnectionResult,
+} from "./adapters/base";
+import { getAiAdapter } from "./adapters/registry";
+import { parseSseBuffer } from "./sse";
 
-export interface TestAiConnectionOptions {
-  baseUrl: string;
-  apiKey: string;
-  model: string;
-  timeoutMs?: number;
-}
-
-export interface TestAiConnectionResult {
-  ok: boolean;
-  message: string;
-  latencyMs?: number;
-}
+export { parseSseBuffer };
+export type {
+  TestAiConnectionOptions,
+  TestAiConnectionResult,
+  FetchAiModelsOptions,
+  FetchAiModelsResult,
+};
 
 export async function testAiConnection(
   options: TestAiConnectionOptions,
 ): Promise<TestAiConnectionResult> {
-  const { baseUrl, apiKey, model, timeoutMs = 15000 } = options;
-  if (!baseUrl.trim()) {
-    return { ok: false, message: "接口地址 (Base URL) 不能为空" };
-  }
-  if (!model.trim()) {
-    return { ok: false, message: "模型名称不能为空" };
-  }
-
-  const endpoint = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const start = Date.now();
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey.trim()) {
-      headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-    }
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: model.trim(),
-        messages: [{ role: "user", content: "Hi" }],
-        max_tokens: 5,
-      }),
-      signal: controller.signal,
-    });
-
-    const latencyMs = Date.now() - start;
-
-    if (!response.ok) {
-      let errorDetail = "";
-      try {
-        const json = (await response.json()) as { error?: { message?: string } };
-        errorDetail = json?.error?.message || JSON.stringify(json);
-      } catch {
-        errorDetail = await response.text().catch(() => "");
-      }
-
-      if (response.status === 401) {
-        return {
-          ok: false,
-          message: `认证失败 (401)：API Key 无效或未提供。${errorDetail ? ` (${errorDetail})` : ""}`,
-          latencyMs,
-        };
-      }
-      if (response.status === 404) {
-        return {
-          ok: false,
-          message: `路径未找到 (404)：请检查 Base URL 是否正确。${errorDetail ? ` (${errorDetail})` : ""}`,
-          latencyMs,
-        };
-      }
-      return {
-        ok: false,
-        message: `请求失败 (${response.status})：${errorDetail || response.statusText}`,
-        latencyMs,
-      };
-    }
-
-    return {
-      ok: true,
-      message: `连接成功！响应耗时 ${latencyMs}ms，模型可用。`,
-      latencyMs,
-    };
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return {
-        ok: false,
-        message: `连接超时（超过 ${timeoutMs / 1000} 秒），请检查网络或端点地址`,
-      };
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, message: `网络连接失败：${msg}` };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export interface FetchAiModelsOptions {
-  baseUrl: string;
-  apiKey: string;
-  timeoutMs?: number;
-}
-
-export interface FetchAiModelsResult {
-  ok: boolean;
-  models: string[];
-  message: string;
+  const protocol = resolveAiProtocol(options.provider, options.baseUrl, options.protocol);
+  const adapter = getAiAdapter(protocol);
+  return adapter.testConnection(options);
 }
 
 export async function fetchAiModels(
   options: FetchAiModelsOptions,
 ): Promise<FetchAiModelsResult> {
-  const { baseUrl, apiKey, timeoutMs = 15000 } = options;
-  if (!baseUrl.trim()) {
-    return { ok: false, models: [], message: "接口地址 (Base URL) 不能为空" };
-  }
+  const protocol = resolveAiProtocol(options.provider, options.baseUrl, options.protocol);
+  const adapter = getAiAdapter(protocol);
+  return adapter.fetchModels(options);
+}
 
-  const endpoint = `${baseUrl.replace(/\/+$/, "")}/models`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey.trim()) {
-      headers["Authorization"] = `Bearer ${apiKey.trim()}`;
-    }
-
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers,
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      let errorDetail = "";
-      try {
-        const json = (await response.json()) as { error?: { message?: string } };
-        errorDetail = json?.error?.message || JSON.stringify(json);
-      } catch {
-        errorDetail = await response.text().catch(() => "");
-      }
-      return {
-        ok: false,
-        models: [],
-        message: `获取模型失败 (${response.status})：${errorDetail || response.statusText}`,
-      };
-    }
-
-    const json = (await response.json()) as Record<string, unknown>;
-    const rawList = Array.isArray(json?.data)
-      ? json.data
-      : Array.isArray(json?.models)
-        ? json.models
-        : Array.isArray(json)
-          ? json
-          : [];
-
-    const models: string[] = [];
-    for (const item of rawList) {
-      if (typeof item === "string" && item.trim()) {
-        models.push(item.trim());
-      } else if (typeof item === "object" && item !== null) {
-        const id =
-          (item as { id?: string; name?: string; model?: string }).id ??
-          (item as { name?: string }).name ??
-          (item as { model?: string }).model;
-        if (typeof id === "string" && id.trim()) {
-          models.push(id.trim());
-        }
-      }
-    }
-
-    const unique = Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
-
-    if (unique.length === 0) {
-      return {
-        ok: true,
-        models: [],
-        message: "接口返回成功，但未解析到模型列表数据",
-      };
-    }
-
-    return {
-      ok: true,
-      models: unique,
-      message: `成功获取到 ${unique.length} 个可用模型`,
-    };
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return {
-        ok: false,
-        models: [],
-        message: `请求超时（超过 ${timeoutMs / 1000} 秒），请检查网络`,
-      };
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, models: [], message: `无法连接服务器：${msg}` };
-  } finally {
-    clearTimeout(timer);
-  }
+export interface StreamAiChatOptions extends AdapterChatOptions {
+  protocol?: AiProtocolType;
+  provider?: string;
 }
 
 /**
- * Parses accumulated SSE buffer lines and extracts StreamChunks.
+ * Streams chat completions across multi-protocol adapters emitting UnifiedStreamEvents.
  */
-export function parseSseBuffer(buffer: string): {
-  events: StreamChunk[];
-  isDone: boolean;
-  remaining: string;
-} {
-  const lines = buffer.split("\n");
-  const remaining = lines.pop() ?? "";
-  const events: StreamChunk[] = [];
-  let isDone = false;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || !line.startsWith("data:")) continue;
-
-    const data = line.slice(5).trim();
-    if (data === "[DONE]") {
-      isDone = true;
-      break;
-    }
-
-    try {
-      const parsed = JSON.parse(data) as {
-        id?: string;
-        model?: string;
-        choices?: Array<{
-          delta?: {
-            content?: string;
-            reasoning_content?: string;
-            tool_calls?: Array<{
-              index: number;
-              id?: string;
-              type?: "function";
-              function?: {
-                name?: string;
-                arguments?: string;
-              };
-            }>;
-          };
-          finish_reason?: string | null;
-        }>;
-      };
-
-      const choice = parsed.choices?.[0];
-      events.push({
-        id: parsed.id ?? "",
-        model: parsed.model ?? "",
-        delta: choice?.delta ?? {},
-        finish_reason: choice?.finish_reason ?? null,
-      });
-    } catch {
-      // Ignore partial or unparseable SSE data lines
-    }
-  }
-
-  return { events, isDone, remaining };
+export async function* streamAiChat(
+  options: StreamAiChatOptions,
+): AsyncGenerator<UnifiedStreamEvent, void, unknown> {
+  const protocol = resolveAiProtocol(options.provider, options.baseUrl, options.protocol);
+  const adapter = getAiAdapter(protocol);
+  yield* adapter.streamChat(options);
 }
 
 export interface StreamChatOptions {

@@ -5,3 +5,4 @@ export * from "./tools";
 export * from "./executor";
 export * from "./commit";
 export * from "./reasoning";
+export * from "./adapters";
