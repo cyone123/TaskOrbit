@@ -8,6 +8,7 @@ import {
 } from "@task-orbit/core";
 import { useStore } from "../../store/store";
 import { Icon } from "../Icon";
+import { AiProviderIcon } from "../icons/AiProviderIcon";
 import {
   CircularProgress,
   FilledButton,
@@ -161,8 +162,22 @@ export function AiSettingsDialog({ open, onClose }: AiSettingsDialogProps) {
             onChange={(e) => handleProviderChange(eventValue(e) as AiProviderKey)}
             menuPositioning="fixed"
           >
+            <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+              <AiProviderIcon provider={provider} size={20} />
+            </span>
             {AI_PROVIDER_PRESETS.map((p) => (
               <SelectOption key={p.id} value={p.id} selected={provider === p.id}>
+                <span
+                  slot="start"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 8,
+                  }}
+                >
+                  <AiProviderIcon provider={p.id} size={20} />
+                </span>
                 <span slot="headline">{p.name}</span>
               </SelectOption>
             ))}
@@ -194,7 +209,7 @@ export function AiSettingsDialog({ open, onClose }: AiSettingsDialogProps) {
                 setApiKey(eventValue(e));
                 setError(null);
               }}
-              placeholder={provider === "ollama" ? "本地模型无需填写（或留空）" : "sk-..."}
+              placeholder="sk-..."
               supportingText="密钥仅保存在本地设备，导出备份时自动脱敏抹除"
               style={{ width: "100%" }}
             />

@@ -14,6 +14,7 @@ import {
   type WebDavSettings,
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
+import { AiProviderIcon } from "../components/icons/AiProviderIcon";
 import {
   CircularProgress,
   FilledButton,
@@ -47,25 +48,25 @@ export const AI_PROTOCOLS: { key: AiProtocolType; label: string; desc: string; d
   {
     key: "openai_chat",
     label: "OpenAI 兼容 (Chat Completions)",
-    desc: "通用 /chat/completions 规范（DeepSeek, Ollama, Qwen, Moonshot, SiliconFlow 等）",
+    desc: "通用 /chat/completions 规范",
     defaultBaseUrl: "https://api.openai.com/v1",
   },
   {
     key: "anthropic",
     label: "Anthropic (Messages API)",
-    desc: "Claude 原生 /v1/messages 接口（支持 Claude 3.7 Extended Thinking 与工具调用）",
+    desc: "Claude 原生 /v1/messages 接口",
     defaultBaseUrl: "https://api.anthropic.com",
   },
   {
     key: "gemini",
     label: "Google Gemini (REST API)",
-    desc: "Gemini 原生 models:streamGenerateContent 接口（支持 2.0 Thinking 与 Function Calling）",
+    desc: "Gemini 原生接口",
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
   },
   {
     key: "openai_responses",
     label: "OpenAI Responses (新版规范)",
-    desc: "OpenAI 新一代 /v1/responses 接口规范（输入指令分离、流式工具调用）",
+    desc: "OpenAI /v1/responses 接口规范",
     defaultBaseUrl: "https://api.openai.com/v1",
   },
 ];
@@ -1270,16 +1271,62 @@ export function SettingsView() {
                       onChange={(e) => handleAiProviderChange(eventValue(e))}
                       style={{ width: "100%" }}
                     >
+                      <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+                        <AiProviderIcon
+                          provider={aiProvider}
+                          name={currentCustomProvider?.name}
+                          protocol={aiProtocol}
+                          size={20}
+                        />
+                      </span>
                       {AI_PROVIDER_PRESETS.map((p) => (
                         <SelectOption key={p.id} value={p.id} selected={aiProvider === p.id}>
+                          <span
+                            slot="start"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: 8,
+                            }}
+                          >
+                            <AiProviderIcon provider={p.id} size={20} />
+                          </span>
                           <span slot="headline">{p.name}</span>
                         </SelectOption>
                       ))}
                       {customProviders.map((cp) => (
                         <SelectOption key={cp.id} value={cp.id} selected={aiProvider === cp.id}>
+                          <span
+                            slot="start"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: 8,
+                            }}
+                          >
+                            <AiProviderIcon provider={cp.id} name={cp.name} protocol={cp.protocol} size={20} />
+                          </span>
                           <span slot="headline">{cp.name} (自定义)</span>
                         </SelectOption>
                       ))}
+                      {aiProvider === "custom" && !customProviders.some((cp) => cp.id === "custom") && (
+                        <SelectOption value="custom" selected>
+                          <span
+                            slot="start"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: 8,
+                            }}
+                          >
+                            <AiProviderIcon provider="custom" size={20} />
+                          </span>
+                          <span slot="headline">自定义提供商</span>
+                        </SelectOption>
+                      )}
                     </OutlinedSelect>
                   </div>
                   <TonalButton
@@ -1337,12 +1384,44 @@ export function SettingsView() {
                     }
                     style={{ width: "100%" }}
                   >
+                    <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+                      <AiProviderIcon
+                        provider={
+                          aiProtocol === "anthropic"
+                            ? "anthropic"
+                            : aiProtocol === "gemini"
+                              ? "gemini"
+                              : "openai"
+                        }
+                        size={20}
+                      />
+                    </span>
                     {AI_PROTOCOLS.map((p) => (
                       <SelectOption
                         key={p.key}
                         value={p.key}
                         selected={(aiProtocol || "openai_chat") === p.key}
                       >
+                        <span
+                          slot="start"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginRight: 8,
+                          }}
+                        >
+                          <AiProviderIcon
+                            provider={
+                              p.key === "anthropic"
+                                ? "anthropic"
+                                : p.key === "gemini"
+                                  ? "gemini"
+                                  : "openai"
+                            }
+                            size={20}
+                          />
+                        </span>
                         <span slot="headline">{p.label}</span>
                       </SelectOption>
                     ))}
@@ -1736,12 +1815,12 @@ export function SettingsView() {
             label="服务商名称"
             value={newCustomName}
             onInput={(e) => setNewCustomName(eventValue(e))}
-            placeholder="例如 Groq、通义千问、公司内网大模型"
+            placeholder="例如 Grok、OpenRouter"
             required
             autoFocus
           />
           <OutlinedSelect
-            label="协议规范 (API Protocol)"
+            label="协议规范"
             value={newCustomProtocol}
             onChange={(e) => {
               const nextProto = eventValue(e) as AiProtocolType;
@@ -1757,12 +1836,44 @@ export function SettingsView() {
             }
             style={{ width: "100%" }}
           >
+            <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center" }}>
+              <AiProviderIcon
+                provider={
+                  newCustomProtocol === "anthropic"
+                    ? "anthropic"
+                    : newCustomProtocol === "gemini"
+                      ? "gemini"
+                      : "openai"
+                }
+                size={20}
+              />
+            </span>
             {AI_PROTOCOLS.map((p) => (
               <SelectOption
                 key={p.key}
                 value={p.key}
                 selected={newCustomProtocol === p.key}
               >
+                <span
+                  slot="start"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 8,
+                  }}
+                >
+                  <AiProviderIcon
+                    provider={
+                      p.key === "anthropic"
+                        ? "anthropic"
+                        : p.key === "gemini"
+                          ? "gemini"
+                          : "openai"
+                    }
+                    size={20}
+                  />
+                </span>
                 <span slot="headline">{p.label}</span>
               </SelectOption>
             ))}
@@ -1776,7 +1887,7 @@ export function SettingsView() {
                 ? "https://api.anthropic.com"
                 : newCustomProtocol === "gemini"
                   ? "https://generativelanguage.googleapis.com"
-                  : "例如 https://api.groq.com/openai/v1"
+                  : "例如 https://openrouter.ai/api/v1"
             }
             supportingText={
               newCustomProtocol === "anthropic"
@@ -1794,10 +1905,10 @@ export function SettingsView() {
             onInput={(e) => setNewCustomModel(eventValue(e))}
             placeholder={
               newCustomProtocol === "anthropic"
-                ? "claude-3-7-sonnet-20250219"
+                ? "claude--sonnet-5"
                 : newCustomProtocol === "gemini"
-                  ? "gemini-2.0-flash"
-                  : "例如 llama-3.3-70b-versatile"
+                  ? "gemini-3.5-flash"
+                  : "例如 deepseek-chat"
             }
           />
         </div>

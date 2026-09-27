@@ -140,6 +140,8 @@ export type BuiltinAiProviderKey =
   | "openai"
   | "anthropic"
   | "gemini"
+  | "glm"
+  | "kimi"
   | "ollama"
   | "custom";
 

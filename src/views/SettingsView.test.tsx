@@ -49,6 +49,10 @@ describe("SettingsView", () => {
     expect(html).toContain("保存 AI 配置");
     expect(html).toContain("Anthropic Claude");
     expect(html).toContain("Google Gemini");
+    expect(html).toContain("GLM (智谱 AI)");
+    expect(html).toContain("Kimi (Moonshot)");
+    expect(html).not.toContain("自定义 (OpenAI 兼容)");
+    expect(html).not.toContain("自定义提供商");
 
     // Check Section 5: Data & WebDAV
     expect(html).toContain("WebDAV 云端同步");
