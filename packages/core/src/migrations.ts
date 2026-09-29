@@ -162,7 +162,7 @@ function migrateV9ToV10(input: JsonRecord): JsonRecord {
   const oldAi = asRecord(input.aiSettings);
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 10,
     aiSettings: {
       ...DEFAULT_AI_SETTINGS,
       ...oldAi,
@@ -172,6 +172,30 @@ function migrateV9ToV10(input: JsonRecord): JsonRecord {
           ? oldAi.providersConfig
           : {},
     },
+  };
+}
+
+/** v11 adds status: "todo" | "in_progress" | "done" to Task entities. */
+function migrateV10ToV11(input: JsonRecord): JsonRecord {
+  const tasks = asArray(input.tasks).map((rawTask) => {
+    const isDone = Boolean(rawTask.done);
+    const existingStatus = typeof rawTask.status === "string" ? rawTask.status : null;
+    const status =
+      existingStatus === "todo" || existingStatus === "in_progress" || existingStatus === "done"
+        ? existingStatus
+        : isDone
+          ? "done"
+          : "todo";
+    return {
+      ...rawTask,
+      done: status === "done",
+      status,
+    };
+  });
+  return {
+    ...input,
+    version: STATE_VERSION,
+    tasks,
   };
 }
 
@@ -197,6 +221,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 7) migrated = migrateV7ToV8(migrated);
   if (version <= 8) migrated = migrateV8ToV9(migrated);
   if (version <= 9) migrated = migrateV9ToV10(migrated);
+  if (version <= 10) migrated = migrateV10ToV11(migrated);
 
   return migrated;
 }

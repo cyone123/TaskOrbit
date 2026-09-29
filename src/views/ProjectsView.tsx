@@ -19,6 +19,7 @@ import {
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
 import { InstantNotePanel, type InstantNoteTarget } from "../components/InstantNotePanel";
+import { ProjectKanbanBoard } from "../components/ProjectKanbanBoard";
 import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
 import { stripHtml } from "../utils/htmlText";
 import {
@@ -167,6 +168,7 @@ export function ProjectsView() {
   const [dragOverTarget, setDragOverTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const [isOverArchiveZone, setIsOverArchiveZone] = useState(false);
   const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
+  const [overviewTaskViewMode, setOverviewTaskViewMode] = useState<"kanban" | "list">("kanban");
   const [planDate, setPlanDate] = useState(todayISO());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
@@ -602,7 +604,13 @@ export function ProjectsView() {
             checked={task.done}
             aria-label={`标记任务「${task.name}」${task.done ? "未完成" : "已完成"}`}
             onClick={(event) => event.stopPropagation()}
-            onChange={() => store.updateTask(task.id, { done: !task.done })}
+            onChange={() => {
+              if (task.done) {
+                store.updateTask(task.id, { done: false, status: "todo" });
+              } else {
+                store.updateTask(task.id, { done: true, status: "done" });
+              }
+            }}
           />
           <span
             className={`project-priority-pill project-priority-pill--${task.priority}`}
@@ -649,12 +657,47 @@ export function ProjectsView() {
               </div>
             );
           })()}
-          <span className={`chip chip--small project-status-chip project-status-chip--${taskStatus.type}`}>
-            {taskStatus.type === "ongoing" && <span className="project-status-pulse" />}
-            {taskStatus.text}
-          </span>
+          {task.status === "in_progress" ? (
+            <span className="chip chip--small project-status-chip project-status-chip--ongoing">
+              <span className="project-status-pulse" />
+              进行中
+            </span>
+          ) : task.status === "done" ? (
+            <span className="chip chip--small project-status-chip project-status-chip--ended">
+              已完成
+            </span>
+          ) : (
+            <span className="chip chip--small project-status-chip project-status-chip--not-started">
+              待处理
+            </span>
+          )}
           <span className="body-sm muted project-task-row__date">{relativeRangeLabel(task.startDate, task.endDate)}</span>
           <div className="project-row-actions">
+            {!task.done && (
+              task.status === "todo" ? (
+                <IconButton
+                  aria-label="开始推进"
+                  title="设为进行中"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    store.updateTask(task.id, { status: "in_progress" });
+                  }}
+                >
+                  <Icon name="play_arrow" size={18} />
+                </IconButton>
+              ) : (
+                <IconButton
+                  aria-label="设为待处理"
+                  title="设为待处理"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    store.updateTask(task.id, { status: "todo" });
+                  }}
+                >
+                  <Icon name="undo" size={18} />
+                </IconButton>
+              )
+            )}
             <IconButton
               aria-label={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
               title={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
@@ -770,6 +813,72 @@ export function ProjectsView() {
             {standalonePlans.map((plan) => renderPlanRow(plan, false))}
           </div>
         </div>
+      )}
+    </section>
+  );
+
+  const renderOverviewTaskSection = () => (
+    <section className="project-panel" id="project-tasks">
+      <SectionHeader
+        title={overviewTaskViewMode === "kanban" ? "任务看板" : "任务"}
+        subtitle={overviewTaskViewMode === "kanban" ? "按阶段流转推进项目核心任务" : "把项目拆成可执行的下一步"}
+        badge={<Badge value={projectTasks.length} variant="primary" />}
+        actions={
+          <div className="row gap-8 align-center">
+            <div className="project-view-mode-toggle" role="group" aria-label="视图切换">
+              <button
+                type="button"
+                className={`project-view-toggle-btn ${overviewTaskViewMode === "kanban" ? "is-active" : ""}`}
+                onClick={() => setOverviewTaskViewMode("kanban")}
+                title="切换到看板视图"
+                aria-pressed={overviewTaskViewMode === "kanban"}
+              >
+                <Icon name="view_kanban" size={16} />
+                <span>看板</span>
+              </button>
+              <button
+                type="button"
+                className={`project-view-toggle-btn ${overviewTaskViewMode === "list" ? "is-active" : ""}`}
+                onClick={() => setOverviewTaskViewMode("list")}
+                title="切换到列表视图"
+                aria-pressed={overviewTaskViewMode === "list"}
+              >
+                <Icon name="format_list_bulleted" size={16} />
+                <span>列表</span>
+              </button>
+            </div>
+            <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
+              <Icon name="add" size={18} slot="icon" /> 添加任务
+            </TextButton>
+          </div>
+        }
+      />
+      {overviewTaskViewMode === "kanban" ? (
+        <ProjectKanbanBoard
+          project={selectedProject!}
+          tasks={projectTasks}
+          dailyPlans={projectPlans}
+          onAddTask={() => selectedProject && openNewTask(selectedProject.id)}
+          onEditTask={(task) => setTaskForm({ projectId: task.projectId, editing: task, open: true })}
+          onDeleteTask={askDeleteTask}
+          onOpenNote={(taskId) => openInstantNote("task", taskId)}
+        />
+      ) : (
+        projectTasks.length === 0 ? (
+          <div className="project-empty-row">
+            <Icon name="checklist" size={24} />
+            <span>还没有任务，先添加一个目标吧。</span>
+          </div>
+        ) : (
+          <div className="project-task-list">
+            {projectTasks.slice(0, 4).map(renderTask)}
+            {projectTasks.length > 4 && (
+              <button type="button" className="project-list-footer" onClick={() => setActiveTab("tasks")}>
+                查看全部 {projectTasks.length} 个任务 <Icon name="arrow_forward" size={17} />
+              </button>
+            )}
+          </div>
+        )
       )}
     </section>
   );
@@ -1035,7 +1144,7 @@ export function ProjectsView() {
             </div>
           </div>
         </div>
-        {renderTaskSection(false)}
+        {renderOverviewTaskSection()}
       </div>
     );
   };

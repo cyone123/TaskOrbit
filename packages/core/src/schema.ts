@@ -96,25 +96,59 @@ const projectSchema = z
   });
 
 const taskSchema = z
-  .object({
-    id: z.string().min(1),
-    projectId: z.string().min(1),
-    name: z.string().trim().min(1),
-    description: z.string(),
-    startDate: isoDate,
-    endDate: isoDate,
-    done: z.boolean(),
-    priority: z.enum(["low", "medium", "high"]),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  })
-  .passthrough()
+  .preprocess(
+    (val: unknown) => {
+      if (typeof val === "object" && val !== null) {
+        const rec = val as Record<string, unknown>;
+        let status = rec.status;
+        const done = Boolean(rec.done);
+        if (done && status !== "done") {
+          status = "done";
+        } else if (!done && (status === "done" || !status)) {
+          status = "todo";
+        }
+        return {
+          ...rec,
+          status,
+          done: status === "done",
+        };
+      }
+      return val;
+    },
+    z.object({
+      id: z.string().min(1),
+      projectId: z.string().min(1),
+      name: z.string().trim().min(1),
+      description: z.string(),
+      startDate: isoDate,
+      endDate: isoDate,
+      done: z.boolean(),
+      status: z.enum(["todo", "in_progress", "done"]),
+      priority: z.enum(["low", "medium", "high"]),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }).passthrough(),
+  )
   .superRefine((task, ctx) => {
     if (task.endDate < task.startDate) {
       ctx.addIssue({
         code: "custom",
         path: ["endDate"],
         message: "结束日期不能早于开始日期",
+      });
+    }
+    if (task.done && task.status !== "done") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "已完成任务的状态必须为 done",
+      });
+    }
+    if (!task.done && task.status === "done") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "未完成任务的状态不能为 done",
       });
     }
   });

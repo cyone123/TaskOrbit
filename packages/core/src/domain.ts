@@ -10,6 +10,7 @@ import type {
   Priority,
   Project,
   Task,
+  TaskStatus,
   Settings,
   VaultSettings,
   WebDavSettings,
@@ -35,10 +36,11 @@ export interface TaskInput {
   startDate: string;
   endDate: string;
   priority: Priority;
+  status?: TaskStatus;
 }
 
 export type TaskPatch = Partial<
-  Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "priority">
+  Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "status" | "priority">
 >;
 
 export interface InboxItemInput {
@@ -289,10 +291,12 @@ export function deleteProjectState(state: AppState, id: string): AppState {
 }
 
 export function createTask(input: TaskInput, createdAt = Date.now()): Task {
+  const status = input.status ?? "todo";
   return {
     id: uid("t_"),
     ...input,
-    done: false,
+    status,
+    done: status === "done",
     createdAt,
     updatedAt: createdAt,
   };
@@ -310,16 +314,39 @@ export function updateTaskState(
   patch: TaskPatch,
   updatedAt = Date.now(),
 ): AppState {
+  const currentTask = state.tasks.find((task) => task.id === id);
+  if (!currentTask) return state;
+
+  let resolvedStatus = patch.status ?? currentTask.status;
+  let resolvedDone = patch.done ?? currentTask.done;
+
+  if (patch.status !== undefined && patch.done === undefined) {
+    resolvedDone = patch.status === "done";
+  } else if (patch.done !== undefined && patch.status === undefined) {
+    if (patch.done) {
+      resolvedStatus = "done";
+    } else {
+      resolvedStatus = currentTask.status === "done" ? "todo" : currentTask.status;
+    }
+  } else if (patch.status !== undefined && patch.done !== undefined) {
+    resolvedDone = patch.status === "done";
+  }
+
+  const effectivePatch: TaskPatch = {
+    ...patch,
+    status: resolvedStatus,
+    done: resolvedDone,
+  };
+
   const nextTasks = state.tasks.map((task) =>
-    task.id === id ? { ...task, ...patch, updatedAt } : task,
+    task.id === id ? { ...task, ...effectivePatch, updatedAt } : task,
   );
 
   let nextDailyPlans = state.dailyPlans;
-  if (patch.done !== undefined) {
-    const targetDone = patch.done;
+  if (resolvedDone !== currentTask.done) {
     nextDailyPlans = state.dailyPlans.map((plan) =>
-      plan.taskId === id && plan.done !== targetDone
-        ? { ...plan, done: targetDone, updatedAt }
+      plan.taskId === id && plan.done !== resolvedDone
+        ? { ...plan, done: resolvedDone, updatedAt }
         : plan,
     );
   }

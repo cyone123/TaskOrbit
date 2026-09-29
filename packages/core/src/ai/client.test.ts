@@ -16,6 +16,7 @@ describe("AI presets", () => {
       "openai",
       "anthropic",
       "gemini",
+      "qwen",
       "glm",
       "kimi",
       "ollama",
@@ -23,23 +24,23 @@ describe("AI presets", () => {
 
     const deepseek = getAiProviderPreset("deepseek");
     expect(deepseek?.baseUrl).toBe("https://api.deepseek.com/v1");
-    expect(deepseek?.defaultModel).toBe("deepseek-chat");
+    expect(deepseek?.defaultModel).toBe("deepseek-v4-flash");
 
     const anthropic = getAiProviderPreset("anthropic");
     expect(anthropic?.baseUrl).toBe("https://api.anthropic.com");
-    expect(anthropic?.defaultModel).toBe("claude-3-7-sonnet-20250219");
+    expect(anthropic?.defaultModel).toBe("claude-sonnet-5");
 
     const gemini = getAiProviderPreset("gemini");
     expect(gemini?.baseUrl).toBe("https://generativelanguage.googleapis.com");
-    expect(gemini?.defaultModel).toBe("gemini-2.0-flash");
+    expect(gemini?.defaultModel).toBe("gemini-3.7-flash");
 
     const glm = getAiProviderPreset("glm");
     expect(glm?.baseUrl).toBe("https://open.bigmodel.cn/api/paas/v4");
-    expect(glm?.defaultModel).toBe("glm-4-flash");
+    expect(glm?.defaultModel).toBe("glm-5.2");
 
     const kimi = getAiProviderPreset("kimi");
     expect(kimi?.baseUrl).toBe("https://api.moonshot.cn/v1");
-    expect(kimi?.defaultModel).toBe("moonshot-v1-8k");
+    expect(kimi?.defaultModel).toBe("kimi-k2.6");
   });
 });
 

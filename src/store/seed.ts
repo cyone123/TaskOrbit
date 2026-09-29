@@ -15,6 +15,7 @@ import {
   type Priority,
   type Project,
   type Task,
+  type TaskStatus,
 } from "@task-orbit/core";
 
 function d(offset: number): string {
@@ -51,6 +52,7 @@ function mkTask(
   priority: Priority,
   done = false,
   description = "",
+  status: TaskStatus = done ? "done" : "todo",
 ): Task {
   const now = Date.now();
   return {
@@ -60,7 +62,8 @@ function mkTask(
     description,
     startDate: d(startOffset),
     endDate: d(endOffset),
-    done,
+    done: status === "done",
+    status,
     priority,
     createdAt: now,
     updatedAt: now,

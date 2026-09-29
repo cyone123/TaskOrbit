@@ -15,6 +15,8 @@ export interface Project {
   updatedAt: number;
 }
 
+export type TaskStatus = "todo" | "in_progress" | "done";
+
 export interface Task {
   id: string;
   projectId: string;
@@ -23,6 +25,7 @@ export interface Task {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   done: boolean;
+  status: TaskStatus;
   priority: Priority;
   createdAt: number;
   updatedAt: number;
