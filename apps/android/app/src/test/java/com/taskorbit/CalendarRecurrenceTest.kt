@@ -8,8 +8,10 @@ import com.taskorbit.domain.model.DailyPlan
 import com.taskorbit.domain.model.DailyPlanRepeat
 import com.taskorbit.domain.model.Task
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -211,5 +213,63 @@ class CalendarRecurrenceTest {
         assertEquals("22:15", CalendarModel.minutesToTime(snappedLateStart))
         assertEquals("23:45", CalendarModel.minutesToTime(snappedLateEnd))
         assertEquals(durMin, snappedLateEnd - snappedLateStart)
+    }
+
+    @Test
+    fun `layoutSpanningTasksInWeek assigns continuous multi-day slots and reuses non-overlapping slots`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23)) // Sun 2026-09-20 to Sat 2026-09-26
+
+        // Task 1: Mon(1) to Wed(3) (span = 3)
+        val task1 = Task(id = "t1", projectId = "p1", name = "设计评审", startDate = "2026-09-21", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
+        // Task 2: Wed(3) to Fri(5) (span = 3) -> overlaps task1 on Wed(3), should be in slot 1
+        val task2 = Task(id = "t2", projectId = "p2", name = "代码重构", startDate = "2026-09-23", endDate = "2026-09-25", createdAt = 0, updatedAt = 0)
+        // Task 3: Thu(4) to Fri(5) (span = 2) -> does NOT overlap task1(1..3), should reuse slot 0
+        val task3 = Task(id = "t3", projectId = "p1", name = "单元测试", startDate = "2026-09-24", endDate = "2026-09-25", createdAt = 0, updatedAt = 0)
+
+        val layout = CalendarModel.layoutSpanningTasksInWeek(listOf(task1, task2, task3), weekDays, maxVisibleSlots = 3)
+
+        assertEquals(3, layout.visibleSegments.size)
+        val seg1 = layout.visibleSegments.find { it.task.id == "t1" }!!
+        val seg2 = layout.visibleSegments.find { it.task.id == "t2" }!!
+        val seg3 = layout.visibleSegments.find { it.task.id == "t3" }!!
+
+        assertEquals(0, seg1.slot)
+        assertEquals(1, seg1.startCol)
+        assertEquals(3, seg1.endCol)
+        assertTrue(seg1.isStart)
+        assertTrue(seg1.isEnd)
+
+        assertEquals(1, seg2.slot)
+        assertEquals(3, seg2.startCol)
+        assertEquals(5, seg2.endCol)
+
+        // seg3 reuses slot 0 without collision!
+        assertEquals(0, seg3.slot)
+        assertEquals(4, seg3.startCol)
+        assertEquals(5, seg3.endCol)
+    }
+
+    @Test
+    fun `layoutSpanningTasksInWeek marks continuation boundaries across weeks and calculates overflow`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23)) // Sun 2026-09-20 to Sat 2026-09-26
+
+        // 跨周任务：上一周开始 (09-18)，在当前周周二结束 (09-22)
+        val crossTask = Task(id = "c1", projectId = "p1", name = "跨周任务", startDate = "2026-09-18", endDate = "2026-09-22", createdAt = 0, updatedAt = 0)
+        val layout1 = CalendarModel.layoutSpanningTasksInWeek(listOf(crossTask), weekDays)
+        val seg = layout1.visibleSegments.first()
+        assertEquals(0, seg.startCol) // Sun=0
+        assertEquals(2, seg.endCol)   // Tue=2
+        assertFalse(seg.isStart)      // Started before this week
+        assertTrue(seg.isEnd)         // Ends in this week
+
+        // 溢出测试：在周三 (2026-09-23, col=3) 堆叠 4 个任务
+        val tA = Task(id = "a", projectId = "p", name = "A", startDate = "2026-09-23", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
+        val tB = Task(id = "b", projectId = "p", name = "B", startDate = "2026-09-23", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
+        val tC = Task(id = "c", projectId = "p", name = "C", startDate = "2026-09-23", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
+        val tD = Task(id = "d", projectId = "p", name = "D", startDate = "2026-09-23", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
+
+        val overflowLayout = CalendarModel.layoutSpanningTasksInWeek(listOf(tA, tB, tC, tD), weekDays, maxVisibleSlots = 3)
+        // 4 个任务超出 maxVisibleSlots=3，最后 1 个槽位作为 +N 胶囊，溢出数 = 4 - 2 = 2
+        assertEquals(2, overflowLayout.overflowPerCol[3])
     }
 }

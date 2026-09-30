@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -156,6 +157,7 @@ fun CalendarScreen(
     val tasksInWeek by viewModel.tasksInWeek.collectAsState()
     val monthPlanCounts by viewModel.monthPlanCounts.collectAsState()
     val tasksByDateInMonth by viewModel.tasksByDateInMonth.collectAsState()
+    val tasksInMonth by viewModel.tasksInMonth.collectAsState()
     val tasksOfDay by viewModel.tasksOfDay.collectAsState()
 
     val isPlanFormOpen by viewModel.isPlanFormOpen.collectAsState()
@@ -284,7 +286,7 @@ fun CalendarScreen(
                                 anchorDate = anchorDate,
                                 selectedDate = selectedDate,
                                 monthDays = monthDays,
-                                tasksByDate = tasksByDateInMonth,
+                                tasks = tasksInMonth,
                                 tasksOfDay = tasksOfDay,
                                 onSelectDate = viewModel::selectDate,
                                 onToggleTaskDone = viewModel::toggleTask,
@@ -1591,14 +1593,14 @@ private fun WeekGanttView(
 }
 
 /**
- * 月视图：42 天月历网格（展示项目彩色任务条）与选中日期任务清单联动
+ * 月视图：42 天月历网格（展示多天连续横幅任务条）与选中日期任务清单联动
  */
 @Composable
 private fun MonthCalendarView(
     anchorDate: LocalDate,
     selectedDate: LocalDate,
     monthDays: List<LocalDate>,
-    tasksByDate: Map<LocalDate, List<Task>>,
+    tasks: List<Task>,
     tasksOfDay: List<Task>,
     onSelectDate: (LocalDate) -> Unit,
     onToggleTaskDone: (String, Boolean) -> Unit,
@@ -1607,8 +1609,11 @@ private fun MonthCalendarView(
 ) {
     val today = LocalDate.now()
     val currentMonth = anchorDate.monthValue
+    val scrollState = key(anchorDate) { rememberScrollState() }
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier.verticalScroll(scrollState)
+    ) {
         // 星期头：日 一 二 三 四 五 六
         Row(
             modifier = Modifier
@@ -1627,75 +1632,86 @@ private fun MonthCalendarView(
             }
         }
 
-        // 42 天网格
+        // 42 天网格（按周分行呈现连续跨天横条）
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp)
         ) {
             val rows = monthDays.chunked(7)
-            rows.forEach { week ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    week.forEach { day ->
-                        val isCurrentMonth = day.monthValue == currentMonth
-                        val isToday = day == today
-                        val isSelected = day == selectedDate
-                        val tasks = tasksByDate[day] ?: emptyList()
+            val weekRowHeight = 78.dp
+            val dateHeaderHeight = 24.dp
+            val slotHeight = 13.dp
+            val slotGap = 2.dp
+            val slotTopBase = 25.dp
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(76.dp)
-                                .padding(1.5.dp)
-                                .clip(ShapeTokens.Small)
-                                .background(
-                                    when {
-                                        isSelected && !isToday -> MaterialTheme.colorScheme.surfaceContainerHigh
-                                        isSelected && isToday -> MaterialTheme.colorScheme.surfaceContainerHighest
-                                        else -> Color.Transparent
-                                    }
-                                )
-                                .then(
-                                    if (isSelected) {
-                                        Modifier.border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                            shape = ShapeTokens.Small
-                                        )
-                                    } else Modifier
-                                )
-                                .clickable { onSelectDate(day) },
-                            contentAlignment = Alignment.TopCenter
-                        ) {
-                            Column(
+            rows.forEach { weekDays ->
+                val spanningLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 3)
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(weekRowHeight)
+                ) {
+                    val columnWidth = maxWidth / 7f
+
+                    // 1. 底层：7 天日期单元格（背景、公历日标头、选中态与点击响应）
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        weekDays.forEach { day ->
+                            val isCurrentMonth = day.monthValue == currentMonth
+                            val isToday = day == today
+                            val isSelected = day == selectedDate
+
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 2.dp, vertical = 2.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(1.dp)
+                                    .clip(ShapeTokens.Small)
+                                    .background(
+                                        when {
+                                            isSelected && !isToday -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                            isSelected && isToday -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.border(
+                                                width = 1.dp,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                                shape = ShapeTokens.Small
+                                            )
+                                        } else Modifier
+                                    )
+                                    .clickable { onSelectDate(day) },
+                                contentAlignment = Alignment.TopCenter
                             ) {
-                                // 公历日数字：当日以蓝色圆形徽章高亮
-                                if (isToday) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${day.dayOfMonth}",
-                                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier.size(24.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                // 日期标头
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(dateHeaderHeight),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isToday) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "${day.dayOfMonth}",
+                                                style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        }
+                                    } else {
                                         Text(
                                             text = "${day.dayOfMonth}",
                                             style = TextStyle(
@@ -1709,50 +1725,78 @@ private fun MonthCalendarView(
                                         )
                                     }
                                 }
-
-                                // 任务彩色横向小胶囊条（Task Bars）
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 2.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    val displayTasks = tasks.take(3)
-                                    displayTasks.forEach { task ->
-                                        val colorKey = getProjectColor(task.projectId)
-                                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
-
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(11.dp)
-                                                .clip(ShapeTokens.ExtraSmall)
-                                                .background(accent.copy(alpha = if (task.done) 0.25f else 0.45f))
-                                                .padding(horizontal = 2.dp),
-                                            contentAlignment = Alignment.CenterStart
-                                        ) {
-                                            Text(
-                                                text = task.name,
-                                                style = TextStyle(fontSize = 8.5.sp, fontWeight = FontWeight.Medium),
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
-                                            )
-                                        }
-                                    }
-
-                                    if (tasks.size > 3) {
-                                        Text(
-                                            text = "+${tasks.size - 3}",
-                                            style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
                             }
+                        }
+                    }
+
+                    // 2. 顶层：跨天连续横幅条（Spanning Task Bars）
+                    spanningLayout.visibleSegments.forEach { segment ->
+                        val startCol = segment.startCol
+                        val endCol = segment.endCol
+                        val span = endCol - startCol + 1
+
+                        val startMargin = if (segment.isStart) 2.dp else 0.dp
+                        val endMargin = if (segment.isEnd) 2.dp else 0.dp
+
+                        val left = columnWidth * startCol + startMargin
+                        val width = columnWidth * span - startMargin - endMargin
+                        val top = slotTopBase + (slotHeight + slotGap) * segment.slot
+
+                        val barShape = RoundedCornerShape(
+                            topStart = if (segment.isStart) 3.dp else 0.dp,
+                            bottomStart = if (segment.isStart) 3.dp else 0.dp,
+                            topEnd = if (segment.isEnd) 3.dp else 0.dp,
+                            bottomEnd = if (segment.isEnd) 3.dp else 0.dp
+                        )
+
+                        val colorKey = getProjectColor(segment.task.projectId)
+                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                        val barColor = accent.copy(alpha = if (segment.task.done) 0.35f else 0.88f)
+
+                        Box(
+                            modifier = Modifier
+                                .offset(x = left, y = top)
+                                .width(width)
+                                .height(slotHeight)
+                                .clip(barShape)
+                                .background(barColor)
+                                .clickable { onSelectDate(weekDays[startCol]) }
+                                .padding(horizontal = 3.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Text(
+                                text = segment.task.name,
+                                style = TextStyle(fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textDecoration = if (segment.task.done) TextDecoration.LineThrough else TextDecoration.None
+                            )
+                        }
+                    }
+
+                    // 3. 溢出指示胶囊（+N）
+                    spanningLayout.overflowPerCol.forEach { (col, overflowCount) ->
+                        val left = columnWidth * col + 2.dp
+                        val width = columnWidth - 4.dp
+                        val top = slotTopBase + (slotHeight + slotGap) * 2 // 放置在第 3 个槽位 (index 2)
+
+                        Box(
+                            modifier = Modifier
+                                .offset(x = left, y = top)
+                                .width(width)
+                                .height(slotHeight)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .clickable { onSelectDate(weekDays[col]) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+$overflowCount",
+                                style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
@@ -1773,7 +1817,7 @@ private fun MonthCalendarView(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .padding(vertical = 36.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1783,14 +1827,13 @@ private fun MonthCalendarView(
                 )
             }
         } else {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 88.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(tasksOfDay, key = { it.id }) { task ->
+                tasksOfDay.forEach { task ->
                     val colorKey = getProjectColor(task.projectId)
                     val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
 
@@ -1839,6 +1882,9 @@ private fun MonthCalendarView(
                 }
             }
         }
+
+        // 底部安全留白，避免浮动底栏与 FAB 遮挡内容
+        Spacer(modifier = Modifier.height(96.dp))
     }
 }
 

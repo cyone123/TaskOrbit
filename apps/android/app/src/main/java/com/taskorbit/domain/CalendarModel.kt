@@ -12,6 +12,21 @@ data class PlanColumnLayout(
     val columnCount: Int
 )
 
+data class SpanningTaskSegment(
+    val task: Task,
+    val startCol: Int,
+    val endCol: Int,
+    val isStart: Boolean,
+    val isEnd: Boolean,
+    val slot: Int
+)
+
+data class WeekSpanningLayout(
+    val visibleSegments: List<SpanningTaskSegment>,
+    val overflowPerCol: Map<Int, Int> = emptyMap(),
+    val totalSlots: Int = 0
+)
+
 enum class CalendarMode {
     DAY,
     WEEK,
@@ -152,5 +167,122 @@ object CalendarModel {
         val endIdx = java.time.temporal.ChronoUnit.DAYS.between(weekStart, visibleEnd).toInt().coerceIn(0, 6)
 
         return Pair(startIdx, endIdx)
+    }
+
+    /**
+     * 月视图周行中多天连续任务条（Spanning Task Bars）贪心槽位排布算法：
+     * 1. 筛选落入该周的任务，跨多天任务优先分配顶部连续槽位；
+     * 2. 在不重叠前提下尽量复用槽位；
+     * 3. 计算超限溢出（overflow），超过最大可见槽位展示 +N 提示。
+     */
+    fun layoutSpanningTasksInWeek(
+        tasks: List<Task>,
+        weekDays: List<LocalDate>,
+        maxVisibleSlots: Int = 3
+    ): WeekSpanningLayout {
+        if (tasks.isEmpty() || weekDays.isEmpty()) {
+            return WeekSpanningLayout(emptyList(), emptyMap(), 0)
+        }
+
+        val weekStart = weekDays.first()
+        val weekEnd = weekDays.last()
+        val weekStartIso = weekStart.format(DATE_FORMATTER)
+        val weekEndIso = weekEnd.format(DATE_FORMATTER)
+
+        // 筛选落入本周并计算有效跨列范围的任务
+        val candidateTasks = tasks.mapNotNull { task ->
+            val range = taskRangeInWeek(task, weekDays) ?: return@mapNotNull null
+            val isStart = task.startDate >= weekStartIso
+            val isEnd = task.endDate <= weekEndIso
+            Triple(task, range, Pair(isStart, isEnd))
+        }
+
+        if (candidateTasks.isEmpty()) {
+            return WeekSpanningLayout(emptyList(), emptyMap(), 0)
+        }
+
+        // 排序：多天跨度优先（保持跨天长条在上方稳定连贯），其次按起始列、起始日期与任务 ID 排序
+        val sorted = candidateTasks.sortedWith(
+            compareByDescending<Triple<Task, Pair<Int, Int>, Pair<Boolean, Boolean>>> { it.second.second - it.second.first + 1 }
+                .thenBy { it.second.first }
+                .thenBy { it.first.startDate }
+                .thenBy { it.first.id }
+        )
+
+        val slots = mutableListOf<BooleanArray>()
+        val allSegments = mutableListOf<SpanningTaskSegment>()
+        val dayCounts = IntArray(7)
+
+        for ((task, range, bounds) in sorted) {
+            val (startCol, endCol) = range
+            val (isStart, isEnd) = bounds
+
+            for (c in startCol..endCol) {
+                dayCounts[c]++
+            }
+
+            var assignedSlot = -1
+            for (s in slots.indices) {
+                var canFit = true
+                for (c in startCol..endCol) {
+                    if (slots[s][c]) {
+                        canFit = false
+                        break
+                    }
+                }
+                if (canFit) {
+                    assignedSlot = s
+                    break
+                }
+            }
+
+            if (assignedSlot == -1) {
+                assignedSlot = slots.size
+                slots.add(BooleanArray(7))
+            }
+
+            for (c in startCol..endCol) {
+                slots[assignedSlot][c] = true
+            }
+
+            allSegments.add(
+                SpanningTaskSegment(
+                    task = task,
+                    startCol = startCol,
+                    endCol = endCol,
+                    isStart = isStart,
+                    isEnd = isEnd,
+                    slot = assignedSlot
+                )
+            )
+        }
+
+        // 确定各天是否存在溢出（超出 maxVisibleSlots）
+        val overflowMap = mutableMapOf<Int, Int>()
+        for (c in 0..6) {
+            if (dayCounts[c] > maxVisibleSlots) {
+                // 超出的任务数量（由于最后 1 个可见槽位用于展示 "+N" 胶囊，因此多出来的任务数是 dayCounts[c] - (maxVisibleSlots - 1)）
+                overflowMap[c] = dayCounts[c] - (maxVisibleSlots - 1)
+            }
+        }
+
+        // 筛选可见的横条：
+        // 1. 如果 slot < maxVisibleSlots - 1（如 slot 0, 1），始终可见
+        // 2. 如果 slot == maxVisibleSlots - 1（如 slot 2），仅在其跨越的列中没有任意一列发生溢出时保留；若存在溢出列，则该列由 "+N" 承载
+        val visibleSegments = allSegments.filter { seg ->
+            if (seg.slot < maxVisibleSlots - 1) {
+                true
+            } else if (seg.slot == maxVisibleSlots - 1) {
+                (seg.startCol..seg.endCol).none { c -> overflowMap.containsKey(c) }
+            } else {
+                false
+            }
+        }
+
+        return WeekSpanningLayout(
+            visibleSegments = visibleSegments,
+            overflowPerCol = overflowMap,
+            totalSlots = slots.size
+        )
     }
 }

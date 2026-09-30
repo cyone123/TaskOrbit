@@ -91,6 +91,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         CalendarModel.tasksByDate(state.tasks, days)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    val tasksInMonth: StateFlow<List<Task>> = combine(
+        repository.state,
+        monthDays
+    ) { state, days ->
+        if (days.isEmpty()) emptyList()
+        else {
+            val startIso = days.first().format(dateFormatter)
+            val endIso = days.last().format(dateFormatter)
+            state.tasks.filter { it.endDate >= startIso && it.startDate <= endIso }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val tasksOfDay: StateFlow<List<Task>> = combine(
         repository.state,
         selectedDate
