@@ -85,4 +85,41 @@ class ProjectTaskDomainTest {
         assertEquals(0, state.tasks.size)
         assertEquals(0, state.dailyPlans.size)
     }
+
+    @Test
+    fun `appendDailyPlans allows standalone project plans and task-linked plans`() {
+        val proj = ProjectDomain.createProject(ProjectInput("P1", "", "violet", "2026-09-01", "2026-09-30"))
+        val task = TaskDomain.createTask(TaskInput(proj.id, "T1", "", "2026-09-01", "2026-09-10", Priority.MEDIUM))
+
+        var state = AppState()
+        state = ProjectDomain.appendProject(state, proj)
+        state = TaskDomain.appendTask(state, task)
+
+        // 1. 添加任务关联计划
+        val taskPlanInput = com.taskorbit.domain.DailyPlanInput(
+            projectId = proj.id,
+            taskId = task.id,
+            name = "Task Plan",
+            date = "2026-09-05",
+            startTime = "09:00",
+            endTime = "10:00"
+        )
+        val taskPlans = com.taskorbit.domain.DailyPlanDomain.createDailyPlans(taskPlanInput)
+        state = com.taskorbit.domain.DailyPlanDomain.appendDailyPlans(state, taskPlans)
+        assertEquals(1, state.dailyPlans.size)
+        assertEquals(task.id, state.dailyPlans[0].taskId)
+
+        // 2. 添加项目独立计划（无关联任务）
+        val projectPlanInput = com.taskorbit.domain.DailyPlanInput(
+            projectId = proj.id,
+            taskId = null,
+            name = "Project Standalone Plan",
+            date = "2026-09-06",
+            startTime = "14:00",
+            endTime = "15:30"
+        )
+        val projPlans = com.taskorbit.domain.DailyPlanDomain.createDailyPlans(projectPlanInput)
+        state = com.taskorbit.domain.DailyPlanDomain.appendDailyPlans(state, projPlans)
+        assertEquals(2, state.dailyPlans.size)
+    }
 }

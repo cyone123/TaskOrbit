@@ -5,12 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.taskorbit.data.common.DateTimeUtils
 import com.taskorbit.data.repository.AppStateRepository
+import com.taskorbit.domain.CalendarModel
+import com.taskorbit.domain.DailyPlanInput
+import com.taskorbit.domain.DailyPlanPatch
 import com.taskorbit.domain.ProjectDomain
 import com.taskorbit.domain.ProjectInput
 import com.taskorbit.domain.TaskDomain
 import com.taskorbit.domain.TaskInput
 import com.taskorbit.domain.TaskPatch
 import com.taskorbit.domain.model.DailyPlan
+import com.taskorbit.domain.model.DailyPlanRepeat
 import com.taskorbit.domain.model.Priority
 import com.taskorbit.domain.model.Project
 import com.taskorbit.domain.model.Task
@@ -23,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 
 enum class ProjectDetailSection {
     TASKS,
+    PLANS,
     STATS
 }
 
@@ -213,5 +218,100 @@ class ProjectDetailViewModel(
             )
         )
         closeProjectForm()
+    }
+
+    // --- 每日计划表单与操作 ---
+
+    val isPlanFormOpen = MutableStateFlow(false)
+    var editingPlanId: String? = null
+    val planName = MutableStateFlow("")
+    val planDescription = MutableStateFlow("")
+    val planDate = MutableStateFlow(DateTimeUtils.todayISO())
+    val planStartTime = MutableStateFlow("09:00")
+    val planEndTime = MutableStateFlow("10:00")
+    val planTaskId = MutableStateFlow<String?>(null)
+    val planRepeat = MutableStateFlow(DailyPlanRepeat.NONE)
+    val planRepeatCount = MutableStateFlow("4")
+
+    fun openNewPlanForm(presetTaskId: String? = null) {
+        val proj = project.value
+        editingPlanId = null
+        planName.value = ""
+        planDescription.value = ""
+        val today = DateTimeUtils.todayISO()
+        planDate.value = if (proj != null && today in proj.startDate..proj.endDate) today else proj?.startDate ?: today
+        planStartTime.value = "09:00"
+        planEndTime.value = "10:00"
+        planTaskId.value = presetTaskId
+        planRepeat.value = DailyPlanRepeat.NONE
+        planRepeatCount.value = "4"
+        isPlanFormOpen.value = true
+    }
+
+    fun openEditPlanForm(plan: DailyPlan) {
+        editingPlanId = plan.id
+        planName.value = plan.name
+        planDescription.value = plan.description
+        planDate.value = plan.date
+        planStartTime.value = plan.startTime
+        planEndTime.value = plan.endTime
+        planTaskId.value = plan.taskId
+        planRepeat.value = plan.recurrence.frequency
+        planRepeatCount.value = if (plan.recurrence.count > 1) plan.recurrence.count.toString() else "4"
+        isPlanFormOpen.value = true
+    }
+
+    fun closePlanForm() {
+        isPlanFormOpen.value = false
+        editingPlanId = null
+    }
+
+    fun submitPlan() {
+        val name = planName.value.trim()
+        if (name.isEmpty()) return
+
+        val count = planRepeatCount.value.toIntOrNull() ?: 1
+        val estimatedMinutes = (CalendarModel.timeToMinutes(planEndTime.value) - CalendarModel.timeToMinutes(planStartTime.value)).coerceAtLeast(0)
+
+        val id = editingPlanId
+        if (id != null) {
+            repository.updatePlan(
+                id = id,
+                patch = DailyPlanPatch(
+                    projectId = projectId,
+                    taskId = planTaskId.value,
+                    name = name,
+                    description = planDescription.value.trim(),
+                    date = planDate.value,
+                    startTime = planStartTime.value,
+                    endTime = planEndTime.value,
+                    estimatedMinutes = estimatedMinutes
+                )
+            )
+        } else {
+            repository.addPlans(
+                DailyPlanInput(
+                    projectId = projectId,
+                    taskId = planTaskId.value,
+                    name = name,
+                    description = planDescription.value.trim(),
+                    date = planDate.value,
+                    startTime = planStartTime.value,
+                    endTime = planEndTime.value,
+                    estimatedMinutes = estimatedMinutes,
+                    repeat = planRepeat.value,
+                    repeatCount = if (planRepeat.value == DailyPlanRepeat.NONE) 1 else count
+                )
+            )
+        }
+        closePlanForm()
+    }
+
+    fun togglePlan(id: String, done: Boolean) {
+        repository.togglePlan(id, done)
+    }
+
+    fun removePlan(id: String) {
+        repository.removePlan(id)
     }
 }
