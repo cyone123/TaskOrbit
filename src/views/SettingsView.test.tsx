@@ -14,6 +14,11 @@ describe("SettingsView", () => {
       </StoreProvider>
     );
 
+    // Check layout structure
+    expect(html).toContain("settings-sidebar");
+    expect(html).toContain("settings-content");
+    expect(html).toContain("设置分类");
+
     // Check Tab navigation
     expect(html).toContain("全部");
     expect(html).toContain("外观偏好");

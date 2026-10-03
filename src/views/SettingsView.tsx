@@ -22,10 +22,8 @@ import {
   OutlinedButton,
   OutlinedSelect,
   OutlinedTextField,
-  PrimaryTab,
   SelectOption,
   Switch,
-  Tabs,
   TextButton,
   TonalButton,
   eventValue,
@@ -270,8 +268,7 @@ export function SettingsView() {
   const { state, updateSettings, updateAiSettings, updateWebDavSettings } = store;
   const { show } = useSnackbar();
 
-  const [activeTabIdx, setActiveTabIdx] = useState<number>(0);
-  const activeTab = TABS[activeTabIdx]?.key ?? "all";
+  const [activeTab, setActiveTab] = useState<SettingsTab>("all");
 
   // ---------------------------------------------------------------------------
   // 1. Appearance Settings
@@ -900,20 +897,34 @@ export function SettingsView() {
 
   return (
     <div className="settings-view">
-      {/* Category Tabs */}
-      <div className="settings-nav-tabs">
-        <Tabs
-          activeTabIndex={activeTabIdx}
-          onChange={(e) => setActiveTabIdx((e.target as unknown as { activeTabIndex: number }).activeTabIndex)}
-        >
-          {TABS.map((t) => (
-            <PrimaryTab key={t.key}>
-              <Icon name={t.icon} size={18} slot="icon" />
-              {t.label}
-            </PrimaryTab>
-          ))}
-        </Tabs>
-      </div>
+      {/* Left Vertical Sidebar Navigation */}
+      <aside className="settings-sidebar" aria-label="设置导航">
+        <div className="settings-sidebar__header">
+          <span className="settings-sidebar__title">设置分类</span>
+        </div>
+        <nav className="settings-nav-list">
+          {TABS.map((t) => {
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                className={`settings-nav-item ${isActive ? "is-active" : ""}`}
+                onClick={() => setActiveTab(t.key)}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <span className="settings-nav-item__icon">
+                  <Icon name={t.icon} size={20} fill={isActive} />
+                </span>
+                <span className="settings-nav-item__label">{t.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Right Settings Content Details */}
+      <div className="settings-content">
 
       {/* =====================================================================
           1. 外观偏好
@@ -1770,6 +1781,7 @@ export function SettingsView() {
           </div>
         </section>
       )}
+      </div>
 
       {/* Import Confirmation Dialog */}
       <ConfirmDialog
