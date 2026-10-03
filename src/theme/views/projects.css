@@ -788,6 +788,7 @@
 
 .project-tab-body {
   min-width: 0;
+  max-width: 100%;
 }
 
 .project-context-sidebar {
@@ -797,11 +798,13 @@
   gap: 24px;
   position: sticky;
   top: 16px;
+  z-index: 2;
 }
 
 .project-overview-content {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 24px;
 }
@@ -2330,25 +2333,63 @@
 
 .project-kanban-board {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-outline-variant) transparent;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
+.project-kanban-board::-webkit-scrollbar {
+  height: 6px;
+}
+
+.project-kanban-board::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-kanban-board::-webkit-scrollbar-thumb {
+  background: var(--md-outline-variant);
+  border-radius: var(--shape-full);
+}
+
+.project-kanban-board::-webkit-scrollbar-thumb:hover {
+  background: var(--md-outline);
+}
+
+/* 
+ * 核心连续自适应设计：
+ * 保持 3 列并排（敏捷看板核心心智），每列 minmax(220px, 1fr)，总最小宽度 680px。
+ * - 当容器宽度 >= 680px 时（如拉宽窗口或收起右侧日程）：三列自适应均分，填满容器，无横向滚动条；
+ * - 当容器宽度 < 680px 时（如默认 1280 窗口展开右侧日程）：在内部平滑横向滚动，卡片宽度不挤压变形，绝不穿透到日历；
+ * - 彻底杜绝 container query 在临界值上切 1 列与 3 列导致的死循环高速频闪！
+ */
 .project-kanban-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 14px;
   align-items: start;
+  min-width: 680px;
+  width: 100%;
 }
 
-@media (max-width: 960px) {
+/* 仅在超窄手机视口下切为单列，基于稳定视口断点 */
+@media (max-width: 560px) {
   .project-kanban-columns {
     grid-template-columns: 1fr;
+    min-width: 0;
+    gap: 12px;
   }
 }
 
 .project-kanban-column {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 440px;
   padding: 12px;
   border-radius: var(--shape-lg);
@@ -2438,6 +2479,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--shape-md);
@@ -2453,8 +2495,7 @@
 }
 
 .project-kanban-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
   border-color: var(--md-outline);
 }
 
@@ -2592,7 +2633,6 @@
   background: var(--md-primary);
   color: var(--md-on-primary);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-  transform: translateY(-0.5px);
 }
 
 .project-kanban-btn--pause {
