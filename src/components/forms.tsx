@@ -14,6 +14,7 @@ import {
 import { PROJECT_COLORS, colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 import {
+  Checkbox,
   FilledButton,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
@@ -154,8 +155,8 @@ export interface TaskFormProps {
   onSubmit: (input: {
     name: string;
     description: string;
-    startDate: string;
-    endDate: string;
+    startDate: string | null;
+    endDate: string | null;
     priority: Priority;
   }) => void;
   onCancel: () => void;
@@ -171,6 +172,9 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
+  const [noSchedule, setNoSchedule] = useState(
+    initial ? !initial.startDate || !initial.endDate : true,
+  );
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISO());
   const [endDate, setEndDate] = useState(
     initial?.endDate ?? toISODate(addDays(new Date(), 7)),
@@ -179,12 +183,15 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
 
   const submit = () => {
     if (!name.trim()) return setError("请输入任务名称");
-    if (endDate < startDate) return setError("结束日期不能早于开始日期");
+    if (!noSchedule) {
+      if (!startDate || !endDate) return setError("请选择开始和结束日期");
+      if (endDate < startDate) return setError("结束日期不能早于开始日期");
+    }
     onSubmit({
       name: name.trim(),
       description: description.trim(),
-      startDate,
-      endDate,
+      startDate: noSchedule ? null : startDate,
+      endDate: noSchedule ? null : endDate,
       priority,
     });
   };
@@ -229,24 +236,44 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
           ))}
         </OutlinedSegmentedButtonSet>
       </div>
-      <div className="field__row">
-        <div className="field">
-          <OutlinedTextField
-            label="开始日期"
-            type="date"
-            value={startDate}
-            onInput={(event) => setStartDate(eventValue(event))}
+      <div className="field">
+        <label
+          className="row gap-8 align-center"
+          style={{ cursor: "pointer", userSelect: "none", width: "fit-content" }}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).tagName.toLowerCase().includes("checkbox")) return;
+            setNoSchedule((v) => !v);
+          }}
+        >
+          <Checkbox
+            checked={noSchedule}
+            onChange={(e) => {
+              setNoSchedule((e.target as HTMLInputElement).checked);
+            }}
           />
-        </div>
-        <div className="field">
-          <OutlinedTextField
-            label="结束日期"
-            type="date"
-            value={endDate}
-            onInput={(event) => setEndDate(eventValue(event))}
-          />
-        </div>
+          <span className="body-md">暂不排期（进入待处理）</span>
+        </label>
       </div>
+      {!noSchedule && (
+        <div className="field__row">
+          <div className="field">
+            <OutlinedTextField
+              label="开始日期"
+              type="date"
+              value={startDate}
+              onInput={(event) => setStartDate(eventValue(event))}
+            />
+          </div>
+          <div className="field">
+            <OutlinedTextField
+              label="结束日期"
+              type="date"
+              value={endDate}
+              onInput={(event) => setEndDate(eventValue(event))}
+            />
+          </div>
+        </div>
+      )}
       {error && <p className="error-text body-sm">{error}</p>}
       <FormActions onCancel={onCancel} submitLabel={initial ? "保存" : "创建任务"} />
     </form>

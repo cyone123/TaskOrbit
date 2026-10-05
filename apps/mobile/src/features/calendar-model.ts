@@ -40,6 +40,7 @@ export function monthGridDays(anchor: Date): Date[] {
 }
 
 export function taskRangeInWeek(task: Pick<Task, "startDate" | "endDate">, anchor: Date): TaskWeekRange | null {
+  if (!task.startDate || !task.endDate) return null;
   const weekStart = startOfWeek(anchor);
   const weekEnd = addDays(weekStart, 6);
   const start = parseISODate(task.startDate);

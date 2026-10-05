@@ -175,19 +175,32 @@ function migrateV9ToV10(input: JsonRecord): JsonRecord {
   };
 }
 
-/** v11 adds status: "todo" | "in_progress" | "done" to Task entities. */
+/** v11 links task status directly to scheduling and done state, supporting null dates. */
 function migrateV10ToV11(input: JsonRecord): JsonRecord {
   const tasks = asArray(input.tasks).map((rawTask) => {
     const isDone = Boolean(rawTask.done);
-    const existingStatus = typeof rawTask.status === "string" ? rawTask.status : null;
-    const status =
-      existingStatus === "todo" || existingStatus === "in_progress" || existingStatus === "done"
-        ? existingStatus
-        : isDone
-          ? "done"
-          : "todo";
+    const startDate =
+      typeof rawTask.startDate === "string" && rawTask.startDate.trim()
+        ? rawTask.startDate.trim()
+        : null;
+    const endDate =
+      typeof rawTask.endDate === "string" && rawTask.endDate.trim()
+        ? rawTask.endDate.trim()
+        : null;
+
+    let status: "todo" | "in_progress" | "done";
+    if (isDone) {
+      status = "done";
+    } else if (startDate && endDate) {
+      status = "in_progress";
+    } else {
+      status = "todo";
+    }
+
     return {
       ...rawTask,
+      startDate,
+      endDate,
       done: status === "done",
       status,
     };

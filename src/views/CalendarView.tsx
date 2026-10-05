@@ -163,9 +163,10 @@ export function CalendarView() {
     const weekEnd = addDays(weekStart, 6);
     return state.tasks
       .filter(
-        (task) =>
-          parseISODate(task.endDate) >= weekStart &&
-          parseISODate(task.startDate) <= weekEnd,
+        (task): task is Task & { startDate: string; endDate: string } =>
+          Boolean(task.startDate && task.endDate) &&
+          parseISODate(task.endDate!) >= weekStart &&
+          parseISODate(task.startDate!) <= weekEnd,
       )
       .sort((a, b) => {
         const projectA = projectById.get(a.projectId)?.startDate ?? "";
@@ -184,8 +185,9 @@ export function CalendarView() {
     const gridEnd = monthDays[monthDays.length - 1];
     return state.tasks.filter(
       (task) =>
-        parseISODate(task.endDate) >= gridStart &&
-        parseISODate(task.startDate) <= gridEnd,
+        Boolean(task.startDate && task.endDate) &&
+        parseISODate(task.endDate!) >= gridStart &&
+        parseISODate(task.startDate!) <= gridEnd,
     );
   }, [monthDays, state.tasks]);
 
@@ -208,7 +210,10 @@ export function CalendarView() {
 
   const tasksOfDay = useMemo(() => {
     return state.tasks.filter(
-      (task) => task.startDate <= selectedISO && task.endDate >= selectedISO,
+      (task) =>
+        Boolean(task.startDate && task.endDate) &&
+        task.startDate! <= selectedISO &&
+        task.endDate! >= selectedISO,
     );
   }, [state.tasks, selectedISO]);
 
@@ -257,6 +262,7 @@ export function CalendarView() {
     ({ "--event-color": colorForProject(projectId) }) as CSSProperties;
 
   const rangeFor = (task: Task): BarRange | null => {
+    if (!task.startDate || !task.endDate) return null;
     const weekStart = startOfWeek(anchor);
     const start = parseISODate(task.startDate);
     const end = parseISODate(task.endDate);
@@ -895,7 +901,10 @@ export function CalendarView() {
                 {days.map((day) => {
                   const iso = toISODate(day);
                   const activeTasks = state.tasks.filter(
-                    (task) => task.startDate <= iso && task.endDate >= iso,
+                    (task) =>
+                      Boolean(task.startDate && task.endDate) &&
+                      task.startDate! <= iso &&
+                      task.endDate! >= iso,
                   );
                   return (
                     <div className="week-detail__all-day-cell" key={iso}>

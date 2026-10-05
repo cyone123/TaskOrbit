@@ -47,6 +47,18 @@ describe("migrations v10 -> v11", () => {
           createdAt: 1000,
           updatedAt: 1000,
         },
+        {
+          id: "t3",
+          projectId: "p1",
+          name: "未排期待处理任务",
+          description: "",
+          startDate: null,
+          endDate: null,
+          done: false,
+          priority: "low",
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
       ],
       dailyPlans: [],
       inboxItems: [],
@@ -96,11 +108,13 @@ describe("migrations v10 -> v11", () => {
 
     const migrated = migratePersistedState(v10Data) as AppState;
     expect(migrated.version).toBe(STATE_VERSION);
-    expect(migrated.tasks).toHaveLength(2);
-    expect(migrated.tasks[0]?.status).toBe("todo");
+    expect(migrated.tasks).toHaveLength(3);
+    expect(migrated.tasks[0]?.status).toBe("in_progress");
     expect(migrated.tasks[0]?.done).toBe(false);
     expect(migrated.tasks[1]?.status).toBe("done");
     expect(migrated.tasks[1]?.done).toBe(true);
+    expect(migrated.tasks[2]?.status).toBe("todo");
+    expect(migrated.tasks[2]?.done).toBe(false);
 
     // Ensure it strictly passes schema validation
     expect(() => validateAppState(migrated)).not.toThrow();

@@ -28,7 +28,7 @@ function createMockState(): AppState {
     startDate: "2026-09-10",
     endDate: "2026-09-30",
     done: false,
-    status: "todo",
+    status: "in_progress",
     priority: "high",
     createdAt: 1000,
     updatedAt: 1000,

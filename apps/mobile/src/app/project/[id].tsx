@@ -80,7 +80,7 @@ export default function ProjectDetailScreen() {
   const accent = PROJECT_COLOR_HEX[project.color] ?? colors.primary;
   const resetTaskForm = () => { setTaskForm({ open: false, editing: null }); setTaskName(""); setTaskDescription(""); setTaskStart(project.startDate); setTaskEnd(project.endDate); setPriority("medium"); };
   const openNewTask = () => { resetTaskForm(); setTaskStart(todayISO() < project.startDate ? project.startDate : todayISO()); setTaskEnd(project.endDate); setTaskForm({ open: true, editing: null }); };
-  const openEditTask = (task: Task) => { setTaskName(task.name); setTaskDescription(task.description); setTaskStart(task.startDate); setTaskEnd(task.endDate); setPriority(task.priority); setTaskForm({ open: true, editing: task }); };
+  const openEditTask = (task: Task) => { setTaskName(task.name); setTaskDescription(task.description); setTaskStart(task.startDate ?? project.startDate); setTaskEnd(task.endDate ?? project.endDate); setPriority(task.priority); setTaskForm({ open: true, editing: task }); };
   const toggleTaskExpand = (taskId: string) => {
     setExpandedTasks((prev) => {
       const next = new Set(prev);

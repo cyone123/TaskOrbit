@@ -33,10 +33,10 @@ export interface TaskInput {
   projectId: string;
   name: string;
   description: string;
-  startDate: string;
-  endDate: string;
+  startDate?: string | null;
+  endDate?: string | null;
   priority: Priority;
-  status?: TaskStatus;
+  done?: boolean;
 }
 
 export type TaskPatch = Partial<
@@ -290,11 +290,26 @@ export function deleteProjectState(state: AppState, id: string): AppState {
   };
 }
 
+export function deriveTaskStatus(
+  done: boolean,
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+): TaskStatus {
+  if (done) return "done";
+  if (startDate && endDate) return "in_progress";
+  return "todo";
+}
+
 export function createTask(input: TaskInput, createdAt = Date.now()): Task {
-  const status = input.status ?? "todo";
+  const startDate = input.startDate?.trim() ? input.startDate.trim() : null;
+  const endDate = input.endDate?.trim() ? input.endDate.trim() : null;
+  const done = input.done ?? false;
+  const status = deriveTaskStatus(done, startDate, endDate);
   return {
     id: uid("t_"),
     ...input,
+    startDate,
+    endDate,
     status,
     done: status === "done",
     createdAt,
@@ -317,23 +332,40 @@ export function updateTaskState(
   const currentTask = state.tasks.find((task) => task.id === id);
   if (!currentTask) return state;
 
-  let resolvedStatus = patch.status ?? currentTask.status;
-  let resolvedDone = patch.done ?? currentTask.done;
+  let nextStartDate =
+    patch.startDate !== undefined
+      ? patch.startDate?.trim()
+        ? patch.startDate.trim()
+        : null
+      : currentTask.startDate;
+  let nextEndDate =
+    patch.endDate !== undefined
+      ? patch.endDate?.trim()
+        ? patch.endDate.trim()
+        : null
+      : currentTask.endDate;
 
-  if (patch.status !== undefined && patch.done === undefined) {
-    resolvedDone = patch.status === "done";
-  } else if (patch.done !== undefined && patch.status === undefined) {
-    if (patch.done) {
-      resolvedStatus = "done";
-    } else {
-      resolvedStatus = currentTask.status === "done" ? "todo" : currentTask.status;
+  let nextDone = patch.done !== undefined ? patch.done : currentTask.done;
+
+  if (patch.status !== undefined) {
+    if (patch.status === "done") {
+      nextDone = true;
+    } else if (patch.status === "in_progress") {
+      nextDone = false;
+    } else if (patch.status === "todo") {
+      nextDone = false;
+      if (patch.startDate === undefined) nextStartDate = null;
+      if (patch.endDate === undefined) nextEndDate = null;
     }
-  } else if (patch.status !== undefined && patch.done !== undefined) {
-    resolvedDone = patch.status === "done";
   }
+
+  const resolvedStatus = deriveTaskStatus(nextDone, nextStartDate, nextEndDate);
+  const resolvedDone = resolvedStatus === "done";
 
   const effectivePatch: TaskPatch = {
     ...patch,
+    startDate: nextStartDate,
+    endDate: nextEndDate,
     status: resolvedStatus,
     done: resolvedDone,
   };

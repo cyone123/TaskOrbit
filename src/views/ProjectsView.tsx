@@ -596,7 +596,6 @@ export function ProjectsView() {
     const taskPlans = plansOfTask.get(task.id) ?? [];
     const doneCount = taskPlans.filter((plan) => plan.done).length;
     const expanded = expandedTasks.has(task.id);
-    const taskStatus = statusLabel(task.startDate, task.endDate);
     return (
       <div className={`project-task-item ${task.done ? "is-done" : ""}`} key={task.id}>
         <div className="project-task-row" onClick={() => toggleTask(task.id)}>
@@ -605,11 +604,7 @@ export function ProjectsView() {
             aria-label={`标记任务「${task.name}」${task.done ? "未完成" : "已完成"}`}
             onClick={(event) => event.stopPropagation()}
             onChange={() => {
-              if (task.done) {
-                store.updateTask(task.id, { done: false, status: "todo" });
-              } else {
-                store.updateTask(task.id, { done: true, status: "done" });
-              }
+              store.updateTask(task.id, { done: !task.done });
             }}
           />
           <span
@@ -673,31 +668,6 @@ export function ProjectsView() {
           )}
           <span className="body-sm muted project-task-row__date">{relativeRangeLabel(task.startDate, task.endDate)}</span>
           <div className="project-row-actions">
-            {!task.done && (
-              task.status === "todo" ? (
-                <IconButton
-                  aria-label="开始推进"
-                  title="设为进行中"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    store.updateTask(task.id, { status: "in_progress" });
-                  }}
-                >
-                  <Icon name="play_arrow" size={18} />
-                </IconButton>
-              ) : (
-                <IconButton
-                  aria-label="设为待处理"
-                  title="设为待处理"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    store.updateTask(task.id, { status: "todo" });
-                  }}
-                >
-                  <Icon name="undo" size={18} />
-                </IconButton>
-              )
-            )}
             <IconButton
               aria-label={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
               title={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}

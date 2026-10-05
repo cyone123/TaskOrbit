@@ -22,8 +22,8 @@ export interface Task {
   projectId: string;
   name: string;
   description: string;
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  startDate: string | null; // YYYY-MM-DD or null if unscheduled
+  endDate: string | null; // YYYY-MM-DD or null if unscheduled
   done: boolean;
   status: TaskStatus;
   priority: Priority;

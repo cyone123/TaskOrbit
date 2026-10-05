@@ -643,27 +643,43 @@ describe("domain commands", () => {
 
     it("handles task kanban status transitions and plan synchronization", () => {
       const { task, plan, state } = fixtureState();
-      // 1. Initially todo
+      // 1. Scheduled task initially in_progress
       const initialTask = state.tasks.find((t) => t.id === task.id)!;
-      expect(initialTask.status).toBe("todo");
+      expect(initialTask.status).toBe("in_progress");
       expect(initialTask.done).toBe(false);
 
-      // 2. Start task -> in_progress
-      const started = updateTaskState(state, task.id, { status: "in_progress" });
-      const startedTask = started.tasks.find((t) => t.id === task.id)!;
-      expect(startedTask.status).toBe("in_progress");
-      expect(startedTask.done).toBe(false);
-      expect(validateAppState(started)).toBeDefined();
+      // 2. Unscheduled task is initially todo
+      const unscheduledTask = createTask({
+        projectId: task.projectId,
+        name: "暂未排期任务",
+        description: "",
+        priority: "medium",
+      }, 10);
+      expect(unscheduledTask.status).toBe("todo");
+      expect(unscheduledTask.startDate).toBeNull();
+      expect(unscheduledTask.endDate).toBeNull();
 
-      // 3. Pause / set back to todo
-      const paused = updateTaskState(started, task.id, { status: "todo" });
-      const pausedTask = paused.tasks.find((t) => t.id === task.id)!;
-      expect(pausedTask.status).toBe("todo");
-      expect(pausedTask.done).toBe(false);
-      expect(validateAppState(paused)).toBeDefined();
+      // 3. Move task to todo (clears schedule)
+      const toTodo = updateTaskState(state, task.id, { status: "todo" });
+      const todoTask = toTodo.tasks.find((t) => t.id === task.id)!;
+      expect(todoTask.status).toBe("todo");
+      expect(todoTask.startDate).toBeNull();
+      expect(todoTask.endDate).toBeNull();
+      expect(todoTask.done).toBe(false);
+      expect(validateAppState(toTodo)).toBeDefined();
 
-      // 4. Mark done via checkbox -> done = true, status = "done", sub-plans also done
-      const completed = updateTaskState(started, task.id, { done: true });
+      // 4. Schedule dates -> moves to in_progress
+      const scheduled = updateTaskState(toTodo, task.id, {
+        startDate: "2026-08-17",
+        endDate: "2026-08-18",
+      });
+      const scheduledTask = scheduled.tasks.find((t) => t.id === task.id)!;
+      expect(scheduledTask.status).toBe("in_progress");
+      expect(scheduledTask.done).toBe(false);
+      expect(validateAppState(scheduled)).toBeDefined();
+
+      // 5. Mark done via checkbox -> done = true, status = "done", sub-plans also done
+      const completed = updateTaskState(scheduled, task.id, { done: true });
       const completedTask = completed.tasks.find((t) => t.id === task.id)!;
       const completedPlan = completed.dailyPlans.find((p) => p.id === plan.id)!;
       expect(completedTask.status).toBe("done");
@@ -671,16 +687,23 @@ describe("domain commands", () => {
       expect(completedPlan.done).toBe(true);
       expect(validateAppState(completed)).toBeDefined();
 
-      // 5. Unmark done via checkbox -> returns to "todo", sub-plans uncompleted
+      // 6. Unmark done via checkbox -> returns to "in_progress" because it has dates
       const uncompleted = updateTaskState(completed, task.id, { done: false });
       const uncompletedTask = uncompleted.tasks.find((t) => t.id === task.id)!;
       const uncompletedPlan = uncompleted.dailyPlans.find((p) => p.id === plan.id)!;
-      expect(uncompletedTask.status).toBe("todo");
+      expect(uncompletedTask.status).toBe("in_progress");
       expect(uncompletedTask.done).toBe(false);
       expect(uncompletedPlan.done).toBe(false);
       expect(validateAppState(uncompleted)).toBeDefined();
 
-      // 6. Set status directly to "done"
+      // 7. Unscheduled task completed and uncompleted -> returns to "todo"
+      const withUnscheduled = appendTask(state, unscheduledTask);
+      const doneUnscheduled = updateTaskState(withUnscheduled, unscheduledTask.id, { done: true });
+      expect(doneUnscheduled.tasks.find((t) => t.id === unscheduledTask.id)!.status).toBe("done");
+      const undoneUnscheduled = updateTaskState(doneUnscheduled, unscheduledTask.id, { done: false });
+      expect(undoneUnscheduled.tasks.find((t) => t.id === unscheduledTask.id)!.status).toBe("todo");
+
+      // 8. Set status directly to "done"
       const setDoneStatus = updateTaskState(state, task.id, { status: "done" });
       const setDoneTask = setDoneStatus.tasks.find((t) => t.id === task.id)!;
       expect(setDoneTask.status).toBe("done");

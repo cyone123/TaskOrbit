@@ -1,6 +1,9 @@
 import { useState, useMemo, type DragEvent } from "react";
 import {
+  addDays,
   relativeRangeLabel,
+  toISODate,
+  todayISO,
   type DailyPlan,
   type Priority,
   type Project,
@@ -8,7 +11,7 @@ import {
   type TaskStatus,
 } from "@task-orbit/core";
 import { Icon } from "./Icon";
-import { Checkbox, IconButton, TextButton } from "./material";
+import { Checkbox, IconButton } from "./material";
 import { Badge } from "./ui";
 import { useStore } from "../store/store";
 
@@ -42,14 +45,14 @@ const COLUMNS: ColumnConfig[] = [
     title: "待处理",
     icon: "assignment",
     badgeVariant: "neutral",
-    emptyHint: "暂无待处理任务，点击下方按钮添加",
+    emptyHint: "暂无待处理任务，点击右上角添加",
   },
   {
     status: "in_progress",
     title: "进行中",
     icon: "hourglass_top",
     badgeVariant: "primary",
-    emptyHint: "没有推进中的任务，点击卡片「开始推进」进入",
+    emptyHint: "暂无排期进行中的任务",
   },
   {
     status: "done",
@@ -65,7 +68,7 @@ function stripHtml(input: string): string {
 }
 
 export function ProjectKanbanBoard({
-  project: _project,
+  project,
   tasks,
   dailyPlans,
   onAddTask,
@@ -152,7 +155,19 @@ export function ProjectKanbanBoard({
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === targetStatus) return;
 
-    store.updateTask(taskId, { status: targetStatus });
+    if (targetStatus === "todo") {
+      store.updateTask(taskId, { done: false, startDate: null, endDate: null });
+    } else if (targetStatus === "in_progress") {
+      const startDate = task.startDate ?? todayISO();
+      const defaultEnd =
+        project.endDate && project.endDate >= startDate
+          ? project.endDate
+          : toISODate(addDays(new Date(), 7));
+      const endDate = task.endDate ?? defaultEnd;
+      store.updateTask(taskId, { done: false, startDate, endDate });
+    } else if (targetStatus === "done") {
+      store.updateTask(taskId, { done: true });
+    }
   };
 
   return (
@@ -223,13 +238,7 @@ export function ProjectKanbanBoard({
                               aria-label={`标记任务「${task.name}」${task.done ? "未完成" : "已完成"}`}
                               onClick={(e) => e.stopPropagation()}
                               onChange={() => {
-                                if (task.done) {
-                                  // When unchecking, reset status to todo
-                                  store.updateTask(task.id, { done: false, status: "todo" });
-                                } else {
-                                  // When checking, set status to done
-                                  store.updateTask(task.id, { done: true, status: "done" });
-                                }
+                                store.updateTask(task.id, { done: !task.done });
                               }}
                             />
                             <span
@@ -281,7 +290,7 @@ export function ProjectKanbanBoard({
                           )}
                         </div>
 
-                        {/* Card Footer: Metadata and Status Flow Button */}
+                        {/* Card Footer: Metadata */}
                         <div className="project-kanban-card__footer">
                           <div className="project-kanban-card__meta">
                             <span className="body-sm muted project-kanban-card__date">
@@ -298,31 +307,6 @@ export function ProjectKanbanBoard({
                               </span>
                             )}
                           </div>
-
-                          {/* Action Button: Disappears when Done */}
-                          {task.status === "todo" && (
-                            <button
-                              type="button"
-                              className="project-kanban-btn project-kanban-btn--start"
-                              title="将任务设为进行中"
-                              onClick={() => store.updateTask(task.id, { status: "in_progress" })}
-                            >
-                              <Icon name="play_arrow" size={16} />
-                              <span>开始推进</span>
-                            </button>
-                          )}
-
-                          {task.status === "in_progress" && (
-                            <button
-                              type="button"
-                              className="project-kanban-btn project-kanban-btn--pause"
-                              title="将任务退回待处理状态"
-                              onClick={() => store.updateTask(task.id, { status: "todo" })}
-                            >
-                              <Icon name="undo" size={15} />
-                              <span>设为待处理</span>
-                            </button>
-                          )}
                         </div>
                       </div>
                     );

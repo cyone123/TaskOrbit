@@ -100,17 +100,25 @@ const taskSchema = z
     (val: unknown) => {
       if (typeof val === "object" && val !== null) {
         const rec = val as Record<string, unknown>;
-        let status = rec.status;
         const done = Boolean(rec.done);
-        if (done && status !== "done") {
+        const startDate =
+          typeof rec.startDate === "string" && rec.startDate.trim() ? rec.startDate.trim() : null;
+        const endDate =
+          typeof rec.endDate === "string" && rec.endDate.trim() ? rec.endDate.trim() : null;
+        let status: "todo" | "in_progress" | "done";
+        if (done) {
           status = "done";
-        } else if (!done && (status === "done" || !status)) {
+        } else if (startDate && endDate) {
+          status = "in_progress";
+        } else {
           status = "todo";
         }
         return {
           ...rec,
-          status,
+          startDate,
+          endDate,
           done: status === "done",
+          status,
         };
       }
       return val;
@@ -120,8 +128,8 @@ const taskSchema = z
       projectId: z.string().min(1),
       name: z.string().trim().min(1),
       description: z.string(),
-      startDate: isoDate,
-      endDate: isoDate,
+      startDate: isoDate.nullable(),
+      endDate: isoDate.nullable(),
       done: z.boolean(),
       status: z.enum(["todo", "in_progress", "done"]),
       priority: z.enum(["low", "medium", "high"]),
@@ -130,7 +138,14 @@ const taskSchema = z
     }).passthrough(),
   )
   .superRefine((task, ctx) => {
-    if (task.endDate < task.startDate) {
+    if ((task.startDate && !task.endDate) || (!task.startDate && task.endDate)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["startDate"],
+        message: "任务起止日期必须同时提供或同时为空",
+      });
+    }
+    if (task.startDate && task.endDate && task.endDate < task.startDate) {
       ctx.addIssue({
         code: "custom",
         path: ["endDate"],
@@ -149,6 +164,20 @@ const taskSchema = z
         code: "custom",
         path: ["status"],
         message: "未完成任务的状态不能为 done",
+      });
+    }
+    if (!task.done && task.startDate && task.endDate && task.status !== "in_progress") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "已排期未完成任务的状态必须为 in_progress",
+      });
+    }
+    if (!task.done && (!task.startDate || !task.endDate) && task.status !== "todo") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "未排期任务的状态必须为 todo",
       });
     }
   });
