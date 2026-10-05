@@ -30,6 +30,7 @@ import {
 } from "../components/material";
 import { ConfirmDialog, Dialog, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
+import { useSettingsViewState } from "../store/view-state";
 
 type SettingsTab = "all" | "appearance" | "calendar" | "pomodoro" | "ai" | "data";
 
@@ -268,7 +269,7 @@ export function SettingsView() {
   const { state, updateSettings, updateAiSettings, updateWebDavSettings } = store;
   const { show } = useSnackbar();
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>("all");
+  const { activeTab, setActiveTab } = useSettingsViewState();
 
   // ---------------------------------------------------------------------------
   // 1. Appearance Settings

@@ -43,6 +43,9 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
   // The content region owns scrolling for every view. Listening in the capture
   // phase also catches inner scrollers (e.g. the project detail pane).
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const prevViewRef = useRef<ViewKey>(view);
+
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -55,7 +58,23 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
   }, []);
 
   useEffect(() => {
-    setScrolled(false);
+    const el = contentRef.current;
+    if (el) {
+      if (prevViewRef.current !== view) {
+        scrollPositionsRef.current[prevViewRef.current] = el.scrollTop;
+      }
+      const restored = scrollPositionsRef.current[view] ?? 0;
+      el.scrollTop = restored;
+      setScrolled(restored > 4);
+      const frameId = requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = restored;
+        }
+      });
+      prevViewRef.current = view;
+      return () => cancelAnimationFrame(frameId);
+    }
+    prevViewRef.current = view;
   }, [view]);
 
   return (

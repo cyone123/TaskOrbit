@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { Icon } from "./components/Icon";
 import { Layout } from "./components/Layout";
@@ -8,6 +7,7 @@ import { PomodoroNotifier } from "./desktop/PomodoroNotifier";
 import { PomodoroWindowBridge } from "./desktop/PomodoroWindowBridge";
 import { StoreProvider, useStore } from "./store/store";
 import { AiChatProvider } from "./store/ai-chat-store";
+import { ViewStateProvider, useViewState } from "./store/view-state";
 import { ThemeManager } from "./theme/theme";
 import { CalendarView } from "./views/CalendarView";
 import { PomodoroView } from "./views/PomodoroView";
@@ -26,17 +26,17 @@ const TITLES: Record<ViewKey, string> = {
 };
 
 function Shell() {
-  const [view, setView] = useState<ViewKey>("projects");
+  const { currentView, setCurrentView } = useViewState();
 
   return (
-    <Layout view={view} title={TITLES[view]} onNavigate={setView}>
-      <div className="view-stage" key={view}>
-        {view === "inbox" && <InboxView />}
-        {view === "projects" && <ProjectsView />}
-        {view === "calendar" && <CalendarView />}
-        {view === "pomodoro" && <PomodoroView />}
-        {view === "stats" && <StatsView />}
-        {view === "settings" && <SettingsView />}
+    <Layout view={currentView} title={TITLES[currentView]} onNavigate={setCurrentView}>
+      <div className="view-stage" key={currentView}>
+        {currentView === "inbox" && <InboxView />}
+        {currentView === "projects" && <ProjectsView />}
+        {currentView === "calendar" && <CalendarView />}
+        {currentView === "pomodoro" && <PomodoroView />}
+        {currentView === "stats" && <StatsView />}
+        {currentView === "settings" && <SettingsView />}
       </div>
     </Layout>
   );
@@ -119,7 +119,9 @@ export default function App() {
     <StoreProvider>
       <SnackbarProvider>
         <AiChatProvider>
-          <BootstrapGate />
+          <ViewStateProvider>
+            <BootstrapGate />
+          </ViewStateProvider>
         </AiChatProvider>
       </SnackbarProvider>
     </StoreProvider>

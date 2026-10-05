@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   calculateProjectProgress,
@@ -43,6 +43,7 @@ import {
 } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import { useProjectsViewState } from "../store/view-state";
 
 const PRIORITY_COLOR: Record<Priority, string> = {
   high: "var(--md-error)",
@@ -160,20 +161,36 @@ export function ProjectsView() {
     [state.projects],
   );
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
+  const {
+    selectedProjectId,
+    setSelectedProjectId,
+    searchQuery,
+    setSearchQuery,
+    showArchived,
+    setShowArchived,
+    activeTab,
+    setActiveTab,
+    overviewTaskViewMode,
+    setOverviewTaskViewMode,
+    planDate,
+    setPlanDate,
+    expandedTasks,
+    setExpandedTasks,
+    leftSidebarCollapsed,
+    setLeftSidebarCollapsed,
+    rightSidebarCollapsed,
+    setRightSidebarCollapsed,
+    activeNoteTarget,
+    setActiveNoteTarget,
+    detailScrollTop,
+    setDetailScrollTop,
+  } = useProjectsViewState();
+
   const [isManaging, setIsManaging] = useState(false);
   const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const [isOverArchiveZone, setIsOverArchiveZone] = useState(false);
-  const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
-  const [overviewTaskViewMode, setOverviewTaskViewMode] = useState<"kanban" | "list">("kanban");
-  const [planDate, setPlanDate] = useState(todayISO());
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
-  const [activeNoteTarget, setActiveNoteTarget] = useState<InstantNoteTarget | null>(null);
+  const detailAreaRef = useRef<HTMLElement | null>(null);
 
   const openInstantNote = (type: "task" | "plan", id: string) => {
     setActiveNoteTarget({ type, id });
@@ -260,6 +277,24 @@ export function ProjectsView() {
       setSelectedProjectId(activeProjects[0].id);
     }
   }, [activeProjects, selectedProjectId]);
+
+  useEffect(() => {
+    const el = detailAreaRef.current;
+    if (!el) return;
+    if (detailScrollTop > 0) {
+      el.scrollTop = detailScrollTop;
+      requestAnimationFrame(() => {
+        if (detailAreaRef.current) {
+          detailAreaRef.current.scrollTop = detailScrollTop;
+        }
+      });
+    }
+    const onScroll = () => {
+      setDetailScrollTop(el.scrollTop);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [selectedProjectId, activeTab, setDetailScrollTop]);
 
   const selectedProject = activeProjects.find((project) => project.id === selectedProjectId) ?? null;
 
@@ -350,6 +385,7 @@ export function ProjectsView() {
     setActiveTab("overview");
     setExpandedTasks(new Set());
     setActiveNoteTarget(null);
+    setDetailScrollTop(0);
   };
 
   const openNewTask = (projectId: string) => {
@@ -1338,7 +1374,7 @@ export function ProjectsView() {
         </button>
       </aside>
 
-      <main className="project-detail-area">
+      <main ref={detailAreaRef} className="project-detail-area">
         {!selectedProject ? (
           <div className="project-detail-empty">
             <EmptyState icon="space_dashboard" title="还没有项目" hint="点击左侧「新建项目」开始规划你的工作" />

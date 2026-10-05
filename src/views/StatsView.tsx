@@ -14,6 +14,7 @@ import { EmptyState, SectionHeader, StatCard } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
+import { useStatsViewState } from "../store/view-state";
 
 function isoOfTimestamp(ts: number): string {
   const d = new Date(ts);
@@ -90,7 +91,7 @@ export function StatsView() {
   const planTotal = state.dailyPlans.length;
   const planDone = state.dailyPlans.filter((p) => p.done).length;
 
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const { selectedDay, setSelectedDay } = useStatsViewState();
 
   const weekHasData = last7.some((iso) => (minutesByDay.get(iso) ?? 0) > 0);
   const avgDay = Math.round(

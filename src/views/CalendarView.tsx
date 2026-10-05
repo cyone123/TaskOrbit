@@ -44,6 +44,7 @@ import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } 
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
+import { useCalendarViewState } from "../store/view-state";
 import {
   type PlanDragMode,
   computeDraggedPlanTimes,
@@ -80,10 +81,16 @@ export function CalendarView() {
   const { state } = store;
   const { show } = useSnackbar();
 
-  const [mode, setMode] = useState<CalendarMode>("week");
-  const [weekView, setWeekView] = useState<WeekViewMode>("gantt");
-  const [monthFilter, setMonthFilter] = useState<MonthViewFilter>("all");
-  const [anchor, setAnchor] = useState<Date>(() => new Date());
+  const {
+    mode,
+    setMode,
+    weekView,
+    setWeekView,
+    monthFilter,
+    setMonthFilter,
+    anchor,
+    setAnchor,
+  } = useCalendarViewState();
   const contentRef = useRef<HTMLDivElement>(null);
 
   const weekDetailStartHour = state.settings.weekDetailStartHour ?? 6;

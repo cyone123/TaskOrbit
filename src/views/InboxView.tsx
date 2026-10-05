@@ -20,6 +20,7 @@ import {
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
+import { useInboxViewState } from "../store/view-state";
 
 /** Keep in sync with --sys-motion-selection-duration used by .inbox-item exit. */
 const ITEM_EXIT_MS = 200;
@@ -174,9 +175,14 @@ function InboxEditDialog({
 export function InboxView() {
   const store = useStore();
   const { show } = useSnackbar();
-  const [mode, setMode] = useState<InboxItemKind>("todo");
-  const [draft, setDraft] = useState("");
-  const [filter, setFilter] = useState<InboxFilter>("all");
+  const {
+    mode,
+    setMode,
+    draft,
+    setDraft,
+    filter,
+    setFilter,
+  } = useInboxViewState();
   const [editing, setEditing] = useState<InboxItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InboxItem | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
