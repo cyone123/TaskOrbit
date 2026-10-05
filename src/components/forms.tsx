@@ -13,6 +13,8 @@ import {
 } from "@task-orbit/core";
 import { PROJECT_COLORS, colorByKey, contrastText, normalizeHex } from "../store/colors";
 import { Icon } from "./Icon";
+import { DatePicker } from "./DatePicker";
+import { TimePicker } from "./TimePicker";
 import { useStore } from "../store/store";
 import {
   Checkbox,
@@ -199,19 +201,21 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
       </div>
       <div className="field__row">
         <div className="field">
-          <OutlinedTextField
+          <DatePicker
             label="开始日期"
-            type="date"
             value={startDate}
-            onInput={(event) => setStartDate(eventValue(event))}
+            onChange={setStartDate}
+            max={endDate}
+            align="left"
           />
         </div>
         <div className="field">
-          <OutlinedTextField
+          <DatePicker
             label="结束日期"
-            type="date"
             value={endDate}
-            onInput={(event) => setEndDate(eventValue(event))}
+            onChange={setEndDate}
+            min={startDate}
+            align="right"
           />
         </div>
       </div>
@@ -313,39 +317,52 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
         </OutlinedSegmentedButtonSet>
       </div>
       <div className="field">
-        <label
+        <div
           className="row gap-8 align-center"
           style={{ cursor: "pointer", userSelect: "none", width: "fit-content" }}
-          onClick={(e) => {
-            if ((e.target as HTMLElement).tagName.toLowerCase().includes("checkbox")) return;
-            setNoSchedule((v) => !v);
-          }}
+          onClick={() => setNoSchedule((v) => !v)}
         >
           <Checkbox
+            id="task-no-schedule"
             checked={noSchedule}
+            aria-label="暂不排期（进入待处理）"
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               setNoSchedule((e.target as HTMLInputElement).checked);
             }}
           />
-          <span className="body-md">暂不排期（进入待处理）</span>
-        </label>
+          <label
+            htmlFor="task-no-schedule"
+            className="body-md"
+            style={{ cursor: "pointer", userSelect: "none" }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setNoSchedule((v) => !v);
+            }}
+          >
+            暂不排期（进入待处理）
+          </label>
+        </div>
       </div>
       {!noSchedule && (
         <div className="field__row">
           <div className="field">
-            <OutlinedTextField
+            <DatePicker
               label="开始日期"
-              type="date"
               value={startDate}
-              onInput={(event) => setStartDate(eventValue(event))}
+              onChange={setStartDate}
+              max={endDate}
+              align="left"
             />
           </div>
           <div className="field">
-            <OutlinedTextField
+            <DatePicker
               label="结束日期"
-              type="date"
               value={endDate}
-              onInput={(event) => setEndDate(eventValue(event))}
+              onChange={setEndDate}
+              min={startDate}
+              align="right"
             />
           </div>
         </div>
@@ -564,29 +581,30 @@ export function DailyPlanForm({
       </div>
 
       <div className="field">
-        <OutlinedTextField
+        <DatePicker
           label="执行日期"
-          type="date"
           value={date}
-          onInput={(event) => setDate(eventValue(event))}
+          onChange={setDate}
         />
       </div>
 
       <div className="field__row">
         <div className="field">
-          <OutlinedTextField
+          <TimePicker
             label="开始时间"
-            type="time"
             value={startTime}
-            onInput={(event) => setStartTime(eventValue(event))}
+            onChange={setStartTime}
+            max={endTime}
+            align="left"
           />
         </div>
         <div className="field">
-          <OutlinedTextField
+          <TimePicker
             label="结束时间"
-            type="time"
             value={endTime}
-            onInput={(event) => setEndTime(eventValue(event))}
+            onChange={setEndTime}
+            min={startTime}
+            align="right"
           />
         </div>
       </div>

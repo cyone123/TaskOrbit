@@ -877,3 +877,298 @@ md-dialog {
 .color-dot--custom.selected {
   border: 3px solid var(--md-on-surface);
 }
+
+/* ============================================================================
+   MD3 Date & Time Pickers
+   ========================================================================== */
+
+.md3-picker-container {
+  position: relative;
+  width: 100%;
+}
+
+.md3-picker-trailing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--shape-full);
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  transition: background var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-picker-trailing-btn:hover {
+  background: var(--md-surface-container-highest);
+  color: var(--md-primary);
+}
+
+.md3-picker-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 312px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  background: var(--md-surface-container-high);
+  border-radius: var(--shape-xl);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--md-outline-variant);
+  padding: 16px;
+  box-sizing: border-box;
+  user-select: none;
+  scrollbar-width: thin;
+  animation: pickerPopEnter var(--sys-motion-dialog-duration) var(--sys-motion-dialog-easing);
+}
+
+.md3-time-popover {
+  width: 290px;
+}
+
+@keyframes pickerPopEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.md3-picker-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.md3-picker-chip {
+  padding: 3px 10px;
+  border-radius: var(--shape-sm);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  border: none;
+  transition: all var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-picker-chip:hover:not(:disabled) {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+.md3-picker-chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.md3-picker-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--shape-full);
+  cursor: pointer;
+  color: var(--md-on-surface-variant);
+  background: transparent;
+  border: none;
+  transition: background var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-picker-icon-btn:hover {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+
+.md3-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.md3-date-header__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.md3-date-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.md3-date-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  line-height: 24px;
+}
+
+.md3-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  gap: 4px;
+  justify-content: center;
+}
+.md3-date-cell {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--shape-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--md-on-surface);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: transparent;
+  box-sizing: border-box;
+  padding: 0;
+  transition: background var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
+              border-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-date-cell:hover:not(.disabled):not(.selected) {
+  background: var(--md-surface-container-highest);
+}
+.md3-date-cell.today:not(.selected) {
+  border-color: var(--md-primary);
+  color: var(--md-primary);
+  font-weight: 600;
+}
+.md3-date-cell.selected {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-weight: 600;
+  border-color: var(--md-primary);
+}
+.md3-date-cell.outside {
+  color: var(--md-outline);
+  opacity: 0.55;
+}
+.md3-date-cell.disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.md3-date-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.md3-time-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.md3-time-digit-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  height: 52px;
+  background: var(--md-surface-container-highest);
+  border-radius: var(--shape-md);
+  color: var(--md-on-surface);
+  border: 2px solid transparent;
+  transition: all var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-time-digit-box.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: var(--md-primary);
+}
+.md3-time-digit-val {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.md3-time-digit-lbl {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+.md3-time-colon {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--md-on-surface-variant);
+}
+
+.md3-time-cols {
+  display: flex;
+  gap: 12px;
+  height: 180px;
+  margin-bottom: 8px;
+}
+.md3-time-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-md);
+  background: var(--md-surface);
+  scrollbar-width: thin;
+}
+.md3-time-col-header {
+  position: sticky;
+  top: 0;
+  background: var(--md-surface);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  padding: 2px 0 4px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  z-index: 1;
+}
+.md3-time-option {
+  padding: 6px 0;
+  text-align: center;
+  border-radius: var(--shape-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: background var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+.md3-time-option:hover:not(.selected):not(.disabled) {
+  background: var(--md-surface-container-highest);
+}
+.md3-time-option.selected {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  font-weight: 600;
+}
+.md3-time-option.disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.md3-time-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-outline-variant);
+}
