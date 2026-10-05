@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   MAX_DAILY_PLAN_REPEAT_COUNT,
   addDays,
@@ -11,7 +11,8 @@ import {
   type Project,
   type Task,
 } from "@task-orbit/core";
-import { PROJECT_COLORS, colorByKey } from "../store/colors";
+import { PROJECT_COLORS, colorByKey, contrastText, normalizeHex } from "../store/colors";
+import { Icon } from "./Icon";
 import { useStore } from "../store/store";
 import {
   Checkbox,
@@ -62,11 +63,46 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [color, setColor] = useState(initial?.color ?? PROJECT_COLORS[0].key);
+  const [customColor, setCustomColor] = useState<string | null>(() => {
+    if (initial?.color && !PROJECT_COLORS.some((c) => c.key === initial.color)) {
+      return normalizeHex(initial.color);
+    }
+    return null;
+  });
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISO());
   const [endDate, setEndDate] = useState(
     initial?.endDate ?? toISODate(addDays(new Date(), 14)),
   );
   const [error, setError] = useState("");
+
+  const isCustomColor = !PROJECT_COLORS.some((c) => c.key === color);
+  const activeCustomHex = normalizeHex(
+    isCustomColor ? color : (customColor ?? colorByKey(color)),
+  );
+
+  const handleCustomColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomColor(val);
+    setColor(val);
+  };
+
+  const handleOpenColorPicker = () => {
+    if (!isCustomColor && customColor) {
+      setColor(customColor);
+    }
+    if (colorInputRef.current) {
+      if (typeof colorInputRef.current.showPicker === "function") {
+        try {
+          colorInputRef.current.showPicker();
+        } catch {
+          colorInputRef.current.click();
+        }
+      } else {
+        colorInputRef.current.click();
+      }
+    }
+  };
 
   const submit = () => {
     if (!name.trim()) return setError("请输入项目名称");
@@ -107,7 +143,18 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
         />
       </div>
       <div className="field">
-        <label className="field__label">颜色</label>
+        <div className="spread">
+          <label className="field__label">颜色</label>
+          {isCustomColor && (
+            <span
+              className="label-sm muted"
+              style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}
+              title={`当前自定义颜色: ${activeCustomHex.toUpperCase()}`}
+            >
+              {activeCustomHex.toUpperCase()}
+            </span>
+          )}
+        </div>
         <div className="row row--wrap gap-8">
           {PROJECT_COLORS.map((c) => (
             <button
@@ -117,8 +164,37 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
               style={{ background: c.hex }}
               onClick={() => setColor(c.key)}
               title={c.name}
+              aria-label={c.name}
             />
           ))}
+          <button
+            type="button"
+            className={`color-dot color-dot--custom ${isCustomColor ? "selected" : ""}`}
+            style={{
+              background: isCustomColor ? activeCustomHex : "var(--md-surface-container-high)",
+            }}
+            onClick={handleOpenColorPicker}
+            title={isCustomColor ? `自定义颜色 (${activeCustomHex.toUpperCase()})` : "自定义颜色（调色盘）"}
+            aria-label={isCustomColor ? `自定义颜色 (${activeCustomHex.toUpperCase()})` : "自定义颜色（调色盘）"}
+          >
+            <Icon
+              name="palette"
+              size={16}
+              style={{
+                color: isCustomColor ? contrastText(activeCustomHex) : "inherit",
+              }}
+            />
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={activeCustomHex}
+            onInput={handleCustomColorChange}
+            onChange={handleCustomColorChange}
+            style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
         </div>
       </div>
       <div className="field__row">

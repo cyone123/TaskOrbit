@@ -15,13 +15,37 @@ export const PROJECT_COLORS: ColorOption[] = [
   { key: "brown", name: "棕色", hex: "#6D4C41" },
 ];
 
-export function colorByKey(key: string): string {
+export function colorByKey(key?: string | null): string {
+  if (!key) return PROJECT_COLORS[0].hex;
+  if (key.startsWith("#") || key.startsWith("rgb") || key.startsWith("hsl")) {
+    return key;
+  }
   return PROJECT_COLORS.find((c) => c.key === key)?.hex ?? PROJECT_COLORS[0].hex;
+}
+
+/** Normalize hex string to lowercase 7-char `#rrggbb` format for color inputs. */
+export function normalizeHex(hex?: string | null, fallback = PROJECT_COLORS[0].hex): string {
+  if (!hex || typeof hex !== "string") return fallback;
+  const trimmed = hex.trim();
+  if (!trimmed.startsWith("#")) {
+    const matched = PROJECT_COLORS.find((c) => c.key === trimmed);
+    return matched ? matched.hex.toLowerCase() : fallback;
+  }
+  if (trimmed.length === 4) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`.toLowerCase();
+  }
+  if (trimmed.length === 7) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
 }
 
 /** Choose a readable text color (dark or light) for a given hex background. */
 export function contrastText(hex: string): string {
-  const raw = hex.replace("#", "");
+  let raw = hex.replace("#", "").trim();
+  if (raw.length === 3) {
+    raw = `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+  }
   if (raw.length < 6) return "#ffffff";
   const r = parseInt(raw.slice(0, 2), 16) / 255;
   const g = parseInt(raw.slice(2, 4), 16) / 255;

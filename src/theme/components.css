@@ -857,3 +857,23 @@ md-dialog {
 .color-dot.selected {
   border-color: var(--md-on-surface);
 }
+.color-dot:focus-visible {
+  outline: 2px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+.color-dot--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface-variant);
+  border: 2px dashed var(--md-outline-variant);
+}
+.color-dot--custom:hover {
+  border-color: var(--md-outline);
+  color: var(--md-on-surface);
+}
+.color-dot--custom.selected {
+  border: 3px solid var(--md-on-surface);
+}
