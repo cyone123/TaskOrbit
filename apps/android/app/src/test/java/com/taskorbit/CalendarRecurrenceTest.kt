@@ -180,6 +180,7 @@ class CalendarRecurrenceTest {
         val lateNightRange = CalendarModel.visibleHourRange(emptyList(), includeHour = 22)
         assertEquals(8, lateNightRange.first)
         assertEquals(23, lateNightRange.second)
+        assertEquals(24, CalendarModel.visibleHourRange(emptyList(), includeHour = 23).second)
 
         // Mid-day at 14 (within standard 8..20)
         val midDayRange = CalendarModel.visibleHourRange(emptyList(), includeHour = 14)

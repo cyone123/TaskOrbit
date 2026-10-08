@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.taskorbit.domain.model
 
 import kotlinx.serialization.SerialName
@@ -218,10 +220,12 @@ data class WebDavSettings(
 
 @Serializable
 data class AiProviderConfig(
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val protocol: String? = null,
     val baseUrl: String = "",
     val apiKey: String = "",
     val model: String = "",
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val temperature: Double? = null
 )
 
@@ -229,6 +233,7 @@ data class AiProviderConfig(
 data class CustomAiProvider(
     val id: String,
     val name: String,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val protocol: String? = null,
     val baseUrl: String = "",
     val apiKey: String = "",
@@ -240,6 +245,7 @@ data class CustomAiProvider(
 data class AiSettings(
     val enabled: Boolean = false,
     val provider: String = "deepseek",
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val protocol: String? = null,
     val baseUrl: String = "https://api.deepseek.com/v1",
     val apiKey: String = "",

@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.taskorbit.data.repository.AppStateRepository
 import com.taskorbit.domain.OverviewStats
 import com.taskorbit.domain.StatsEngine
+import com.taskorbit.domain.model.AiProviderConfig
+import com.taskorbit.domain.model.AiSettings
 import com.taskorbit.domain.model.WebDavSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,6 +52,10 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
         .map { it.webDavSettings }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WebDavSettings())
 
+    val aiSettings: StateFlow<AiSettings> = repository.state
+        .map { it.aiSettings }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AiSettings())
+
     val syncStatus = repository.syncStatus
     val lastSyncAt = repository.lastSyncAt
     val syncErrorMessage = repository.syncErrorMessage
@@ -66,6 +72,19 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateWebDavSettings(settings: WebDavSettings) {
         repository.updateWebDavSettings(settings)
+    }
+
+    fun updateAiProvider(provider: String, config: AiProviderConfig) {
+        try {
+            repository.updateAiProvider(provider, config)
+            viewModelScope.launch {
+                _events.emit(StatsUiEvent.Success("AI 助手配置已更新"))
+            }
+        } catch (e: Exception) {
+            viewModelScope.launch {
+                _events.emit(StatsUiEvent.Error("保存失败: ${e.message}"))
+            }
+        }
     }
 
     suspend fun testWebDavConnection(settings: WebDavSettings): com.taskorbit.data.sync.WebDavConnectionTestResult {

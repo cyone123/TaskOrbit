@@ -56,7 +56,7 @@ Task Orbit 原生 Android 端是一个基于现代化 Android 技术栈构建的
 
 ### 数据版本与迁移
 
-- `AppState.version` 当前为 `7`。
+- `AppState.version` 当前为 `11`。
 - 修改状态数据结构时，必须递增版本号并在 `com.taskorbit.data.migrations.MigrationManager` 中按版本链式添加迁移逻辑，确保用户升级时数据无损。
 - 支持导入与导出备份（通过 `TransferEngine`），导出数据自动脱敏并剔除设备本地的活跃计时器和私有路径信息。
 

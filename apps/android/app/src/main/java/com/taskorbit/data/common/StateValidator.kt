@@ -11,6 +11,7 @@ object StateValidator {
         if (state.version != CURRENT_VERSION) {
             throw ValidationException("不支持的数据版本: ${state.version}，当前版本应为 $CURRENT_VERSION")
         }
+        com.taskorbit.domain.SettingsDomain.validate(state.settings)
 
         val projectIds = state.projects.map { it.id }.toSet()
         val taskMap = state.tasks.associateBy { it.id }

@@ -315,6 +315,19 @@ class AppStateRepository private constructor(context: Context) {
         }
     }
 
+    fun updateCalendarSettings(settings: com.taskorbit.domain.model.Settings) {
+        com.taskorbit.domain.SettingsDomain.validate(settings)
+        mutate { state -> state.copy(settings = state.settings.copy(
+            weekDetailStartHour = settings.weekDetailStartHour, weekDetailEndHour = settings.weekDetailEndHour,
+            dayStartHour = settings.dayStartHour, dayEndHour = settings.dayEndHour,
+            monthMaxTaskTracks = settings.monthMaxTaskTracks, monthMaxDailyPlans = settings.monthMaxDailyPlans
+        )) }
+    }
+
+    fun updateAiProvider(provider: String, config: com.taskorbit.domain.model.AiProviderConfig) {
+        mutate { state -> state.copy(aiSettings = com.taskorbit.domain.SettingsDomain.updateAiProvider(state.aiSettings, provider, config)) }
+    }
+
     suspend fun syncNow(): com.taskorbit.data.sync.SyncResult {
         if (!_isReady.value || _loadError.value != null) return com.taskorbit.data.sync.SyncResult(false, "数据尚未成功加载，已停止同步。")
         _syncStatus.value = com.taskorbit.data.sync.SyncStatus.SYNCING

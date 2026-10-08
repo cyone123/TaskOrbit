@@ -26,6 +26,8 @@ import java.time.format.DateTimeFormatter
 class CalendarViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = AppStateRepository.getInstance(application)
+    val settings = repository.state.map { it.settings }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.taskorbit.domain.model.Settings())
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
     val anchorDate = MutableStateFlow(LocalDate.now())
@@ -271,5 +273,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun getProjectName(projectId: String?): String? {
         if (projectId == null) return null
         return repository.state.value.projects.find { it.id == projectId }?.name
+    }
+
+    fun saveCalendarSettings(settings: com.taskorbit.domain.model.Settings) {
+        repository.updateCalendarSettings(settings)
     }
 }

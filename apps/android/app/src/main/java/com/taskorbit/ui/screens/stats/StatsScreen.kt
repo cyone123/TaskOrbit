@@ -27,10 +27,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudDone
@@ -59,6 +62,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -69,7 +73,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import com.taskorbit.domain.SettingsDomain
+import com.taskorbit.domain.model.AiProviderConfig
+import com.taskorbit.domain.model.AiSettings
+import com.taskorbit.ui.components.ButtonVariant
+import com.taskorbit.ui.components.TaskOrbitButton
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -103,6 +113,7 @@ fun StatsScreen(
     val overview by viewModel.overviewStats.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
     val webDavSettings by viewModel.webDavSettings.collectAsState()
+    val aiSettings by viewModel.aiSettings.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
     val lastSyncAt by viewModel.lastSyncAt.collectAsState()
     val syncErrorMessage by viewModel.syncErrorMessage.collectAsState()
@@ -112,6 +123,7 @@ fun StatsScreen(
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showImportConfirmDialog by remember { mutableStateOf(false) }
     var showWebDavSheet by remember { mutableStateOf(false) }
+    var showAiSheet by remember { mutableStateOf(false) }
 
     // 处理来自 ViewModel 的 Toast / Snackbar 事件
     LaunchedEffect(Unit) {
@@ -218,7 +230,13 @@ fun StatsScreen(
                 onSettingsClick = { showWebDavSheet = true }
             )
 
-            // 6. 危险操作区
+            // 6. AI 助手配置
+            AiAssistantCard(
+                aiSettings = aiSettings,
+                onSettingsClick = { showAiSheet = true }
+            )
+
+            // 7. 危险操作区
             DangerZoneCard(
                 onResetClick = { showResetConfirmDialog = true }
             )
@@ -296,6 +314,18 @@ fun StatsScreen(
                 viewModel.testWebDavConnection(settings)
             },
             onDismiss = { showWebDavSheet = false }
+        )
+    }
+
+    // AI 助手配置弹层
+    if (showAiSheet) {
+        AiSettingsSheet(
+            aiSettings = aiSettings,
+            onSave = { provider, config ->
+                viewModel.updateAiProvider(provider, config)
+                showAiSheet = false
+            },
+            onDismiss = { showAiSheet = false }
         )
     }
 }
@@ -1040,3 +1070,272 @@ fun DangerZoneCard(onResetClick: () -> Unit) {
         }
     }
 }
+
+@Composable
+fun AiAssistantCard(
+    aiSettings: AiSettings,
+    onSettingsClick: () -> Unit
+) {
+    TaskOrbitCard(
+        modifier = Modifier.fillMaxWidth(),
+        variant = CardVariant.FILLED,
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "AI 助手配置",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val providerDisplay = aiSettings.customProviders.find { it.id == aiSettings.provider }?.name
+                        ?: aiSettings.provider.ifBlank { "未选择" }
+                    val modelDisplay = aiSettings.model.ifBlank { "默认模型" }
+                    Text(
+                        text = "$providerDisplay · $modelDisplay",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "多端兼容配置。移动端原生 AI 助手功能暂未开放。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("管理供应商配置")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun AiSettingsSheet(
+    aiSettings: AiSettings,
+    onSave: (provider: String, config: AiProviderConfig) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var provider by remember { mutableStateOf(aiSettings.provider) }
+    fun configFor(key: String): AiProviderConfig {
+        if (key == aiSettings.provider) return AiProviderConfig(aiSettings.protocol, aiSettings.baseUrl, aiSettings.apiKey, aiSettings.model, aiSettings.temperature)
+        aiSettings.customProviders.find { it.id == key }?.let { return AiProviderConfig(it.protocol, it.baseUrl, it.apiKey, it.model, it.temperature) }
+        return aiSettings.providersConfig[key] ?: AiProviderConfig()
+    }
+
+    var config by remember { mutableStateOf(configFor(provider)) }
+    var temperature by remember { mutableFloatStateOf((config.temperature ?: 0.7).toFloat()) }
+    var apiKeyVisible by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val providers = (listOf("deepseek", "siliconflow", "openai", "anthropic", "gemini", "glm", "kimi", "ollama", "custom") + aiSettings.customProviders.map { it.id } + aiSettings.providersConfig.keys + aiSettings.provider).distinct()
+
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "AI 助手供应商配置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                text = "选择供应商",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                providers.forEach { key ->
+                    val displayName = aiSettings.customProviders.find { it.id == key }?.name ?: key
+                    TaskOrbitButton(
+                        text = displayName,
+                        onClick = {
+                            provider = key
+                            val nextConfig = configFor(key)
+                            config = nextConfig
+                            temperature = (nextConfig.temperature ?: 0.7).toFloat()
+                            error = null
+                        },
+                        variant = if (provider == key) ButtonVariant.TONAL else ButtonVariant.TEXT
+                    )
+                }
+            }
+
+            Text(
+                text = "协议类型",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val protocols = listOf<Pair<String?, String>>(
+                    null to "自动",
+                    "openai_chat" to "OpenAI Chat",
+                    "openai_responses" to "OpenAI Responses",
+                    "anthropic" to "Anthropic",
+                    "gemini" to "Gemini"
+                )
+                protocols.forEach { (proto, label) ->
+                    TaskOrbitButton(
+                        text = label,
+                        onClick = { config = config.copy(protocol = proto) },
+                        variant = if (config.protocol == proto) ButtonVariant.TONAL else ButtonVariant.TEXT
+                    )
+                }
+            }
+
+            androidx.compose.material3.OutlinedTextField(
+                value = config.baseUrl,
+                onValueChange = { config = config.copy(baseUrl = it) },
+                label = { Text("服务地址 (Base URL)") },
+                placeholder = { Text("https://api.deepseek.com/v1") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            androidx.compose.material3.OutlinedTextField(
+                value = config.apiKey,
+                onValueChange = { config = config.copy(apiKey = it) },
+                label = { Text("API Key") },
+                placeholder = { Text("输入 API 凭据") },
+                singleLine = true,
+                visualTransformation = if (apiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
+                        Icon(
+                            imageVector = if (apiKeyVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (apiKeyVisible) "隐藏密钥" else "显示密钥"
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            androidx.compose.material3.OutlinedTextField(
+                value = config.model,
+                onValueChange = { config = config.copy(model = it) },
+                label = { Text("模型名称 (Model)") },
+                placeholder = { Text("例如：deepseek-chat") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "采样温度 (Temperature)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.1f", temperature),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Slider(
+                    value = temperature,
+                    onValueChange = { temperature = (kotlin.math.round(it * 10f) / 10f) },
+                    valueRange = 0f..2f,
+                    steps = 19
+                )
+            }
+
+            error?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+
+                TaskOrbitButton(
+                    text = "保存配置",
+                    onClick = {
+                        try {
+                            val updatedConfig = config.copy(temperature = temperature.toDouble())
+                            SettingsDomain.updateAiProvider(aiSettings, provider, updatedConfig)
+                            onSave(provider, updatedConfig)
+                        } catch (e: IllegalArgumentException) {
+                            error = e.message
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+

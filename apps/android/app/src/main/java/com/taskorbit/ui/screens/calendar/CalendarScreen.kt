@@ -70,6 +70,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -122,6 +126,7 @@ import com.taskorbit.domain.WeekCalendarMode
 import com.taskorbit.domain.model.DailyPlan
 import com.taskorbit.domain.model.DailyPlanRepeat
 import com.taskorbit.domain.model.Task
+import com.taskorbit.domain.model.Settings
 import com.taskorbit.ui.components.CardVariant
 import com.taskorbit.ui.components.TaskOrbitBottomSheet
 import com.taskorbit.ui.components.TaskOrbitButton
@@ -145,6 +150,7 @@ import java.time.format.DateTimeFormatter
 fun CalendarScreen(
     viewModel: CalendarViewModel = viewModel()
 ) {
+    val settings by viewModel.settings.collectAsState()
     val anchorDate by viewModel.anchorDate.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val weekMode by viewModel.weekMode.collectAsState()
@@ -161,6 +167,7 @@ fun CalendarScreen(
     val tasksOfDay by viewModel.tasksOfDay.collectAsState()
 
     val isPlanFormOpen by viewModel.isPlanFormOpen.collectAsState()
+    var showSettingsSheet by remember { mutableStateOf(false) }
 
     // Expressive 浮岛伸缩状态与滚动感知
     var isAppBarExpanded by remember { mutableStateOf(true) }
@@ -204,6 +211,13 @@ fun CalendarScreen(
                     }
                     IconButton(onClick = { viewModel.navigate(1) }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下一周期")
+                    }
+                    IconButton(onClick = { showSettingsSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "日历设置",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -249,6 +263,7 @@ fun CalendarScreen(
                     when (targetMode) {
                         CalendarMode.DAY -> {
                             DayTimelineView(
+                                settings = settings,
                                 currentDate = selectedDate,
                                 plans = plansOfDay,
                                 onPlanClick = viewModel::openEditPlanForm,
@@ -262,6 +277,7 @@ fun CalendarScreen(
                         CalendarMode.WEEK -> {
                             if (weekMode == WeekCalendarMode.PLANS) {
                                 WeekPlansView(
+                                    settings = settings,
                                     daysOfWeek = daysOfWeek,
                                     plansOfWeek = plansOfWeek,
                                     selectedDate = selectedDate,
@@ -283,6 +299,9 @@ fun CalendarScreen(
                         }
                         CalendarMode.MONTH -> {
                             MonthCalendarView(
+                                settings = settings,
+                                plansOfDay = plansOfDay,
+                                onPlanClick = viewModel::openEditPlanForm,
                                 anchorDate = anchorDate,
                                 selectedDate = selectedDate,
                                 monthDays = monthDays,
@@ -422,6 +441,18 @@ fun CalendarScreen(
     // 新建 / 编辑计划 BottomSheet
     if (isPlanFormOpen) {
         PlanFormBottomSheet(viewModel = viewModel)
+    }
+
+    // 日历显示配置弹层
+    if (showSettingsSheet) {
+        CalendarSettingsSheet(
+            settings = settings,
+            onSave = { updatedSettings ->
+                viewModel.saveCalendarSettings(updatedSettings)
+                showSettingsSheet = false
+            },
+            onDismiss = { showSettingsSheet = false }
+        )
     }
 }
 
@@ -837,6 +868,7 @@ private fun DraggablePlanBlock(
  */
 @Composable
 private fun DayTimelineView(
+    settings: Settings,
     currentDate: LocalDate,
     plans: List<DailyPlan>,
     onPlanClick: (DailyPlan) -> Unit,
@@ -863,10 +895,12 @@ private fun DayTimelineView(
     }
 
     // 动态小时范围：若是今天，保证当前小时必定包含在视图之内（自动扩展边界，即使在清晨、深夜或不同时区）
-    val (startHour, endHour) = remember(plans, isToday, currentTime.hour) {
+    val (startHour, endHour) = remember(plans, isToday, currentTime.hour, settings) {
         CalendarModel.visibleHourRange(
             plans = plans,
-            includeHour = if (isToday) currentTime.hour else null
+            includeHour = if (isToday) currentTime.hour else null,
+            preferredStart = settings.dayStartHour,
+            preferredEnd = settings.dayEndHour
         )
     }
     val layouts = remember(plans) { CalendarModel.layoutPlanColumns(plans) }
@@ -1011,6 +1045,7 @@ private fun DayTimelineView(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DraggableWeekPlanBlock(
+    startHour: Int,
     plan: DailyPlan,
     dayIndex: Int,
     daysOfWeek: List<LocalDate>,
@@ -1037,7 +1072,7 @@ private fun DraggableWeekPlanBlock(
     val endMin = CalendarModel.timeToMinutes(plan.endTime)
     val durationMin = (endMin - startMin).coerceAtLeast(15)
 
-    val baseTopOffsetDp = (startMin.toFloat() / 60f) * hourHeight.value
+    val baseTopOffsetDp = ((startMin - startHour * 60).toFloat() / 60f) * hourHeight.value
     val blockHeightDp = (durationMin.toFloat() / 60f) * hourHeight.value
 
     val subColWidthDp = columnWidth / layout.columnCount
@@ -1180,7 +1215,7 @@ private fun DraggableWeekPlanBlock(
                             val targetStartStr = CalendarModel.minutesToTime(targetStartMin)
                             val targetEndStr = CalendarModel.minutesToTime(targetEndMin)
 
-                            val targetTopDp = (targetStartMin.toFloat() / 60f) * hourHeight.value
+                            val targetTopDp = ((targetStartMin - startHour * 60).toFloat() / 60f) * hourHeight.value
                             val targetLeftDp = (hourGutterWidth + columnWidth * tDayIndex + subColWidthDp * layout.column).value
 
                             val initialSpringOffsetY = finalDragOffsetY - targetSnapOffsetY
@@ -1293,6 +1328,7 @@ private fun DraggableWeekPlanBlock(
  */
 @Composable
 private fun WeekPlansView(
+    settings: Settings,
     daysOfWeek: List<LocalDate>,
     plansOfWeek: Map<LocalDate, List<DailyPlan>>,
     selectedDate: LocalDate,
@@ -1306,13 +1342,14 @@ private fun WeekPlansView(
     val today = LocalDate.now()
     val hourHeight = 60.dp
     val hourGutterWidth = 38.dp
-    val totalHeight = hourHeight * 24
+    val (startHour, endHour) = CalendarModel.visibleHourRange(plansOfWeek.values.flatten(), preferredStart = settings.weekDetailStartHour, preferredEnd = settings.weekDetailEndHour)
+    val totalHeight = hourHeight * (endHour - startHour)
     val density = LocalDensity.current
     val vScrollState = rememberScrollState()
 
     // 默认平滑滚动至上午 8 点
-    LaunchedEffect(Unit) {
-        val targetScrollY = with(density) { (hourHeight * 8).toPx() }.roundToInt()
+    LaunchedEffect(startHour) {
+        val targetScrollY = with(density) { (hourHeight * (8 - startHour).coerceAtLeast(0)).toPx() }.roundToInt()
         vScrollState.scrollTo(targetScrollY)
     }
 
@@ -1405,8 +1442,8 @@ private fun WeekPlansView(
                     .height(totalHeight)
             ) {
                 // 1. 小时标尺与整点横向对齐线
-                for (h in 0..23) {
-                    val topOffset = hourHeight * h
+                for (h in startHour until endHour) {
+                    val topOffset = hourHeight * (h - startHour)
 
                     // 整点小时标签
                     Box(
@@ -1458,6 +1495,7 @@ private fun WeekPlansView(
 
                         key(plan.id) {
                             DraggableWeekPlanBlock(
+                                startHour = startHour,
                                 plan = plan,
                                 dayIndex = dayIdx,
                                 daysOfWeek = daysOfWeek,
@@ -1597,6 +1635,9 @@ private fun WeekGanttView(
  */
 @Composable
 private fun MonthCalendarView(
+    settings: Settings,
+    plansOfDay: List<DailyPlan>,
+    onPlanClick: (DailyPlan) -> Unit,
     anchorDate: LocalDate,
     selectedDate: LocalDate,
     monthDays: List<LocalDate>,
@@ -1639,14 +1680,14 @@ private fun MonthCalendarView(
                 .padding(horizontal = 4.dp)
         ) {
             val rows = monthDays.chunked(7)
-            val weekRowHeight = 78.dp
             val dateHeaderHeight = 24.dp
             val slotHeight = 13.dp
             val slotGap = 2.dp
             val slotTopBase = 25.dp
+            val weekRowHeight = slotTopBase + (slotHeight + slotGap) * settings.monthMaxTaskTracks + slotGap
 
             rows.forEach { weekDays ->
-                val spanningLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 3)
+                val spanningLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = settings.monthMaxTaskTracks)
 
                 BoxWithConstraints(
                     modifier = Modifier
@@ -1779,7 +1820,7 @@ private fun MonthCalendarView(
                     spanningLayout.overflowPerCol.forEach { (col, overflowCount) ->
                         val left = columnWidth * col + 2.dp
                         val width = columnWidth - 4.dp
-                        val top = slotTopBase + (slotHeight + slotGap) * 2 // 放置在第 3 个槽位 (index 2)
+                        val top = slotTopBase + (slotHeight + slotGap) * (settings.monthMaxTaskTracks - 1)
 
                         Box(
                             modifier = Modifier
@@ -1805,6 +1846,13 @@ private fun MonthCalendarView(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        Text("每日计划 (${plansOfDay.size})", style = MaterialTheme.typography.titleSmall)
+        plansOfDay.sortedBy { it.startTime }.take(settings.monthMaxDailyPlans).forEach { plan ->
+            TaskOrbitButton("${plan.startTime} ${plan.name}", onClick = { onPlanClick(plan) }, variant = com.taskorbit.ui.components.ButtonVariant.TEXT)
+        }
+        if (plansOfDay.size > settings.monthMaxDailyPlans) {
+            Text("还有 ${plansOfDay.size - settings.monthMaxDailyPlans} 个计划，可在日视图查看", style = MaterialTheme.typography.bodySmall)
+        }
         // 选中日期的任务清单
         Text(
             text = "${selectedDate.format(DateTimeFormatter.ofPattern("M月d日"))} 任务 (${tasksOfDay.size})",
@@ -2110,3 +2158,205 @@ private fun PlanFormBottomSheet(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CalendarSettingsSheet(
+    settings: Settings,
+    onSave: (Settings) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var dayStartHour by remember { mutableIntStateOf(settings.dayStartHour) }
+    var dayEndHour by remember { mutableIntStateOf(settings.dayEndHour) }
+    var weekDetailStartHour by remember { mutableIntStateOf(settings.weekDetailStartHour) }
+    var weekDetailEndHour by remember { mutableIntStateOf(settings.weekDetailEndHour) }
+    var monthMaxTaskTracks by remember { mutableIntStateOf(settings.monthMaxTaskTracks) }
+    var monthMaxDailyPlans by remember { mutableIntStateOf(settings.monthMaxDailyPlans) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "日历显示设置",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "日视图时间范围",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            CalendarSliderRow(
+                label = "开始时间",
+                value = dayStartHour,
+                range = 0..23,
+                formatValue = { String.format("%02d:00", it) },
+                onValueChange = { newStart ->
+                    dayStartHour = newStart
+                    if (dayEndHour <= newStart) {
+                        dayEndHour = (newStart + 1).coerceAtMost(24)
+                    }
+                }
+            )
+
+            CalendarSliderRow(
+                label = "结束时间",
+                value = dayEndHour,
+                range = 1..24,
+                formatValue = { String.format("%02d:00", it) },
+                onValueChange = { newEnd ->
+                    dayEndHour = newEnd
+                    if (dayStartHour >= newEnd) {
+                        dayStartHour = (newEnd - 1).coerceAtLeast(0)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "周视图时间范围",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            CalendarSliderRow(
+                label = "开始时间",
+                value = weekDetailStartHour,
+                range = 0..23,
+                formatValue = { String.format("%02d:00", it) },
+                onValueChange = { newStart ->
+                    weekDetailStartHour = newStart
+                    if (weekDetailEndHour <= newStart) {
+                        weekDetailEndHour = (newStart + 1).coerceAtMost(24)
+                    }
+                }
+            )
+
+            CalendarSliderRow(
+                label = "结束时间",
+                value = weekDetailEndHour,
+                range = 1..24,
+                formatValue = { String.format("%02d:00", it) },
+                onValueChange = { newEnd ->
+                    weekDetailEndHour = newEnd
+                    if (weekDetailStartHour >= newEnd) {
+                        weekDetailStartHour = (newEnd - 1).coerceAtLeast(0)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "月视图显示限制",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            CalendarSliderRow(
+                label = "最多任务轨道数",
+                value = monthMaxTaskTracks,
+                range = 1..10,
+                formatValue = { "$it 条" },
+                onValueChange = { monthMaxTaskTracks = it }
+            )
+
+            CalendarSliderRow(
+                label = "最多每日计划数",
+                value = monthMaxDailyPlans,
+                range = 1..20,
+                formatValue = { "$it 个" },
+                onValueChange = { monthMaxDailyPlans = it }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("取消")
+                }
+
+                TaskOrbitButton(
+                    text = "保存",
+                    onClick = {
+                        val updated = settings.copy(
+                            dayStartHour = dayStartHour,
+                            dayEndHour = dayEndHour,
+                            weekDetailStartHour = weekDetailStartHour,
+                            weekDetailEndHour = weekDetailEndHour,
+                            monthMaxTaskTracks = monthMaxTaskTracks,
+                            monthMaxDailyPlans = monthMaxDailyPlans
+                        )
+                        onSave(updated)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CalendarSliderRow(
+    label: String,
+    value: Int,
+    range: IntRange,
+    formatValue: (Int) -> String,
+    onValueChange: (Int) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = formatValue(value),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = (range.last - range.first) - 1
+        )
+    }
+}
+
