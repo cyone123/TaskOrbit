@@ -118,7 +118,7 @@ class SyncCoordinator(
         // Case C: 远端文件已变更（或首次从已有云端拉取）
         val (content, remoteEtag) = client.getFile(remoteFilePath)
         val remoteEnvelope = try {
-            json.decodeFromString<WebDavSyncEnvelope>(content)
+            decodeEnvelope(content)
         } catch (e: Exception) {
             throw IllegalArgumentException("远端同步文件解析失败: ${e.message}", e)
         }
@@ -150,6 +150,19 @@ class SyncCoordinator(
             message = if (mergeResult.hasChanges) "双向合并完成" else "数据已是最新",
             hasChanges = mergeResult.hasChanges
         )
+    }
+
+    companion object {
+        fun decodeEnvelope(content: String): WebDavSyncEnvelope {
+            val codec = com.taskorbit.data.common.StateCodec
+            val root = codec.json.parseToJsonElement(content) as? kotlinx.serialization.json.JsonObject
+                ?: throw IllegalArgumentException("同步文件格式无效。")
+            require(root["format"] == kotlinx.serialization.json.JsonPrimitive(SYNC_ENVELOPE_FORMAT)) { "同步文件格式无效。" }
+            codec.requireEnvelopeVersion(root, SYNC_ENVELOPE_VERSION)
+            val state = codec.decode(root["state"]?.toString() ?: error("同步文件缺少 state。"))
+            val normalized = kotlinx.serialization.json.JsonObject(root + ("state" to codec.json.encodeToJsonElement(AppState.serializer(), state)))
+            return codec.json.decodeFromJsonElement(WebDavSyncEnvelope.serializer(), normalized)
+        }
     }
 
     private fun buildEnvelope(state: AppState, tombstones: List<Tombstone>): WebDavSyncEnvelope {

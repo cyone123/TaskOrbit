@@ -17,9 +17,10 @@ import java.io.File
 import java.io.FileOutputStream
 
 class AtomicFilePersistence(
-    private val context: Context,
+    private val filesDir: File,
     private val scope: CoroutineScope
 ) {
+    constructor(context: Context, scope: CoroutineScope) : this(context.filesDir, scope)
     companion object {
         private const val MAIN_FILE_NAME = "data.json"
         private const val BACKUP_FILE_NAME = "data.json.bak"
@@ -37,10 +38,11 @@ class AtomicFilePersistence(
 
     private val mutex = Mutex()
     private var debounceJob: Job? = null
-    private val mainFile: File get() = File(context.filesDir, MAIN_FILE_NAME)
-    private val backupFile: File get() = File(context.filesDir, BACKUP_FILE_NAME)
-    private val tmpFile: File get() = File(context.filesDir, TMP_FILE_NAME)
-    private val corruptFile: File get() = File(context.filesDir, CORRUPT_FILE_NAME)
+    private val mainFile: File get() = File(filesDir, MAIN_FILE_NAME)
+    private val backupFile: File get() = File(filesDir, BACKUP_FILE_NAME)
+    private val tmpFile: File get() = File(filesDir, TMP_FILE_NAME)
+    private val corruptFile: File get() = File(filesDir, CORRUPT_FILE_NAME)
+    @Volatile private var writesBlocked = false
 
     data class LoadResult(
         val state: AppState,
@@ -52,11 +54,13 @@ class AtomicFilePersistence(
             if (mainFile.exists()) {
                 try {
                     val raw = mainFile.readText(Charsets.UTF_8)
-                    val migrated = MigrationManager.migrate(raw)
-                    val state = json.decodeFromString<AppState>(migrated)
-                    StateValidator.validate(state)
+                    val state = com.taskorbit.data.common.StateCodec.decode(raw)
                     return@withLock LoadResult(state = state, recoveredFromBackup = false)
                 } catch (e: Exception) {
+                    if (e is com.taskorbit.data.common.UnsupportedDataVersionException) {
+                        writesBlocked = true
+                        throw e
+                    }
                     // 主文件解析失败或校验失败，将其备份为 .corrupt
                     try {
                         mainFile.copyTo(corruptFile, overwrite = true)
@@ -68,11 +72,14 @@ class AtomicFilePersistence(
             if (backupFile.exists()) {
                 try {
                     val raw = backupFile.readText(Charsets.UTF_8)
-                    val migrated = MigrationManager.migrate(raw)
-                    val state = json.decodeFromString<AppState>(migrated)
-                    StateValidator.validate(state)
+                    val state = com.taskorbit.data.common.StateCodec.decode(raw)
                     return@withLock LoadResult(state = state, recoveredFromBackup = true)
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    if (e is com.taskorbit.data.common.UnsupportedDataVersionException) {
+                        writesBlocked = true
+                        throw e
+                    }
+                }
             }
 
             // 无可用文件，返回空状态
@@ -90,6 +97,7 @@ class AtomicFilePersistence(
 
     suspend fun saveImmediately(state: AppState) = withContext(Dispatchers.IO) {
         mutex.withLock {
+            check(!writesBlocked) { "数据版本不受支持，已停止保存，请升级应用。" }
             try {
                 StateValidator.validate(state)
                 val serialized = json.encodeToString(AppState.serializer(), state)

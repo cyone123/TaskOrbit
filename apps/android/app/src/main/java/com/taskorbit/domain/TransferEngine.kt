@@ -78,7 +78,7 @@ object TransferEngine {
             }
             val formatVersion = rootElement["formatVersion"]?.jsonPrimitive?.int ?: 1
             if (formatVersion > EXPORT_FORMAT_VERSION) {
-                throw IllegalArgumentException("快照格式版本 $formatVersion 高于当前版本，请升级应用后再导入。")
+                throw com.taskorbit.data.common.UnsupportedDataVersionException("快照格式版本 $formatVersion 高于当前版本，请升级应用后再导入。")
             }
             val stateObj = rootElement["state"]?.jsonObject ?: throw IllegalArgumentException("快照中缺少有效的 state 节点。")
             stateObj.toString()
@@ -89,8 +89,7 @@ object TransferEngine {
         }
 
         // 版本平滑迁移至当前最新版
-        val migrated = MigrationManager.migrate(stateString)
-        val state = json.decodeFromString(AppState.serializer(), migrated)
+        val state = com.taskorbit.data.common.StateCodec.decode(stateString)
 
         // 导入状态强制将 activeTimer 置空
         return state.copy(activeTimer = null)

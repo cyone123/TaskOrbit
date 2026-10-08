@@ -40,6 +40,8 @@ class AppStateRepository private constructor(context: Context) {
 
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
+    private val _loadError = MutableStateFlow<String?>(null)
+    val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
     private val _notice = MutableStateFlow<String?>(null)
     private val tombstones = mutableListOf<Tombstone>()
@@ -93,6 +95,7 @@ class AppStateRepository private constructor(context: Context) {
 
     init {
         applicationScope.launch {
+            try {
             val result = persistence.loadState()
             _state.value = result.state
             if (result.recoveredFromBackup) {
@@ -104,6 +107,10 @@ class AppStateRepository private constructor(context: Context) {
             if (result.state.webDavSettings.enabled && result.state.webDavSettings.autoSync) {
                 syncNow()
             }
+            } catch (e: com.taskorbit.data.common.UnsupportedDataVersionException) {
+                _loadError.value = e.message
+                _isReady.value = true
+            }
         }
     }
 
@@ -112,6 +119,7 @@ class AppStateRepository private constructor(context: Context) {
     }
 
     fun mutate(mutator: (AppState) -> AppState) {
+        if (!_isReady.value || _loadError.value != null) return
         applicationScope.launch {
             mutateMutex.withLock {
                 val current = _state.value
@@ -275,10 +283,12 @@ class AppStateRepository private constructor(context: Context) {
     }
 
     fun exportSnapshot(): String {
+        check(_isReady.value && _loadError.value == null) { "数据尚未成功加载。" }
         return com.taskorbit.domain.TransferEngine.serializeExportSnapshot(_state.value)
     }
 
     suspend fun importSnapshot(rawJson: String) {
+        check(_isReady.value && _loadError.value == null) { "数据尚未成功加载。" }
         val importedState = com.taskorbit.domain.TransferEngine.parseImportSnapshot(rawJson)
         com.taskorbit.data.common.StateValidator.validate(importedState)
         _state.value = importedState
@@ -286,6 +296,7 @@ class AppStateRepository private constructor(context: Context) {
     }
 
     suspend fun resetAllData() {
+        check(_isReady.value && _loadError.value == null) { "数据尚未成功加载。" }
         val emptyState = AppState()
         _state.value = emptyState
         persistence.saveImmediately(emptyState)
@@ -305,6 +316,7 @@ class AppStateRepository private constructor(context: Context) {
     }
 
     suspend fun syncNow(): com.taskorbit.data.sync.SyncResult {
+        if (!_isReady.value || _loadError.value != null) return com.taskorbit.data.sync.SyncResult(false, "数据尚未成功加载，已停止同步。")
         _syncStatus.value = com.taskorbit.data.sync.SyncStatus.SYNCING
         _syncErrorMessage.value = null
 

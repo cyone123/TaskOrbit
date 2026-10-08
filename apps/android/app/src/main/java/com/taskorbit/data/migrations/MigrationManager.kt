@@ -30,7 +30,7 @@ object MigrationManager {
 
         val version = root["version"]?.jsonPrimitive?.intOrNull ?: 1
         if (version > CURRENT_VERSION) {
-            throw IllegalArgumentException("数据版本 $version 高于当前版本 $CURRENT_VERSION，请升级应用。")
+            throw com.taskorbit.data.common.UnsupportedDataVersionException("数据版本 $version 高于当前版本 $CURRENT_VERSION，请升级应用。")
         }
 
         var migrated = root
