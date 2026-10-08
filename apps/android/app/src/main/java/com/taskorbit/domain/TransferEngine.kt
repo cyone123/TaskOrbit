@@ -47,7 +47,13 @@ object TransferEngine {
         val portableState = state.copy(
             activeTimer = null,
             vaultSettings = portableVaultSettings,
-            webDavSettings = portableWebDavSettings
+            webDavSettings = portableWebDavSettings,
+            aiSettings = state.aiSettings.copy(
+                enabled = false,
+                apiKey = "",
+                customProviders = state.aiSettings.customProviders.map { it.copy(apiKey = "") },
+                providersConfig = state.aiSettings.providersConfig.mapValues { (_, config) -> config.copy(apiKey = "") }
+            )
         )
 
         val envelope = TaskOrbitExportEnvelope(

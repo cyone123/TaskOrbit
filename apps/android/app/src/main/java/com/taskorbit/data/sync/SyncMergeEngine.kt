@@ -222,10 +222,11 @@ object SyncMergeEngine {
             dailyPlans = validPlans,
             inboxItems = inboxRes.merged,
             pomodoroSessions = mergedSessions,
-            settings = remotePayload.settings.copy(theme = localState.settings.theme),
+            settings = localState.settings,
             vaultSettings = localState.vaultSettings,
             activeTimer = localState.activeTimer,
-            webDavSettings = localState.webDavSettings
+            webDavSettings = localState.webDavSettings,
+            aiSettings = localState.aiSettings
         )
 
         // 7. 通过完整性校验

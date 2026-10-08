@@ -153,6 +153,11 @@ class SyncCoordinator(
     }
 
     companion object {
+        internal fun portableState(state: AppState): AppState = state.copy(
+            activeTimer = null,
+            webDavSettings = com.taskorbit.domain.model.WebDavSettings()
+        )
+
         fun decodeEnvelope(content: String): WebDavSyncEnvelope {
             val codec = com.taskorbit.data.common.StateCodec
             val root = codec.json.parseToJsonElement(content) as? kotlinx.serialization.json.JsonObject
@@ -166,10 +171,7 @@ class SyncCoordinator(
     }
 
     private fun buildEnvelope(state: AppState, tombstones: List<Tombstone>): WebDavSyncEnvelope {
-        val portableState = state.copy(
-            activeTimer = null,
-            webDavSettings = com.taskorbit.domain.model.WebDavSettings()
-        )
+        val portableState = portableState(state)
         return WebDavSyncEnvelope(
             format = SYNC_ENVELOPE_FORMAT,
             formatVersion = SYNC_ENVELOPE_VERSION,
