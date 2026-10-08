@@ -19,6 +19,14 @@ describe("snapshot transfer", () => {
         autoSync: true,
         syncIntervalMinutes: 15,
       },
+      aiSettings: {
+        enabled: true,
+        provider: "deepseek" as const,
+        baseUrl: "https://api.deepseek.com/v1",
+        apiKey: "sk-my-secret-key",
+        model: "deepseek-chat",
+        temperature: 0.7,
+      },
       activeTimer: {
         projectId: null,
         taskId: null,
@@ -40,6 +48,8 @@ describe("snapshot transfer", () => {
     expect(exported.state.vaultSettings.rootPath).toBeNull();
     expect(exported.state.webDavSettings.password).toBe("");
     expect(exported.state.webDavSettings.enabled).toBe(false);
+    expect(exported.state.aiSettings.apiKey).toBe("");
+    expect(exported.state.aiSettings.enabled).toBe(false);
     expect(parseImportSnapshot(exported)).toMatchObject({
       version: STATE_VERSION,
       activeTimer: null,

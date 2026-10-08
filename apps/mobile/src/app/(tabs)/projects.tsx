@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { addDays, calculateProjectProgress, relativeRangeLabel, toISODate, todayISO } from "@task-orbit/core";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -23,7 +23,7 @@ import { PROJECT_COLORS, PROJECT_COLOR_HEX, useAppStore } from "@/store/app-stor
 export default function ProjectsScreen() {
   const colors = useAppColors();
   const router = useRouter();
-  const { state, addProject, restoreProject, removeProject } = useAppStore();
+  const { state, addProject, restoreProject, removeProject, archiveProject, reorderProjects } = useAppStore();
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
@@ -31,6 +31,27 @@ export default function ProjectsScreen() {
   const [startDate, setStartDate] = useState(todayISO());
   const [endDate, setEndDate] = useState(toISODate(addDays(new Date(), 30)));
   const [color, setColor] = useState<string>(PROJECT_COLORS[0]);
+
+  // Drag and drop state
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [isOverArchive, setIsOverArchive] = useState(false);
+  const [translateY, setTranslateY] = useState(0);
+
+  const touchState = useRef({
+    projectId: null as string | null,
+    startX: 0,
+    startY: 0,
+    currentY: 0,
+    isDragging: false,
+    timer: null as ReturnType<typeof setTimeout> | null,
+  });
+
+  const itemLayouts = useRef<Record<string, { y: number; height: number; pageY: number }>>({});
+  const archiveLayout = useRef<{ y: number; height: number; pageY: number } | null>(null);
+  const cardRefs = useRef<Record<string, View | null>>({});
+  const archiveZoneRef = useRef<View | null>(null);
 
   const activeProjects = useMemo(
     () =>
@@ -42,6 +63,155 @@ export default function ProjectsScreen() {
     [query, state.projects],
   );
   const archivedProjects = state.projects.filter((project) => project.archived);
+
+  const handleTouchStart = (projectId: string, e: any) => {
+    if (touchState.current.isDragging) return;
+
+    const pageX = e.nativeEvent.pageX;
+    const pageY = e.nativeEvent.pageY;
+
+    if (touchState.current.timer) {
+      clearTimeout(touchState.current.timer);
+    }
+
+    touchState.current = {
+      projectId,
+      startX: pageX,
+      startY: pageY,
+      currentY: pageY,
+      isDragging: false,
+      timer: setTimeout(() => {
+        touchState.current.isDragging = true;
+        setDraggingId(projectId);
+        setScrollEnabled(false);
+        setTranslateY(0);
+        const currentIndex = activeProjects.findIndex((p) => p.id === projectId);
+        setHoverIndex(currentIndex);
+        setIsOverArchive(false);
+
+        Object.entries(cardRefs.current).forEach(([id, el]) => {
+          el?.measureInWindow((x, y, width, height) => {
+            itemLayouts.current[id] = { y, height, pageY: y };
+          });
+        });
+        archiveZoneRef.current?.measureInWindow((x, y, width, height) => {
+          archiveLayout.current = { y, height, pageY: y };
+        });
+      }, 250),
+    };
+  };
+
+  const handleTouchMove = (e: any) => {
+    const pageX = e.nativeEvent.pageX;
+    const pageY = e.nativeEvent.pageY;
+    touchState.current.currentY = pageY;
+
+    if (!touchState.current.isDragging) {
+      const dx = Math.abs(pageX - touchState.current.startX);
+      const dy = Math.abs(pageY - touchState.current.startY);
+      if (dx > 8 || dy > 8) {
+        if (touchState.current.timer) {
+          clearTimeout(touchState.current.timer);
+          touchState.current.timer = null;
+        }
+      }
+      return;
+    }
+
+    const dy = pageY - touchState.current.startY;
+    setTranslateY(dy);
+
+    const archiveY = archiveLayout.current?.pageY;
+    if (archiveY !== undefined && pageY >= archiveY - 30) {
+      setIsOverArchive(true);
+      setHoverIndex(null);
+      return;
+    }
+    setIsOverArchive(false);
+
+    const fromIndex = activeProjects.findIndex((p) => p.id === touchState.current.projectId);
+    let targetIdx = fromIndex;
+    for (let i = 0; i < activeProjects.length; i++) {
+      const p = activeProjects[i];
+      const layout = itemLayouts.current[p.id];
+      if (layout) {
+        if (pageY >= layout.pageY && pageY <= layout.pageY + layout.height) {
+          targetIdx = i;
+          break;
+        } else if (pageY < layout.pageY && i === 0) {
+          targetIdx = 0;
+          break;
+        } else if (pageY > layout.pageY + layout.height && i === activeProjects.length - 1) {
+          targetIdx = activeProjects.length - 1;
+          break;
+        }
+      }
+    }
+    setHoverIndex(targetIdx);
+  };
+
+  const handleTouchEnd = (projectId: string) => {
+    if (touchState.current.timer) {
+      clearTimeout(touchState.current.timer);
+      touchState.current.timer = null;
+    }
+
+    if (touchState.current.isDragging) {
+      const currentDragId = touchState.current.projectId;
+
+      if (isOverArchive && currentDragId) {
+        const proj = activeProjects.find((p) => p.id === currentDragId);
+        archiveProject(currentDragId);
+        Alert.alert("已归档", `项目「${proj?.name ?? ""}」已归档。`);
+      } else if (hoverIndex !== null && currentDragId) {
+        const fromIndex = activeProjects.findIndex((p) => p.id === currentDragId);
+        if (fromIndex !== -1 && hoverIndex !== fromIndex) {
+          const next = [...activeProjects.map((p) => p.id)];
+          const [movedId] = next.splice(fromIndex, 1);
+          next.splice(hoverIndex, 0, movedId);
+          reorderProjects(next);
+        }
+      }
+    } else {
+      if (touchState.current.projectId === projectId) {
+        router.push({ pathname: "/project/[id]", params: { id: projectId } });
+      }
+    }
+
+    touchState.current = {
+      projectId: null,
+      startX: 0,
+      startY: 0,
+      currentY: 0,
+      isDragging: false,
+      timer: null,
+    };
+    setDraggingId(null);
+    setTranslateY(0);
+    setScrollEnabled(true);
+    setHoverIndex(null);
+    setIsOverArchive(false);
+  };
+
+  const handleTouchCancel = () => {
+    if (touchState.current.timer) {
+      clearTimeout(touchState.current.timer);
+      touchState.current.timer = null;
+    }
+    touchState.current = {
+      projectId: null,
+      startX: 0,
+      startY: 0,
+      currentY: 0,
+      isDragging: false,
+      timer: null,
+    };
+    setDraggingId(null);
+    setTranslateY(0);
+    setScrollEnabled(true);
+    setHoverIndex(null);
+    setIsOverArchive(false);
+  };
 
   const reset = () => {
     setFormOpen(false);
@@ -76,7 +246,7 @@ export default function ProjectsScreen() {
       subtitle={`${activeProjects.length} 个进行中`}
     >
       <SearchField value={query} onChangeText={setQuery} placeholder="搜索项目" />
-      <PageScroll>
+      <PageScroll scrollEnabled={scrollEnabled}>
         {activeProjects.length === 0 ? (
           <EmptyState
             icon="folder-open-outline"
@@ -95,63 +265,135 @@ export default function ProjectsScreen() {
             const completedPlans = plans.filter((plan) => plan.done).length;
             const progress = calculateProjectProgress(tasks, plans);
             const accent = PROJECT_COLOR_HEX[project.color] ?? colors.primary;
+            const isDragging = draggingId === project.id;
+            const currentIndex = activeProjects.findIndex((p) => p.id === project.id);
+            const draggingIndex = activeProjects.findIndex((p) => p.id === draggingId);
+            const isDropTarget = !isDragging && hoverIndex === currentIndex;
 
             return (
-              <Pressable
+              <View
                 key={project.id}
-                accessibilityRole="button"
-                accessibilityLabel={`打开项目 ${project.name}`}
-                onPress={() =>
-                  router.push({ pathname: "/project/[id]", params: { id: project.id } })
-                }
+                ref={(el) => {
+                  cardRefs.current[project.id] = el;
+                }}
+                onLayout={() => {
+                  cardRefs.current[project.id]?.measureInWindow((x, y, width, height) => {
+                    itemLayouts.current[project.id] = { y, height, pageY: y };
+                  });
+                }}
+                onTouchStart={(e) => handleTouchStart(project.id, e)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={() => handleTouchEnd(project.id)}
+                onTouchCancel={handleTouchCancel}
+                style={[
+                  isDragging && {
+                    transform: [{ translateY }, { scale: 1.03 }],
+                    zIndex: 999,
+                    elevation: 8,
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 10,
+                    opacity: 0.95,
+                  },
+                ]}
               >
-                {({ pressed }) => (
-                  <Card variant="elevated" style={[styles.projectCard, { opacity: pressed ? 0.88 : 1 }]}>
-                    <View style={styles.projectTop}>
-                      <View style={[styles.projectIcon, { backgroundColor: `${accent}20` }]}>
-                        <Ionicons name="folder" size={24} color={accent} />
-                      </View>
-                      <View style={styles.projectCopy}>
-                        <Text style={[styles.projectName, { color: colors.onSurface }]} numberOfLines={1}>
-                          {project.name}
-                        </Text>
-                        <Text style={[styles.projectMeta, { color: colors.onSurfaceVariant }]}>
-                          {relativeRangeLabel(project.startDate, project.endDate)}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color={colors.outline} />
-                    </View>
-
-                    {project.description ? (
-                      <Text style={[styles.description, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
-                        {project.description}
-                      </Text>
-                    ) : null}
-
-                    <View style={styles.progressLabel}>
-                      <Text style={[styles.progressText, { color: colors.onSurfaceVariant }]}>
-                        {tasks.length > 0 ? `${completedTasks} / ${tasks.length} 个任务完成` : `${completedPlans} / ${plans.length} 个计划完成`}
-                      </Text>
-                      <Text style={[styles.progressValue, { color: accent }]}>{progress}%</Text>
-                    </View>
-                    <ProgressBar value={progress} color={accent} />
-
-                    <View style={styles.projectFooter}>
-                      <AssistChip
-                        icon="checkmark-done"
-                        label={`${tasks.length} 任务`}
-                        color={accent}
-                      />
-                      <AssistChip
-                        icon="calendar"
-                        label={`${plans.length} 计划`}
-                      />
-                    </View>
-                  </Card>
+                {isDropTarget && hoverIndex !== null && hoverIndex < draggingIndex && (
+                  <View style={[styles.dropIndicatorLine, { backgroundColor: colors.primary }]} />
                 )}
-              </Pressable>
+                <Card
+                  variant="elevated"
+                  style={[
+                    styles.projectCard,
+                    isDragging && { borderColor: colors.primary, borderWidth: 1.5 },
+                  ]}
+                >
+                  <View style={styles.projectTop}>
+                    <View style={[styles.projectIcon, { backgroundColor: `${accent}20` }]}>
+                      <Ionicons name="folder" size={24} color={accent} />
+                    </View>
+                    <View style={styles.projectCopy}>
+                      <Text style={[styles.projectName, { color: colors.onSurface }]} numberOfLines={1}>
+                        {project.name}
+                      </Text>
+                      <Text style={[styles.projectMeta, { color: colors.onSurfaceVariant }]}>
+                        {relativeRangeLabel(project.startDate, project.endDate)}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={isDragging ? "reorder-two" : "chevron-forward"}
+                      size={20}
+                      color={isDragging ? colors.primary : colors.outline}
+                    />
+                  </View>
+
+                  {project.description ? (
+                    <Text style={[styles.description, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+                      {project.description}
+                    </Text>
+                  ) : null}
+
+                  <View style={styles.progressLabel}>
+                    <Text style={[styles.progressText, { color: colors.onSurfaceVariant }]}>
+                      {tasks.length > 0 ? `${completedTasks} / ${tasks.length} 个任务完成` : `${completedPlans} / ${plans.length} 个计划完成`}
+                    </Text>
+                    <Text style={[styles.progressValue, { color: accent }]}>{progress}%</Text>
+                  </View>
+                  <ProgressBar value={progress} color={accent} />
+
+                  <View style={styles.projectFooter}>
+                    <AssistChip
+                      icon="checkmark-done"
+                      label={`${tasks.length} 任务`}
+                      color={accent}
+                    />
+                    <AssistChip
+                      icon="calendar"
+                      label={`${plans.length} 计划`}
+                    />
+                  </View>
+                </Card>
+                {isDropTarget && hoverIndex !== null && hoverIndex > draggingIndex && (
+                  <View style={[styles.dropIndicatorLine, { backgroundColor: colors.primary }]} />
+                )}
+              </View>
             );
           })
+        )}
+
+        {/* Archive Drop Zone for Dragging - 只有拖动时才显示 */}
+        {draggingId !== null && (
+          <View
+            ref={archiveZoneRef}
+            onLayout={() => {
+              archiveZoneRef.current?.measureInWindow((x, y, width, height) => {
+                archiveLayout.current = { y, height, pageY: y };
+              });
+            }}
+            style={[
+              styles.archiveDropZone,
+              {
+                borderColor: isOverArchive ? colors.primary : colors.outlineVariant,
+                backgroundColor: isOverArchive ? colors.primaryContainer : colors.surfaceContainerLow,
+              },
+              styles.archiveDropZoneVisible,
+            ]}
+          >
+            <Ionicons
+              name={isOverArchive ? "archive" : "archive-outline"}
+              size={22}
+              color={isOverArchive ? colors.onPrimaryContainer : colors.onSurfaceVariant}
+            />
+            <Text
+              style={[
+                styles.archiveDropText,
+                { color: isOverArchive ? colors.onPrimaryContainer : colors.onSurfaceVariant },
+                isOverArchive && { fontWeight: "700" },
+              ]}
+            >
+              {isOverArchive ? "松开以归档项目" : "拖拽到此处归档"}
+            </Text>
+          </View>
         )}
 
         {archivedProjects.length ? (
@@ -280,4 +522,30 @@ const styles = StyleSheet.create({
   },
   dateFields: { flexDirection: "row", gap: 10 },
   flex: { flex: 1 },
+  dropIndicatorLine: {
+    height: 3,
+    borderRadius: 2,
+    marginVertical: 4,
+  },
+  archiveDropZone: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: MD3Shape.medium,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  archiveDropZoneVisible: {
+    borderStyle: "solid",
+    elevation: 2,
+  },
+  archiveDropText: {
+    ...MD3Typography.labelLarge,
+    fontWeight: "500",
+  },
 });

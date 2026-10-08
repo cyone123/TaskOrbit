@@ -93,7 +93,7 @@ export default function CalendarScreen() {
     [selectedISO, state.dailyPlans],
   );
   const tasksOfDay = useMemo(
-    () => state.tasks.filter((task) => task.startDate <= selectedISO && task.endDate >= selectedISO),
+    () => state.tasks.filter((task) => Boolean(task.startDate && task.endDate) && task.startDate! <= selectedISO && task.endDate! >= selectedISO),
     [selectedISO, state.tasks],
   );
   const plansOfWeek = useMemo(
@@ -104,15 +104,15 @@ export default function CalendarScreen() {
     const start = toISODate(days[0]);
     const end = toISODate(days[6]);
     return state.tasks
-      .filter((task) => task.endDate >= start && task.startDate <= end)
+      .filter((task): task is Task & { startDate: string; endDate: string } => Boolean(task.startDate && task.endDate) && task.endDate! >= start && task.startDate! <= end)
       .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name));
   }, [days, state.tasks]);
   const monthTaskStarts = useMemo(() => {
     const result = new Map<string, Task[]>();
     const gridStart = toISODate(monthDays[0]);
     const gridEnd = toISODate(monthDays[monthDays.length - 1]);
-    state.tasks.filter((task) => task.endDate >= gridStart && task.startDate <= gridEnd).forEach((task) => {
-      const visibleStart = task.startDate < gridStart ? gridStart : task.startDate;
+    state.tasks.filter((task) => Boolean(task.startDate && task.endDate) && task.endDate! >= gridStart && task.startDate! <= gridEnd).forEach((task) => {
+      const visibleStart = task.startDate! < gridStart ? gridStart : task.startDate!;
       result.set(visibleStart, [...(result.get(visibleStart) ?? []), task]);
     });
     return result;
@@ -539,7 +539,7 @@ function WeekPlans({ days, plans, tasks, colors, colorForProject, onOpenDay, onE
               <View style={[styles.weekTimeLabel, { backgroundColor: colors.surfaceContainerHigh }]}><Text style={[styles.allDayLabel, { color: colors.textMuted }]}>任务</Text></View>
               {days.map((day) => {
                 const iso = toISODate(day);
-                const active = tasks.filter((task) => task.startDate <= iso && task.endDate >= iso);
+                const active = tasks.filter((task) => Boolean(task.startDate && task.endDate) && task.startDate! <= iso && task.endDate! >= iso);
                 return <View key={iso} style={[styles.allDayCell, { borderLeftColor: colors.border }]}>{active.slice(0, 2).map((task) => <View key={task.id} style={[styles.miniTask, { backgroundColor: colorForProject(task.projectId) }]}><Text style={styles.miniTaskText} numberOfLines={1}>{task.name}</Text></View>)}{active.length > 2 ? <Text style={[styles.moreText, { color: colors.textMuted }]}>+{active.length - 2}</Text> : null}</View>;
               })}
             </View>

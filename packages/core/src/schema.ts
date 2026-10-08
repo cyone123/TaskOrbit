@@ -3,6 +3,7 @@ import type { AppState } from "./types";
 import { migratePersistedState } from "./migrations";
 import { MAX_DAILY_PLAN_REPEAT_COUNT } from "./recurrence";
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
@@ -95,25 +96,88 @@ const projectSchema = z
   });
 
 const taskSchema = z
-  .object({
-    id: z.string().min(1),
-    projectId: z.string().min(1),
-    name: z.string().trim().min(1),
-    description: z.string(),
-    startDate: isoDate,
-    endDate: isoDate,
-    done: z.boolean(),
-    priority: z.enum(["low", "medium", "high"]),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  })
-  .passthrough()
+  .preprocess(
+    (val: unknown) => {
+      if (typeof val === "object" && val !== null) {
+        const rec = val as Record<string, unknown>;
+        const done = Boolean(rec.done);
+        const startDate =
+          typeof rec.startDate === "string" && rec.startDate.trim() ? rec.startDate.trim() : null;
+        const endDate =
+          typeof rec.endDate === "string" && rec.endDate.trim() ? rec.endDate.trim() : null;
+        let status: "todo" | "in_progress" | "done";
+        if (done) {
+          status = "done";
+        } else if (startDate && endDate) {
+          status = "in_progress";
+        } else {
+          status = "todo";
+        }
+        return {
+          ...rec,
+          startDate,
+          endDate,
+          done: status === "done",
+          status,
+        };
+      }
+      return val;
+    },
+    z.object({
+      id: z.string().min(1),
+      projectId: z.string().min(1),
+      name: z.string().trim().min(1),
+      description: z.string(),
+      startDate: isoDate.nullable(),
+      endDate: isoDate.nullable(),
+      done: z.boolean(),
+      status: z.enum(["todo", "in_progress", "done"]),
+      priority: z.enum(["low", "medium", "high"]),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }).passthrough(),
+  )
   .superRefine((task, ctx) => {
-    if (task.endDate < task.startDate) {
+    if ((task.startDate && !task.endDate) || (!task.startDate && task.endDate)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["startDate"],
+        message: "任务起止日期必须同时提供或同时为空",
+      });
+    }
+    if (task.startDate && task.endDate && task.endDate < task.startDate) {
       ctx.addIssue({
         code: "custom",
         path: ["endDate"],
         message: "结束日期不能早于开始日期",
+      });
+    }
+    if (task.done && task.status !== "done") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "已完成任务的状态必须为 done",
+      });
+    }
+    if (!task.done && task.status === "done") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "未完成任务的状态不能为 done",
+      });
+    }
+    if (!task.done && task.startDate && task.endDate && task.status !== "in_progress") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "已排期未完成任务的状态必须为 in_progress",
+      });
+    }
+    if (!task.done && (!task.startDate || !task.endDate) && task.status !== "todo") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "未排期任务的状态必须为 todo",
       });
     }
   });
@@ -233,13 +297,66 @@ const activeTimerSchema = z
     }
   });
 
-export const settingsSchema = z.object({
-  theme: z.enum(["light", "dark", "system"]).default(DEFAULT_SETTINGS.theme),
-  focusMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.focusMinutes),
-  shortBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.shortBreakMinutes),
-  longBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakMinutes),
-  longBreakInterval: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakInterval),
-});
+export const settingsSchema = z
+  .object({
+    theme: z.enum(["light", "dark", "system"]).default(DEFAULT_SETTINGS.theme),
+    focusMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.focusMinutes),
+    shortBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.shortBreakMinutes),
+    longBreakMinutes: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakMinutes),
+    longBreakInterval: z.number().int().min(1).default(DEFAULT_SETTINGS.longBreakInterval),
+    weekDetailStartHour: z
+      .number()
+      .int()
+      .min(0)
+      .max(23)
+      .default(DEFAULT_SETTINGS.weekDetailStartHour),
+    weekDetailEndHour: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .default(DEFAULT_SETTINGS.weekDetailEndHour),
+    dayStartHour: z
+      .number()
+      .int()
+      .min(0)
+      .max(23)
+      .default(DEFAULT_SETTINGS.dayStartHour),
+    dayEndHour: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .default(DEFAULT_SETTINGS.dayEndHour),
+    monthMaxTaskTracks: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(DEFAULT_SETTINGS.monthMaxTaskTracks),
+    monthMaxDailyPlans: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(DEFAULT_SETTINGS.monthMaxDailyPlans),
+  })
+  .superRefine((data, ctx) => {
+    if (data.weekDetailEndHour <= data.weekDetailStartHour) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["weekDetailEndHour"],
+        message: "周视图结束时间必须晚于起始时间",
+      });
+    }
+    if (data.dayEndHour <= data.dayStartHour) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["dayEndHour"],
+        message: "日视图结束时间必须晚于起始时间",
+      });
+    }
+  });
 
 const vaultSettingsSchema = z.object({
   enabled: z.boolean().default(DEFAULT_VAULT_SETTINGS.enabled),
@@ -264,6 +381,42 @@ export const webDavSettingsSchema = z.object({
     .default(DEFAULT_WEBDAV_SETTINGS.syncIntervalMinutes),
 });
 
+export const aiProtocolSchema = z.enum(["openai_chat", "openai_responses", "anthropic", "gemini"]);
+
+const customAiProviderSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1),
+  protocol: aiProtocolSchema.optional(),
+  baseUrl: z.string().trim(),
+  apiKey: z.string().default(""),
+  model: z.string().trim().default(""),
+  temperature: z.number().min(0).max(2).default(0.7),
+});
+
+const aiProviderConfigSchema = z.object({
+  protocol: aiProtocolSchema.optional(),
+  baseUrl: z.string().trim().default(""),
+  apiKey: z.string().default(""),
+  model: z.string().trim().default(""),
+  temperature: z.number().min(0).max(2).optional(),
+});
+
+export const aiSettingsSchema = z.object({
+  enabled: z.boolean().default(DEFAULT_AI_SETTINGS.enabled),
+  provider: z.string().default(DEFAULT_AI_SETTINGS.provider),
+  protocol: aiProtocolSchema.optional(),
+  baseUrl: z.string().trim().default(DEFAULT_AI_SETTINGS.baseUrl),
+  apiKey: z.string().default(DEFAULT_AI_SETTINGS.apiKey),
+  model: z.string().trim().default(DEFAULT_AI_SETTINGS.model),
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .default(DEFAULT_AI_SETTINGS.temperature),
+  customProviders: z.array(customAiProviderSchema).default([]),
+  providersConfig: z.record(z.string(), aiProviderConfigSchema).default({}),
+});
+
 export const appStateSchema = z.object({
   version: z.literal(STATE_VERSION),
   projects: z.array(projectSchema),
@@ -275,6 +428,7 @@ export const appStateSchema = z.object({
   vaultSettings: vaultSettingsSchema,
   activeTimer: activeTimerSchema.nullable(),
   webDavSettings: webDavSettingsSchema,
+  aiSettings: aiSettingsSchema,
 });
 
 const persistedEnvelopeSchema = z
@@ -289,6 +443,7 @@ const persistedEnvelopeSchema = z
     vaultSettings: z.unknown().optional(),
     activeTimer: z.unknown().optional(),
     webDavSettings: z.unknown().optional(),
+    aiSettings: z.unknown().optional(),
   })
   .passthrough();
 
@@ -304,6 +459,7 @@ export function createEmptyState(): AppState {
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     activeTimer: null,
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
+    aiSettings: { ...DEFAULT_AI_SETTINGS },
   };
 }
 

@@ -15,14 +15,17 @@ export interface Project {
   updatedAt: number;
 }
 
+export type TaskStatus = "todo" | "in_progress" | "done";
+
 export interface Task {
   id: string;
   projectId: string;
   name: string;
   description: string;
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
+  startDate: string | null; // YYYY-MM-DD or null if unscheduled
+  endDate: string | null; // YYYY-MM-DD or null if unscheduled
   done: boolean;
+  status: TaskStatus;
   priority: Priority;
   createdAt: number;
   updatedAt: number;
@@ -107,6 +110,12 @@ export interface Settings {
   shortBreakMinutes: number;
   longBreakMinutes: number;
   longBreakInterval: number; // number of focus sessions before a long break
+  weekDetailStartHour: number; // 0-23
+  weekDetailEndHour: number; // 1-24
+  dayStartHour: number; // 0-23
+  dayEndHour: number; // 1-24
+  monthMaxTaskTracks: number; // 1-10
+  monthMaxDailyPlans: number; // 1-20
 }
 
 export interface VaultSettings {
@@ -128,6 +137,51 @@ export interface WebDavSettings {
   syncIntervalMinutes: number;
 }
 
+export type BuiltinAiProviderKey =
+  | "deepseek"
+  | "siliconflow"
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "glm"
+  | "kimi"
+  | "ollama"
+  | "custom";
+
+export type AiProviderKey = BuiltinAiProviderKey | (string & {});
+
+export type AiProtocolType = "openai_chat" | "openai_responses" | "anthropic" | "gemini";
+
+export interface CustomAiProvider {
+  id: string;
+  name: string;
+  protocol?: AiProtocolType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+}
+
+export interface AiProviderConfig {
+  protocol?: AiProtocolType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature?: number;
+}
+
+export interface AiSettings {
+  enabled: boolean;
+  provider: AiProviderKey;
+  protocol?: AiProtocolType;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+  customProviders?: CustomAiProvider[];
+  providersConfig?: Record<string, AiProviderConfig>;
+}
+
 export type EntityType = "project" | "task" | "dailyPlan" | "inboxItem";
 
 export interface Tombstone {
@@ -147,11 +201,12 @@ export interface AppState {
   vaultSettings: VaultSettings;
   activeTimer: ActiveTimer | null;
   webDavSettings: WebDavSettings;
+  aiSettings: AiSettings;
 }
 
 // ---- Small helper types -----------------------------------------------------
 
-export type ViewKey = "inbox" | "projects" | "calendar" | "pomodoro" | "stats";
+export type ViewKey = "inbox" | "projects" | "calendar" | "pomodoro" | "stats" | "settings";
 
 export interface ColorOption {
   key: string;

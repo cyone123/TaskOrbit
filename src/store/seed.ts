@@ -1,4 +1,6 @@
 import {
+  DEFAULT_AI_SETTINGS,
+  DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
   STATE_VERSION,
@@ -13,6 +15,7 @@ import {
   type Priority,
   type Project,
   type Task,
+  type TaskStatus,
 } from "@task-orbit/core";
 
 function d(offset: number): string {
@@ -49,6 +52,7 @@ function mkTask(
   priority: Priority,
   done = false,
   description = "",
+  status: TaskStatus = done ? "done" : "todo",
 ): Task {
   const now = Date.now();
   return {
@@ -58,7 +62,8 @@ function mkTask(
     description,
     startDate: d(startOffset),
     endDate: d(endOffset),
-    done,
+    done: status === "done",
+    status,
     priority,
     createdAt: now,
     updatedAt: now,
@@ -235,12 +240,9 @@ export function createDemoState(): AppState {
     activeTimer: null,
     vaultSettings: { ...DEFAULT_VAULT_SETTINGS },
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS },
+    aiSettings: { ...DEFAULT_AI_SETTINGS },
     settings: {
-      theme: "system",
-      focusMinutes: 25,
-      shortBreakMinutes: 5,
-      longBreakMinutes: 15,
-      longBreakInterval: 4,
+      ...DEFAULT_SETTINGS,
     },
   };
 }

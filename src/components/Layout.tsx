@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { useWindowSizeClass } from "../hooks/useWindowSizeClass";
-import { useStore } from "../store/store";
-import { DataManagementDialog } from "./DataManagementDialog";
+import { useAiChat } from "../store/ai-chat-store";
+import { AiChatDrawer } from "./ai/AiChatDrawer";
 import { Icon } from "./Icon";
 import { IconButton, Ripple } from "./material";
 
@@ -23,23 +23,29 @@ interface LayoutProps {
 }
 
 export function Layout({ view, title, onNavigate, actions, children }: LayoutProps) {
-  const { state, updateSettings } = useStore();
-  const [dataDialogOpen, setDataDialogOpen] = useState(false);
+  const { isOpen: aiDrawerOpen, toggleDrawer: toggleAiDrawer } = useAiChat();
   const [scrolled, setScrolled] = useState(false);
   const windowClass = useWindowSizeClass();
-  const theme = state.settings.theme;
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-
-  const toggleTheme = () => {
-    updateSettings({ theme: isDark ? "light" : "dark" });
-  };
   const isProjectWorkspace = view === "projects";
+
+  // Global shortcut (Ctrl+J or Cmd+J) to toggle AI Assistant
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        toggleAiDrawer();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleAiDrawer]);
 
   // The content region owns scrolling for every view. Listening in the capture
   // phase also catches inner scrollers (e.g. the project detail pane).
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const prevViewRef = useRef<ViewKey>(view);
+
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -52,7 +58,23 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
   }, []);
 
   useEffect(() => {
-    setScrolled(false);
+    const el = contentRef.current;
+    if (el) {
+      if (prevViewRef.current !== view) {
+        scrollPositionsRef.current[prevViewRef.current] = el.scrollTop;
+      }
+      const restored = scrollPositionsRef.current[view] ?? 0;
+      el.scrollTop = restored;
+      setScrolled(restored > 4);
+      const frameId = requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = restored;
+        }
+      });
+      prevViewRef.current = view;
+      return () => cancelAnimationFrame(frameId);
+    }
+    prevViewRef.current = view;
   }, [view]);
 
   return (
@@ -83,18 +105,36 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
         <div className="nav-rail__spacer" />
         <div className="nav-rail__utilities">
           <IconButton
-            onClick={() => setDataDialogOpen(true)}
-            aria-label="数据管理"
-            title="数据管理"
+            onClick={toggleAiDrawer}
+            aria-label={aiDrawerOpen ? "收起 AI 助理 (Ctrl+J)" : "打开 AI 助理 (Ctrl+J)"}
+            title={aiDrawerOpen ? "收起 AI 助理 (Ctrl+J)" : "打开 AI 助理 (Ctrl+J)"}
           >
-            <Icon name="import_export" size={22} />
+            <Icon
+              name="smart_toy"
+              size={22}
+              fill={aiDrawerOpen}
+              style={{ color: aiDrawerOpen ? "var(--md-primary)" : undefined }}
+            />
           </IconButton>
           <IconButton
-            onClick={toggleTheme}
-            aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
-            title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            onClick={() => onNavigate("settings")}
+            aria-label="应用设置"
+            title="应用设置"
+            style={
+              view === "settings"
+                ? {
+                    background: "var(--md-secondary-container)",
+                    borderRadius: "var(--shape-full)",
+                  }
+                : undefined
+            }
           >
-            <Icon name={isDark ? "light_mode" : "dark_mode"} size={22} />
+            <Icon
+              name="settings"
+              size={22}
+              fill={view === "settings"}
+              style={{ color: view === "settings" ? "var(--md-on-secondary-container)" : undefined }}
+            />
           </IconButton>
         </div>
       </nav>
@@ -104,7 +144,21 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           <header className={`top-bar ${scrolled ? "top-bar--scrolled" : ""}`}>
             <h1 className="top-bar__title">{title}</h1>
             <div className="ml-auto" />
-            {actions}
+            <div className="row items-center gap-4">
+              {actions}
+              <IconButton
+                onClick={toggleAiDrawer}
+                aria-label={aiDrawerOpen ? "收起 AI 助理" : "展开 AI 助理"}
+                title="AI 助理 (Ctrl+J)"
+              >
+                <Icon
+                  name="smart_toy"
+                  size={22}
+                  fill={aiDrawerOpen}
+                  style={{ color: aiDrawerOpen ? "var(--md-primary)" : undefined }}
+                />
+              </IconButton>
+            </div>
           </header>
         )}
         <div
@@ -114,10 +168,8 @@ export function Layout({ view, title, onNavigate, actions, children }: LayoutPro
           {children}
         </div>
       </div>
-      <DataManagementDialog
-        open={dataDialogOpen}
-        onClose={() => setDataDialogOpen(false)}
-      />
+      <AiChatDrawer onNavigateToSettings={() => onNavigate("settings")} />
     </div>
   );
 }
+

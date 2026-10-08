@@ -10,9 +10,11 @@ import type {
   Priority,
   Project,
   Task,
+  TaskStatus,
   Settings,
   VaultSettings,
   WebDavSettings,
+  AiSettings,
 } from "./types";
 import { uid } from "./id";
 import { expandDailyPlanDates, normalizeDailyPlanRepeat } from "./recurrence";
@@ -31,13 +33,14 @@ export interface TaskInput {
   projectId: string;
   name: string;
   description: string;
-  startDate: string;
-  endDate: string;
+  startDate?: string | null;
+  endDate?: string | null;
   priority: Priority;
+  done?: boolean;
 }
 
 export type TaskPatch = Partial<
-  Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "priority">
+  Pick<Task, "name" | "description" | "startDate" | "endDate" | "done" | "status" | "priority">
 >;
 
 export interface InboxItemInput {
@@ -172,6 +175,27 @@ export function appendProject(state: AppState, project: Project): AppState {
   return { ...state, projects: [project, ...state.projects] };
 }
 
+export function reorderProjectsState(state: AppState, orderedIds: string[]): AppState {
+  const projectMap = new Map(state.projects.map((project) => [project.id, project]));
+  const orderedSet = new Set(orderedIds);
+  const reordered: Project[] = [];
+
+  for (const id of orderedIds) {
+    const project = projectMap.get(id);
+    if (project) {
+      reordered.push(project);
+    }
+  }
+
+  for (const project of state.projects) {
+    if (!orderedSet.has(project.id)) {
+      reordered.push(project);
+    }
+  }
+
+  return { ...state, projects: reordered };
+}
+
 export function updateProjectState(
   state: AppState,
   id: string,
@@ -266,11 +290,28 @@ export function deleteProjectState(state: AppState, id: string): AppState {
   };
 }
 
+export function deriveTaskStatus(
+  done: boolean,
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+): TaskStatus {
+  if (done) return "done";
+  if (startDate && endDate) return "in_progress";
+  return "todo";
+}
+
 export function createTask(input: TaskInput, createdAt = Date.now()): Task {
+  const startDate = input.startDate?.trim() ? input.startDate.trim() : null;
+  const endDate = input.endDate?.trim() ? input.endDate.trim() : null;
+  const done = input.done ?? false;
+  const status = deriveTaskStatus(done, startDate, endDate);
   return {
     id: uid("t_"),
     ...input,
-    done: false,
+    startDate,
+    endDate,
+    status,
+    done: status === "done",
     createdAt,
     updatedAt: createdAt,
   };
@@ -288,16 +329,56 @@ export function updateTaskState(
   patch: TaskPatch,
   updatedAt = Date.now(),
 ): AppState {
+  const currentTask = state.tasks.find((task) => task.id === id);
+  if (!currentTask) return state;
+
+  let nextStartDate =
+    patch.startDate !== undefined
+      ? patch.startDate?.trim()
+        ? patch.startDate.trim()
+        : null
+      : currentTask.startDate;
+  let nextEndDate =
+    patch.endDate !== undefined
+      ? patch.endDate?.trim()
+        ? patch.endDate.trim()
+        : null
+      : currentTask.endDate;
+
+  let nextDone = patch.done !== undefined ? patch.done : currentTask.done;
+
+  if (patch.status !== undefined) {
+    if (patch.status === "done") {
+      nextDone = true;
+    } else if (patch.status === "in_progress") {
+      nextDone = false;
+    } else if (patch.status === "todo") {
+      nextDone = false;
+      if (patch.startDate === undefined) nextStartDate = null;
+      if (patch.endDate === undefined) nextEndDate = null;
+    }
+  }
+
+  const resolvedStatus = deriveTaskStatus(nextDone, nextStartDate, nextEndDate);
+  const resolvedDone = resolvedStatus === "done";
+
+  const effectivePatch: TaskPatch = {
+    ...patch,
+    startDate: nextStartDate,
+    endDate: nextEndDate,
+    status: resolvedStatus,
+    done: resolvedDone,
+  };
+
   const nextTasks = state.tasks.map((task) =>
-    task.id === id ? { ...task, ...patch, updatedAt } : task,
+    task.id === id ? { ...task, ...effectivePatch, updatedAt } : task,
   );
 
   let nextDailyPlans = state.dailyPlans;
-  if (patch.done !== undefined) {
-    const targetDone = patch.done;
+  if (resolvedDone !== currentTask.done) {
     nextDailyPlans = state.dailyPlans.map((plan) =>
-      plan.taskId === id && plan.done !== targetDone
-        ? { ...plan, done: targetDone, updatedAt }
+      plan.taskId === id && plan.done !== resolvedDone
+        ? { ...plan, done: resolvedDone, updatedAt }
         : plan,
     );
   }
@@ -913,6 +994,13 @@ export function updateWebDavSettingsState(
   patch: Partial<WebDavSettings>,
 ): AppState {
   return { ...state, webDavSettings: { ...state.webDavSettings, ...patch } };
+}
+
+export function updateAiSettingsState(
+  state: AppState,
+  patch: Partial<AiSettings>,
+): AppState {
+  return { ...state, aiSettings: { ...state.aiSettings, ...patch } };
 }
 
 /**

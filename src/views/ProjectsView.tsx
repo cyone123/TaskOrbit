@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   calculateProjectProgress,
@@ -18,7 +18,10 @@ import {
 } from "@task-orbit/core";
 import { Icon } from "../components/Icon";
 import { DailyPlanForm, ProjectForm, TaskForm } from "../components/forms";
+import { InstantNotePanel, type InstantNoteTarget } from "../components/InstantNotePanel";
+import { ProjectKanbanBoard } from "../components/ProjectKanbanBoard";
 import { ProjectNotesPanel } from "../components/ProjectNotesPanel";
+import { stripHtml } from "../utils/htmlText";
 import {
   Checkbox,
   IconButton,
@@ -40,6 +43,7 @@ import {
 } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import { useProjectsViewState } from "../store/view-state";
 
 const PRIORITY_COLOR: Record<Priority, string> = {
   high: "var(--md-error)",
@@ -157,14 +161,54 @@ export function ProjectsView() {
     [state.projects],
   );
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
-  const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
-  const [planDate, setPlanDate] = useState(todayISO());
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  const {
+    selectedProjectId,
+    setSelectedProjectId,
+    searchQuery,
+    setSearchQuery,
+    showArchived,
+    setShowArchived,
+    activeTab,
+    setActiveTab,
+    overviewTaskViewMode,
+    setOverviewTaskViewMode,
+    planDate,
+    setPlanDate,
+    expandedTasks,
+    setExpandedTasks,
+    leftSidebarCollapsed,
+    setLeftSidebarCollapsed,
+    rightSidebarCollapsed,
+    setRightSidebarCollapsed,
+    activeNoteTarget,
+    setActiveNoteTarget,
+    detailScrollTop,
+    setDetailScrollTop,
+  } = useProjectsViewState();
+
+  const [isManaging, setIsManaging] = useState(false);
+  const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const [isOverArchiveZone, setIsOverArchiveZone] = useState(false);
+  const detailAreaRef = useRef<HTMLElement | null>(null);
+
+  const openInstantNote = (type: "task" | "plan", id: string) => {
+    setActiveNoteTarget({ type, id });
+    if (rightSidebarCollapsed) {
+      setRightSidebarCollapsed(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeNoteTarget) return;
+    if (activeNoteTarget.type === "task") {
+      const exists = state.tasks.some((t) => t.id === activeNoteTarget.id);
+      if (!exists) setActiveNoteTarget(null);
+    } else {
+      const exists = state.dailyPlans.some((p) => p.id === activeNoteTarget.id);
+      if (!exists) setActiveNoteTarget(null);
+    }
+  }, [activeNoteTarget, state.tasks, state.dailyPlans]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -233,6 +277,24 @@ export function ProjectsView() {
       setSelectedProjectId(activeProjects[0].id);
     }
   }, [activeProjects, selectedProjectId]);
+
+  useEffect(() => {
+    const el = detailAreaRef.current;
+    if (!el) return;
+    if (detailScrollTop > 0) {
+      el.scrollTop = detailScrollTop;
+      requestAnimationFrame(() => {
+        if (detailAreaRef.current) {
+          detailAreaRef.current.scrollTop = detailScrollTop;
+        }
+      });
+    }
+    const onScroll = () => {
+      setDetailScrollTop(el.scrollTop);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [selectedProjectId, activeTab, setDetailScrollTop]);
 
   const selectedProject = activeProjects.find((project) => project.id === selectedProjectId) ?? null;
 
@@ -322,6 +384,8 @@ export function ProjectsView() {
     setSelectedProjectId(id);
     setActiveTab("overview");
     setExpandedTasks(new Set());
+    setActiveNoteTarget(null);
+    setDetailScrollTop(0);
   };
 
   const openNewTask = (projectId: string) => {
@@ -398,6 +462,82 @@ export function ProjectsView() {
     });
   };
 
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData("text/plain", projectId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingProjectId(projectId);
+  };
+
+  const handleDragOverCard = (e: React.DragEvent, projectId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggingProjectId === projectId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = e.clientY < midY ? "before" : "after";
+    if (!dragOverTarget || dragOverTarget.id !== projectId || dragOverTarget.position !== position) {
+      setDragOverTarget({ id: projectId, position });
+    }
+  };
+
+  const handleDragLeaveCard = (e: React.DragEvent, projectId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (
+      e.clientY < rect.top ||
+      e.clientY > rect.bottom ||
+      e.clientX < rect.left ||
+      e.clientX > rect.right
+    ) {
+      if (dragOverTarget?.id === projectId) {
+        setDragOverTarget(null);
+      }
+    }
+  };
+
+  const handleDropOnCard = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("text/plain") || draggingProjectId;
+    const position = dragOverTarget?.position ?? "after";
+    setDragOverTarget(null);
+    setDraggingProjectId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const currentIds = activeProjects.map((p) => p.id);
+    const fromIndex = currentIds.indexOf(sourceId);
+    if (fromIndex === -1) return;
+
+    const nextIds = currentIds.filter((id) => id !== sourceId);
+    const toIndex = nextIds.indexOf(targetId);
+    if (toIndex === -1) return;
+
+    const insertIndex = position === "before" ? toIndex : toIndex + 1;
+    nextIds.splice(insertIndex, 0, sourceId);
+
+    store.reorderProjects(nextIds);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingProjectId(null);
+    setDragOverTarget(null);
+    setIsOverArchiveZone(false);
+  };
+
+  const handleArchiveDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOverArchiveZone(false);
+    const sourceId = e.dataTransfer.getData("text/plain") || draggingProjectId;
+    setDraggingProjectId(null);
+    setDragOverTarget(null);
+
+    if (sourceId) {
+      const targetProject = state.projects.find((p) => p.id === sourceId);
+      store.archiveProject(sourceId);
+      show(targetProject ? `已归档项目「${targetProject.name}」` : "项目已归档");
+    }
+  };
+
   const renderPlanRow = (plan: DailyPlan, compact = false) => {
     const task = plan.taskId ? state.tasks.find((item) => item.id === plan.taskId) : null;
     const projectColor = selectedProject ? colorByKey(selectedProject.color) : "var(--md-outline)";
@@ -422,6 +562,13 @@ export function ProjectsView() {
             {!compact && task && ` · ${task.name}`}
           </div>
         </div>
+        {isFocusing && (
+          <span className="project-focus-living-badge" title="当前计划正在专注中">
+            <span className="project-status-pulse" />
+            <Icon name="graphic_eq" size={14} />
+            <span>专注中</span>
+          </span>
+        )}
         {isToday && <span className="chip chip--small project-today-badge">今日</span>}
         <span className="chip chip--small project-time-chip">
           {plan.startTime} - {plan.endTime}
@@ -448,6 +595,18 @@ export function ProjectsView() {
             </IconButton>
           )}
           <IconButton
+            aria-label={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+            title={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+            className={plan.description ? "project-row-action--has-note" : ""}
+            onClick={() => openInstantNote("plan", plan.id)}
+          >
+            <Icon
+              name={plan.description ? "note_alt" : "edit_note"}
+              size={18}
+              style={plan.description ? { color: "var(--md-primary)" } : undefined}
+            />
+          </IconButton>
+          <IconButton
             aria-label="编辑计划"
             title="编辑计划"
             onClick={() => setPlanForm({
@@ -473,7 +632,6 @@ export function ProjectsView() {
     const taskPlans = plansOfTask.get(task.id) ?? [];
     const doneCount = taskPlans.filter((plan) => plan.done).length;
     const expanded = expandedTasks.has(task.id);
-    const taskStatus = statusLabel(task.startDate, task.endDate);
     return (
       <div className={`project-task-item ${task.done ? "is-done" : ""}`} key={task.id}>
         <div className="project-task-row" onClick={() => toggleTask(task.id)}>
@@ -481,30 +639,86 @@ export function ProjectsView() {
             checked={task.done}
             aria-label={`标记任务「${task.name}」${task.done ? "未完成" : "已完成"}`}
             onClick={(event) => event.stopPropagation()}
-            onChange={() => store.updateTask(task.id, { done: !task.done })}
+            onChange={() => {
+              store.updateTask(task.id, { done: !task.done });
+            }}
           />
           <span
             className={`project-priority-pill project-priority-pill--${task.priority}`}
-            title={PRIORITY_LABEL[task.priority]}
+            title={`优先级: ${PRIORITY_LABEL[task.priority]}`}
           >
-            {PRIORITY_LABEL_SHORT[task.priority]}
+            <Icon
+              name={task.priority === "high" ? "flag" : task.priority === "medium" ? "drag_handle" : "south"}
+              size={12}
+            />
+            <span>{PRIORITY_LABEL[task.priority]}</span>
           </span>
           <div className="project-task-row__copy">
             <span className="body-md project-task-row__name">{task.name}</span>
-            {task.description && <span className="body-sm muted project-task-row__description">{task.description}</span>}
+            {task.description && (
+              <span className="body-sm muted project-task-row__description">
+                {stripHtml(task.description)}
+              </span>
+            )}
           </div>
-          {taskPlans.length > 0 && (
-            <span className="chip chip--small project-plan-count-chip" title={`关联 ${taskPlans.length} 个计划，已完成 ${doneCount} 个`}>
-              <Icon name="calendar_today" size={13} />
-              <span>{doneCount}/{taskPlans.length}</span>
+          {taskPlans.length > 0 && (() => {
+            const percent = Math.round((doneCount / taskPlans.length) * 100);
+            const radius = 7;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = circumference - (percent / 100) * circumference;
+            return (
+              <div
+                className="project-task-progress"
+                title={`关联 ${taskPlans.length} 个计划，已完成 ${doneCount} 个 (${percent}%)`}
+              >
+                <svg className="project-task-progress__ring" viewBox="0 0 20 20" aria-hidden="true">
+                  <circle className="project-task-progress__track" cx="10" cy="10" r={radius} />
+                  <circle
+                    className="project-task-progress__indicator"
+                    cx="10"
+                    cy="10"
+                    r={radius}
+                    style={{
+                      strokeDasharray: circumference,
+                      strokeDashoffset,
+                    }}
+                  />
+                </svg>
+                <span className="project-task-progress__text">{doneCount}/{taskPlans.length}</span>
+              </div>
+            );
+          })()}
+          {task.status === "in_progress" ? (
+            <span className="chip chip--small project-status-chip project-status-chip--ongoing">
+              <span className="project-status-pulse" />
+              进行中
+            </span>
+          ) : task.status === "done" ? (
+            <span className="chip chip--small project-status-chip project-status-chip--ended">
+              已完成
+            </span>
+          ) : (
+            <span className="chip chip--small project-status-chip project-status-chip--not-started">
+              待处理
             </span>
           )}
-          <span className={`chip chip--small project-status-chip project-status-chip--${taskStatus.type}`}>
-            {taskStatus.type === "ongoing" && <span className="project-status-pulse" />}
-            {taskStatus.text}
-          </span>
           <span className="body-sm muted project-task-row__date">{relativeRangeLabel(task.startDate, task.endDate)}</span>
           <div className="project-row-actions">
+            <IconButton
+              aria-label={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+              title={task.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+              className={task.description ? "project-row-action--has-note" : ""}
+              onClick={(event) => {
+                event.stopPropagation();
+                openInstantNote("task", task.id);
+              }}
+            >
+              <Icon
+                name={task.description ? "note_alt" : "edit_note"}
+                size={18}
+                style={task.description ? { color: "var(--md-primary)" } : undefined}
+              />
+            </IconButton>
             <IconButton
               aria-label="添加计划"
               title="添加计划"
@@ -513,7 +727,7 @@ export function ProjectsView() {
                 if (selectedProject) openNewPlan(selectedProject.id, task.id);
               }}
             >
-              <Icon name="add" size={19} />
+              <Icon name="add" size={18} />
             </IconButton>
             <IconButton
               aria-label="编辑任务"
@@ -535,8 +749,15 @@ export function ProjectsView() {
             >
               <Icon name="delete" size={18} />
             </IconButton>
-            {taskPlans.length > 0 && <Icon name={expanded ? "expand_less" : "expand_more"} size={20} className="muted" />}
           </div>
+          {taskPlans.length > 0 && (
+            <div
+              className={`project-task-expand-indicator ${expanded ? "is-expanded" : ""}`}
+              title={expanded ? "收起关联计划" : "展开关联计划"}
+            >
+              <Icon name="expand_more" size={20} />
+            </div>
+          )}
         </div>
         {taskPlans.length > 0 && (
           <div className={`project-task-plans ${expanded ? "is-open" : ""}`}>
@@ -602,6 +823,72 @@ export function ProjectsView() {
     </section>
   );
 
+  const renderOverviewTaskSection = () => (
+    <section className="project-panel" id="project-tasks">
+      <SectionHeader
+        title={overviewTaskViewMode === "kanban" ? "任务看板" : "任务"}
+        subtitle={overviewTaskViewMode === "kanban" ? "按阶段流转推进项目核心任务" : "把项目拆成可执行的下一步"}
+        badge={<Badge value={projectTasks.length} variant="primary" />}
+        actions={
+          <div className="row gap-8 align-center">
+            <div className="project-view-mode-toggle" role="group" aria-label="视图切换">
+              <button
+                type="button"
+                className={`project-view-toggle-btn ${overviewTaskViewMode === "kanban" ? "is-active" : ""}`}
+                onClick={() => setOverviewTaskViewMode("kanban")}
+                title="切换到看板视图"
+                aria-pressed={overviewTaskViewMode === "kanban"}
+              >
+                <Icon name="view_kanban" size={16} />
+                <span>看板</span>
+              </button>
+              <button
+                type="button"
+                className={`project-view-toggle-btn ${overviewTaskViewMode === "list" ? "is-active" : ""}`}
+                onClick={() => setOverviewTaskViewMode("list")}
+                title="切换到列表视图"
+                aria-pressed={overviewTaskViewMode === "list"}
+              >
+                <Icon name="format_list_bulleted" size={16} />
+                <span>列表</span>
+              </button>
+            </div>
+            <TextButton onClick={() => selectedProject && openNewTask(selectedProject.id)}>
+              <Icon name="add" size={18} slot="icon" /> 添加任务
+            </TextButton>
+          </div>
+        }
+      />
+      {overviewTaskViewMode === "kanban" ? (
+        <ProjectKanbanBoard
+          project={selectedProject!}
+          tasks={projectTasks}
+          dailyPlans={projectPlans}
+          onAddTask={() => selectedProject && openNewTask(selectedProject.id)}
+          onEditTask={(task) => setTaskForm({ projectId: task.projectId, editing: task, open: true })}
+          onDeleteTask={askDeleteTask}
+          onOpenNote={(taskId) => openInstantNote("task", taskId)}
+        />
+      ) : (
+        projectTasks.length === 0 ? (
+          <div className="project-empty-row">
+            <Icon name="checklist" size={24} />
+            <span>还没有任务，先添加一个目标吧。</span>
+          </div>
+        ) : (
+          <div className="project-task-list">
+            {projectTasks.slice(0, 4).map(renderTask)}
+            {projectTasks.length > 4 && (
+              <button type="button" className="project-list-footer" onClick={() => setActiveTab("tasks")}>
+                查看全部 {projectTasks.length} 个任务 <Icon name="arrow_forward" size={17} />
+              </button>
+            )}
+          </div>
+        )
+      )}
+    </section>
+  );
+
   const renderTodayPlans = () => (
     <section className="project-panel today-plan-card" id="project-plans">
       <div className="project-panel-heading project-panel-heading--compact">
@@ -652,31 +939,44 @@ export function ProjectsView() {
                       />
                       <span className="chip chip--small today-plan-item__time">{plan.startTime} - {plan.endTime}</span>
                     </div>
-                    {!plan.done && (
-                      isFocusing ? (
-                        <span className="today-plan-focusing-badge">
-                          <span className="project-status-pulse" /> 专注中
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="today-plan-focus-btn"
-                          title="开始专注此计划"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            store.startTimer({
-                              projectId: plan.projectId,
-                              taskId: plan.taskId,
-                              dailyPlanId: plan.id,
-                            });
-                            show(`已开始专注「${plan.name}」`);
-                          }}
-                        >
-                          <Icon name="play_arrow" size={15} />
-                          <span>专注</span>
-                        </button>
-                      )
-                    )}
+                    <div className="row gap-4 align-center">
+                      <button
+                        type="button"
+                        className={`today-plan-note-btn ${plan.description ? "has-note" : ""}`}
+                        title={plan.description ? "查看即时笔记（已有内容）" : "添加即时笔记"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openInstantNote("plan", plan.id);
+                        }}
+                      >
+                        <Icon name={plan.description ? "note_alt" : "edit_note"} size={15} />
+                      </button>
+                      {!plan.done && (
+                        isFocusing ? (
+                          <span className="today-plan-focusing-badge">
+                            <span className="project-status-pulse" /> 专注中
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="today-plan-focus-btn"
+                            title="开始专注此计划"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              store.startTimer({
+                                projectId: plan.projectId,
+                                taskId: plan.taskId,
+                                dailyPlanId: plan.id,
+                              });
+                              show(`已开始专注「${plan.name}」`);
+                            }}
+                          >
+                            <Icon name="play_arrow" size={15} />
+                            <span>专注</span>
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                   <div className="title-sm today-plan-item__name">{plan.name}</div>
                   <div className="row gap-6 body-sm muted today-plan-item__footer">
@@ -850,7 +1150,7 @@ export function ProjectsView() {
             </div>
           </div>
         </div>
-        {renderTaskSection(false)}
+        {renderOverviewTaskSection()}
       </div>
     );
   };
@@ -860,31 +1160,44 @@ export function ProjectsView() {
       <aside className="projects-sidebar">
         <div className="projects-sidebar__clip">
           <div className="projects-sidebar__inner">
-            <div className="projects-sidebar__header">
-              <div className="headline-sm">项目</div>
-              <button type="button" className="projects-sidebar__manage" onClick={() => setShowArchived((value) => !value)}>
-                {showArchived ? "收起" : "管理"}
-              </button>
-            </div>
+            <div className="projects-sidebar__top">
+              <div className="projects-sidebar__header">
+                <div className="headline-sm">项目</div>
+                <button
+                  type="button"
+                  className={`projects-sidebar__manage ${isManaging ? "is-active" : ""}`}
+                  onClick={() => setIsManaging((value) => !value)}
+                >
+                  {isManaging ? "完成" : "管理"}
+                </button>
+              </div>
 
-            <div className="projects-sidebar__tools">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="搜索项目..."
-                className="projects-search-bar"
+              <div className="projects-sidebar__tools">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="搜索项目..."
+                  className="projects-search-bar"
+                />
+              </div>
+
+              <ExtendedFab
+                label="新建项目"
+                icon="add"
+                variant="primary"
+                className="projects-create-fab"
+                onClick={() => setProjForm({ open: true, editing: null })}
               />
             </div>
 
-            <ExtendedFab
-              label="新建项目"
-              icon="add"
-              variant="primary"
-              className="projects-create-fab"
-              onClick={() => setProjForm({ open: true, editing: null })}
-            />
-
-            <div className="projects-sidebar__list">
+            <div
+              className="projects-sidebar__list"
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverTarget(null);
+                }
+              }}
+            >
               {filteredProjects.length === 0 ? (
                 <div className="projects-sidebar__empty">{activeProjects.length === 0 ? "还没有项目" : "没有匹配的项目"}</div>
               ) : (
@@ -902,88 +1215,145 @@ export function ProjectsView() {
                       : plans.length > 0
                         ? `${planDone} / ${plans.length} 个计划完成`
                         : "暂无内容";
+                  const isDragging = draggingProjectId === project.id;
+                  const isTargetBefore = dragOverTarget?.id === project.id && dragOverTarget.position === "before";
+                  const isTargetAfter = dragOverTarget?.id === project.id && dragOverTarget.position === "after";
+
                   return (
-                    <button
-                      type="button"
-                      className={`project-nav-item ${selected ? "is-selected" : ""}`}
-                      key={project.id}
-                      onClick={() => selectProject(project.id)}
-                    >
-                      <div className="project-nav-item__top">
-                        <div
-                          className="project-nav-item__icon"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
-                            color: accent,
-                          }}
-                        >
-                          <Icon name="folder" size={20} fill={true} />
+                    <Fragment key={project.id}>
+                      {isTargetBefore && !isDragging && (
+                        <div className="project-drop-indicator-line" />
+                      )}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={`project-nav-item ${selected ? "is-selected" : ""} ${isManaging ? "is-managing" : ""} ${isDragging ? "is-dragging" : ""}`}
+                        draggable={isManaging}
+                        onDragStart={(e) => handleDragStart(e, project.id)}
+                        onDragOver={(e) => isManaging && handleDragOverCard(e, project.id)}
+                        onDrop={(e) => isManaging && handleDropOnCard(e, project.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => {
+                          if (!isDragging) {
+                            selectProject(project.id);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            selectProject(project.id);
+                          }
+                        }}
+                      >
+                        <div className="project-nav-item__top">
+                          {isManaging && (
+                            <div
+                              className="project-nav-item__drag-handle"
+                              title="拖拽排序或归档"
+                              aria-label="拖拽排序或归档"
+                            >
+                              <Icon name="drag_indicator" size={20} />
+                            </div>
+                          )}
+                          <div
+                            className="project-nav-item__icon"
+                            style={{
+                              backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
+                              color: accent,
+                            }}
+                          >
+                            <Icon name="folder" size={20} fill={true} />
+                          </div>
+                          <div className="project-nav-item__header-copy">
+                            <span className="title-sm ellipsis project-nav-item__name">{project.name}</span>
+                            <span className="body-xs muted project-nav-item__date">
+                              {relativeRangeLabel(project.startDate, project.endDate)}
+                            </span>
+                          </div>
+                          <Icon
+                            name="chevron_right"
+                            size={18}
+                            className={`project-nav-item__chevron ${selected ? "is-active" : ""}`}
+                          />
                         </div>
-                        <div className="project-nav-item__header-copy">
-                          <span className="title-sm ellipsis project-nav-item__name">{project.name}</span>
-                          <span className="body-xs muted project-nav-item__date">
-                            {relativeRangeLabel(project.startDate, project.endDate)}
-                          </span>
-                        </div>
-                        <Icon
-                          name="chevron_right"
-                          size={18}
-                          className={`project-nav-item__chevron ${selected ? "is-active" : ""}`}
-                        />
-                      </div>
 
-                      <div className="project-nav-item__progress-section">
-                        <div className="project-nav-item__progress-label">
-                          <span className="body-xs muted project-nav-item__progress-text">
-                            {summaryText}
-                          </span>
-                          <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
-                            {progress}%
-                          </span>
+                        <div className="project-nav-item__progress-section">
+                          <div className="project-nav-item__progress-label">
+                            <span className="body-xs muted project-nav-item__progress-text">
+                              {summaryText}
+                            </span>
+                            <span className="label-sm project-nav-item__progress-percent" style={{ color: accent }}>
+                              {progress}%
+                            </span>
+                          </div>
+                          <LinearProgress
+                            className="project-nav-item__progress-bar"
+                            value={progress}
+                            max={100}
+                            style={{
+                              "--md-linear-progress-active-indicator-color": accent,
+                              "--md-linear-progress-track-color": `color-mix(in srgb, ${accent} 14%, var(--md-surface-container-highest))`,
+                            } as React.CSSProperties}
+                          />
                         </div>
-                        <LinearProgress
-                          className="project-nav-item__progress-bar"
-                          value={progress}
-                          max={100}
-                          style={{
-                            "--md-linear-progress-active-indicator-color": accent,
-                            "--md-linear-progress-track-color": `color-mix(in srgb, ${accent} 14%, var(--md-surface-container-highest))`,
-                          } as React.CSSProperties}
-                        />
-                      </div>
 
-                      <Ripple />
-                    </button>
+                        <Ripple />
+                      </div>
+                      {isTargetAfter && !isDragging && (
+                        <div className="project-drop-indicator-line" />
+                      )}
+                    </Fragment>
                   );
                 })
               )}
             </div>
 
-            {archivedProjects.length > 0 && (
+            {(isManaging || archivedProjects.length > 0) && (
               <div className="projects-sidebar__archived">
-                <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
-                  <span>已归档项目</span>
-                  <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
-                </button>
-                {showArchived && (
-                  <div className="projects-archived-list">
-                    {archivedProjects.map((project) => (
-                      <div className="projects-archived-item" key={project.id}>
-                        <div
-                          className="projects-archived-item__icon"
-                          style={{
-                            backgroundColor: `color-mix(in srgb, ${colorByKey(project.color)} 16%, transparent)`,
-                            color: colorByKey(project.color),
-                          }}
-                        >
-                          <Icon name="folder" size={16} fill={true} />
-                        </div>
-                        <span className="body-sm ellipsis grow">{project.name}</span>
-                        <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
-                        <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
-                      </div>
-                    ))}
+                {isManaging && (
+                  <div
+                    className={`projects-sidebar__archive-dropzone ${isOverArchiveZone ? "is-drag-over" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setIsOverArchiveZone(true);
+                    }}
+                    onDragLeave={() => {
+                      setIsOverArchiveZone(false);
+                    }}
+                    onDrop={handleArchiveDrop}
+                  >
+                    <Icon name="archive" size={20} />
+                    <span>{isOverArchiveZone ? "松开以直接归档" : "拖拽到此处归档"}</span>
                   </div>
+                )}
+                {archivedProjects.length > 0 && (
+                  <>
+                    <button type="button" className="projects-archived-toggle" onClick={() => setShowArchived((value) => !value)}>
+                      <span>已归档项目</span>
+                      <span className="row gap-4"><span className="body-sm muted">{archivedProjects.length}</span><Icon name={showArchived ? "expand_less" : "chevron_right"} size={18} /></span>
+                    </button>
+                    {showArchived && (
+                      <div className="projects-archived-list">
+                        {archivedProjects.map((project) => (
+                          <div className="projects-archived-item" key={project.id}>
+                            <div
+                              className="projects-archived-item__icon"
+                              style={{
+                                backgroundColor: `color-mix(in srgb, ${colorByKey(project.color)} 16%, transparent)`,
+                                color: colorByKey(project.color),
+                              }}
+                            >
+                              <Icon name="folder" size={16} fill={true} />
+                            </div>
+                            <span className="body-sm ellipsis grow">{project.name}</span>
+                            <IconButton aria-label={`恢复项目${project.name}`} title="恢复项目" onClick={() => { store.restoreProject(project.id); show("项目已恢复"); }}><Icon name="unarchive" size={17} /></IconButton>
+                            <IconButton aria-label={`永久删除项目${project.name}`} title="永久删除项目" onClick={() => askPermanentDeleteProject(project)}><Icon name="delete_forever" size={17} /></IconButton>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -1004,7 +1374,7 @@ export function ProjectsView() {
         </button>
       </aside>
 
-      <main className="project-detail-area">
+      <main ref={detailAreaRef} className="project-detail-area">
         {!selectedProject ? (
           <div className="project-detail-empty">
             <EmptyState icon="space_dashboard" title="还没有项目" hint="点击左侧「新建项目」开始规划你的工作" />
@@ -1071,8 +1441,17 @@ export function ProjectsView() {
 
               {!rightSidebarCollapsed && (
                 <aside className="project-context-sidebar">
-                  {renderTodayPlans()}
-                  {renderCalendar()}
+                  {activeNoteTarget ? (
+                    <InstantNotePanel
+                      target={activeNoteTarget}
+                      onClose={() => setActiveNoteTarget(null)}
+                    />
+                  ) : (
+                    <>
+                      {renderTodayPlans()}
+                      {renderCalendar()}
+                    </>
+                  )}
                 </aside>
               )}
             </div>

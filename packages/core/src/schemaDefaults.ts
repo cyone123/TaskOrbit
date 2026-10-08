@@ -1,4 +1,4 @@
-import type { Settings, VaultSettings, WebDavSettings } from "./types";
+import type { AiSettings, Settings, VaultSettings, WebDavSettings } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
@@ -6,6 +6,12 @@ export const DEFAULT_SETTINGS: Settings = {
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
   longBreakInterval: 4,
+  weekDetailStartHour: 6,
+  weekDetailEndHour: 24,
+  dayStartHour: 6,
+  dayEndHour: 24,
+  monthMaxTaskTracks: 3,
+  monthMaxDailyPlans: 4,
 };
 
 export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
@@ -25,4 +31,15 @@ export const DEFAULT_WEBDAV_SETTINGS: WebDavSettings = {
   remoteDir: "/taskorbit",
   autoSync: true,
   syncIntervalMinutes: 15,
+};
+
+export const DEFAULT_AI_SETTINGS: AiSettings = {
+  enabled: false,
+  provider: "deepseek",
+  baseUrl: "https://api.deepseek.com/v1",
+  apiKey: "",
+  model: "deepseek-chat",
+  temperature: 0.7,
+  customProviders: [],
+  providersConfig: {},
 };

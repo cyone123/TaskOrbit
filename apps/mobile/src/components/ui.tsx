@@ -92,9 +92,16 @@ export function AppScreen({
   );
 }
 
-export function PageScroll({ children }: PropsWithChildren) {
+export function PageScroll({
+  children,
+  scrollEnabled = true,
+}: PropsWithChildren<{ scrollEnabled?: boolean }>) {
   return (
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+      scrollEnabled={scrollEnabled}
+    >
       {children as any}
     </ScrollView>
   );

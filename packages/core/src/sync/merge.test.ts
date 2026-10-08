@@ -37,6 +37,7 @@ const mockTask: Task = {
   startDate: "2026-09-01",
   endDate: "2026-09-05",
   done: false,
+  status: "todo",
   priority: "medium",
   createdAt: 1000,
   updatedAt: 1000,

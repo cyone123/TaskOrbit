@@ -366,6 +366,28 @@
   text-align: left;
 }
 
+.month-calendar__more-tasks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: var(--shape-xs);
+  background: var(--md-surface-container-high);
+  color: var(--md-on-surface-variant);
+  font-size: 10px;
+  font-weight: 500;
+  margin: 1px 4px 2px;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  transition: background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing);
+}
+
+.month-calendar__more-tasks:hover {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+
 /* Detailed week view ------------------------------------------------------ */
 
 .week-detail {
@@ -1021,4 +1043,29 @@ body.is-calendar-dragging--resize {
 }
 .gantt-row__days > div:first-child {
   border-left: none;
+}
+
+/* Calendar Settings Dialog ------------------------------------------------ */
+
+.calendar-settings-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 360px;
+  padding: 8px 0;
+}
+
+.calendar-settings-dialog__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendar-settings-dialog__subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
 }

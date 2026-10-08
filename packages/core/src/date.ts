@@ -85,7 +85,11 @@ export function monthLabel(d: Date): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
 
-export function relativeRangeLabel(startISO: string, endISO: string): string {
+export function relativeRangeLabel(
+  startISO: string | null | undefined,
+  endISO: string | null | undefined,
+): string {
+  if (!startISO || !endISO) return "暂无排期";
   return `${formatDateShort(startISO)} - ${formatDateShort(endISO)}`;
 }
 
@@ -227,6 +231,9 @@ export function layoutMonthWeekTasks(
   const rawSegments: Omit<MonthWeekTaskSegment, "trackIndex">[] = [];
 
   for (const task of tasks) {
+    if (!task.startDate || !task.endDate) {
+      continue;
+    }
     const rawStart = task.startDate <= task.endDate ? task.startDate : task.endDate;
     const rawEnd = task.startDate <= task.endDate ? task.endDate : task.startDate;
 
@@ -280,8 +287,10 @@ export function layoutMonthWeekTasks(
     const spanA = a.endCol - a.startCol;
     const spanB = b.endCol - b.startCol;
     if (spanA !== spanB) return spanB - spanA;
-    if (a.task.startDate !== b.task.startDate) {
-      return a.task.startDate.localeCompare(b.task.startDate);
+    const startA = a.task.startDate ?? "";
+    const startB = b.task.startDate ?? "";
+    if (startA !== startB) {
+      return startA.localeCompare(startB);
     }
     return a.task.id.localeCompare(b.task.id);
   });

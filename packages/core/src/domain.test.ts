@@ -14,9 +14,11 @@ import {
   createTask,
   deleteInboxItemState,
   deleteProjectState,
+  reorderProjectsState,
   updateDailyPlanState,
   updateInboxItemState,
   updateTaskState,
+  updateAiSettingsState,
 } from "./domain";
 import { createEmptyState, validateAppState } from "./schema";
 
@@ -529,6 +531,184 @@ describe("domain commands", () => {
 
       // No tasks, 2 standalone plans (1 done -> 50%)
       expect(calculateProjectProgress([], [s1, s2])).toBe(50);
+    });
+  });
+
+  describe("reorderProjectsState", () => {
+    it("reorders projects according to the provided ID array", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      const p2 = createProject({ name: "P2", description: "", color: "green", startDate: "2026-08-17", endDate: "2026-08-20" }, 2);
+      const p3 = createProject({ name: "P3", description: "", color: "orange", startDate: "2026-08-17", endDate: "2026-08-20" }, 3);
+
+      let state = createEmptyState();
+      state = appendProject(state, p1);
+      state = appendProject(state, p2);
+      state = appendProject(state, p3);
+      // Currently state.projects is [p3, p2, p1] because appendProject unshifts
+
+      const reordered = reorderProjectsState(state, [p1.id, p3.id, p2.id]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p1.id, p3.id, p2.id]);
+      expect(validateAppState(reordered)).toBeDefined();
+    });
+
+    it("keeps projects not specified in orderedIds at the end", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      const p2 = createProject({ name: "P2", description: "", color: "green", startDate: "2026-08-17", endDate: "2026-08-20" }, 2);
+      const p3 = createProject({ name: "P3", description: "", color: "orange", startDate: "2026-08-17", endDate: "2026-08-20" }, 3);
+
+      let state = createEmptyState();
+      state = appendProject(state, p1);
+      state = appendProject(state, p2);
+      state = appendProject(state, p3);
+
+      // Only reorder p2 and p1, p3 should stay at the end
+      const reordered = reorderProjectsState(state, [p2.id, p1.id]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p2.id, p1.id, p3.id]);
+    });
+
+    it("handles empty or invalid IDs gracefully", () => {
+      const p1 = createProject({ name: "P1", description: "", color: "blue", startDate: "2026-08-17", endDate: "2026-08-20" }, 1);
+      let state = appendProject(createEmptyState(), p1);
+
+      const reordered = reorderProjectsState(state, ["non-existent-id"]);
+      expect(reordered.projects.map((p) => p.id)).toEqual([p1.id]);
+    });
+  });
+
+  describe("updateAiSettingsState", () => {
+    it("updates AI configuration and validates state", () => {
+      const state = createEmptyState();
+      const updated = updateAiSettingsState(state, {
+        enabled: true,
+        provider: "siliconflow",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sk-test-key",
+        model: "deepseek-ai/DeepSeek-V3",
+        temperature: 0.5,
+      });
+
+      expect(updated.aiSettings).toEqual({
+        enabled: true,
+        provider: "siliconflow",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sk-test-key",
+        model: "deepseek-ai/DeepSeek-V3",
+        temperature: 0.5,
+        customProviders: [],
+        providersConfig: {},
+      });
+      expect(validateAppState(updated)).toBeDefined();
+    });
+
+    it("persists customProviders and providersConfig cleanly", () => {
+      const state = createEmptyState();
+      const updated = updateAiSettingsState(state, {
+        enabled: true,
+        provider: "custom_1",
+        baseUrl: "https://my-llm.corp.internal/v1",
+        apiKey: "sk-internal-key",
+        model: "llama-3-custom",
+        temperature: 0.8,
+        customProviders: [
+          {
+            id: "custom_1",
+            name: "公司内网大模型",
+            baseUrl: "https://my-llm.corp.internal/v1",
+            apiKey: "sk-internal-key",
+            model: "llama-3-custom",
+            temperature: 0.8,
+          },
+        ],
+        providersConfig: {
+          deepseek: {
+            baseUrl: "https://api.deepseek.com/v1",
+            apiKey: "sk-deepseek-key",
+            model: "deepseek-chat",
+            temperature: 0.7,
+          },
+          custom_1: {
+            baseUrl: "https://my-llm.corp.internal/v1",
+            apiKey: "sk-internal-key",
+            model: "llama-3-custom",
+            temperature: 0.8,
+          },
+        },
+      });
+
+      expect(updated.aiSettings.customProviders).toHaveLength(1);
+      expect(updated.aiSettings.customProviders?.[0]?.name).toBe("公司内网大模型");
+      expect(updated.aiSettings.providersConfig?.["deepseek"]?.apiKey).toBe("sk-deepseek-key");
+      expect(validateAppState(updated)).toBeDefined();
+    });
+
+    it("handles task kanban status transitions and plan synchronization", () => {
+      const { task, plan, state } = fixtureState();
+      // 1. Scheduled task initially in_progress
+      const initialTask = state.tasks.find((t) => t.id === task.id)!;
+      expect(initialTask.status).toBe("in_progress");
+      expect(initialTask.done).toBe(false);
+
+      // 2. Unscheduled task is initially todo
+      const unscheduledTask = createTask({
+        projectId: task.projectId,
+        name: "暂未排期任务",
+        description: "",
+        priority: "medium",
+      }, 10);
+      expect(unscheduledTask.status).toBe("todo");
+      expect(unscheduledTask.startDate).toBeNull();
+      expect(unscheduledTask.endDate).toBeNull();
+
+      // 3. Move task to todo (clears schedule)
+      const toTodo = updateTaskState(state, task.id, { status: "todo" });
+      const todoTask = toTodo.tasks.find((t) => t.id === task.id)!;
+      expect(todoTask.status).toBe("todo");
+      expect(todoTask.startDate).toBeNull();
+      expect(todoTask.endDate).toBeNull();
+      expect(todoTask.done).toBe(false);
+      expect(validateAppState(toTodo)).toBeDefined();
+
+      // 4. Schedule dates -> moves to in_progress
+      const scheduled = updateTaskState(toTodo, task.id, {
+        startDate: "2026-08-17",
+        endDate: "2026-08-18",
+      });
+      const scheduledTask = scheduled.tasks.find((t) => t.id === task.id)!;
+      expect(scheduledTask.status).toBe("in_progress");
+      expect(scheduledTask.done).toBe(false);
+      expect(validateAppState(scheduled)).toBeDefined();
+
+      // 5. Mark done via checkbox -> done = true, status = "done", sub-plans also done
+      const completed = updateTaskState(scheduled, task.id, { done: true });
+      const completedTask = completed.tasks.find((t) => t.id === task.id)!;
+      const completedPlan = completed.dailyPlans.find((p) => p.id === plan.id)!;
+      expect(completedTask.status).toBe("done");
+      expect(completedTask.done).toBe(true);
+      expect(completedPlan.done).toBe(true);
+      expect(validateAppState(completed)).toBeDefined();
+
+      // 6. Unmark done via checkbox -> returns to "in_progress" because it has dates
+      const uncompleted = updateTaskState(completed, task.id, { done: false });
+      const uncompletedTask = uncompleted.tasks.find((t) => t.id === task.id)!;
+      const uncompletedPlan = uncompleted.dailyPlans.find((p) => p.id === plan.id)!;
+      expect(uncompletedTask.status).toBe("in_progress");
+      expect(uncompletedTask.done).toBe(false);
+      expect(uncompletedPlan.done).toBe(false);
+      expect(validateAppState(uncompleted)).toBeDefined();
+
+      // 7. Unscheduled task completed and uncompleted -> returns to "todo"
+      const withUnscheduled = appendTask(state, unscheduledTask);
+      const doneUnscheduled = updateTaskState(withUnscheduled, unscheduledTask.id, { done: true });
+      expect(doneUnscheduled.tasks.find((t) => t.id === unscheduledTask.id)!.status).toBe("done");
+      const undoneUnscheduled = updateTaskState(doneUnscheduled, unscheduledTask.id, { done: false });
+      expect(undoneUnscheduled.tasks.find((t) => t.id === unscheduledTask.id)!.status).toBe("todo");
+
+      // 8. Set status directly to "done"
+      const setDoneStatus = updateTaskState(state, task.id, { status: "done" });
+      const setDoneTask = setDoneStatus.tasks.find((t) => t.id === task.id)!;
+      expect(setDoneTask.status).toBe("done");
+      expect(setDoneTask.done).toBe(true);
+      expect(validateAppState(setDoneStatus)).toBeDefined();
     });
   });
 });

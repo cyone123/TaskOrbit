@@ -178,6 +178,7 @@ describe("date helpers", () => {
       startDate: start,
       endDate: end,
       done: false,
+      status: "todo" as const,
       priority: "medium" as const,
       createdAt: 0,
       updatedAt: 0,

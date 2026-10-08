@@ -199,6 +199,7 @@ export function mergeAppState(
     vaultSettings: { ...localState.vaultSettings },
     activeTimer: localState.activeTimer,
     webDavSettings: localState.webDavSettings,
+    aiSettings: localState.aiSettings,
   };
 
   // 7. Validate through Zod to guarantee consistency

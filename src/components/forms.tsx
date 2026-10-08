@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   MAX_DAILY_PLAN_REPEAT_COUNT,
   addDays,
@@ -11,9 +11,13 @@ import {
   type Project,
   type Task,
 } from "@task-orbit/core";
-import { PROJECT_COLORS, colorByKey } from "../store/colors";
+import { PROJECT_COLORS, colorByKey, contrastText, normalizeHex } from "../store/colors";
+import { Icon } from "./Icon";
+import { DatePicker } from "./DatePicker";
+import { TimePicker } from "./TimePicker";
 import { useStore } from "../store/store";
 import {
+  Checkbox,
   FilledButton,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
@@ -61,11 +65,46 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [color, setColor] = useState(initial?.color ?? PROJECT_COLORS[0].key);
+  const [customColor, setCustomColor] = useState<string | null>(() => {
+    if (initial?.color && !PROJECT_COLORS.some((c) => c.key === initial.color)) {
+      return normalizeHex(initial.color);
+    }
+    return null;
+  });
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISO());
   const [endDate, setEndDate] = useState(
     initial?.endDate ?? toISODate(addDays(new Date(), 14)),
   );
   const [error, setError] = useState("");
+
+  const isCustomColor = !PROJECT_COLORS.some((c) => c.key === color);
+  const activeCustomHex = normalizeHex(
+    isCustomColor ? color : (customColor ?? colorByKey(color)),
+  );
+
+  const handleCustomColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomColor(val);
+    setColor(val);
+  };
+
+  const handleOpenColorPicker = () => {
+    if (!isCustomColor && customColor) {
+      setColor(customColor);
+    }
+    if (colorInputRef.current) {
+      if (typeof colorInputRef.current.showPicker === "function") {
+        try {
+          colorInputRef.current.showPicker();
+        } catch {
+          colorInputRef.current.click();
+        }
+      } else {
+        colorInputRef.current.click();
+      }
+    }
+  };
 
   const submit = () => {
     if (!name.trim()) return setError("请输入项目名称");
@@ -106,7 +145,18 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
         />
       </div>
       <div className="field">
-        <label className="field__label">颜色</label>
+        <div className="spread">
+          <label className="field__label">颜色</label>
+          {isCustomColor && (
+            <span
+              className="label-sm muted"
+              style={{ fontFamily: "monospace", letterSpacing: "0.5px" }}
+              title={`当前自定义颜色: ${activeCustomHex.toUpperCase()}`}
+            >
+              {activeCustomHex.toUpperCase()}
+            </span>
+          )}
+        </div>
         <div className="row row--wrap gap-8">
           {PROJECT_COLORS.map((c) => (
             <button
@@ -116,25 +166,56 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
               style={{ background: c.hex }}
               onClick={() => setColor(c.key)}
               title={c.name}
+              aria-label={c.name}
             />
           ))}
+          <button
+            type="button"
+            className={`color-dot color-dot--custom ${isCustomColor ? "selected" : ""}`}
+            style={{
+              background: isCustomColor ? activeCustomHex : "var(--md-surface-container-high)",
+            }}
+            onClick={handleOpenColorPicker}
+            title={isCustomColor ? `自定义颜色 (${activeCustomHex.toUpperCase()})` : "自定义颜色（调色盘）"}
+            aria-label={isCustomColor ? `自定义颜色 (${activeCustomHex.toUpperCase()})` : "自定义颜色（调色盘）"}
+          >
+            <Icon
+              name="palette"
+              size={16}
+              style={{
+                color: isCustomColor ? contrastText(activeCustomHex) : "inherit",
+              }}
+            />
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={activeCustomHex}
+            onInput={handleCustomColorChange}
+            onChange={handleCustomColorChange}
+            style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0 }}
+            tabIndex={-1}
+            aria-hidden="true"
+          />
         </div>
       </div>
       <div className="field__row">
         <div className="field">
-          <OutlinedTextField
+          <DatePicker
             label="开始日期"
-            type="date"
             value={startDate}
-            onInput={(event) => setStartDate(eventValue(event))}
+            onChange={setStartDate}
+            max={endDate}
+            align="left"
           />
         </div>
         <div className="field">
-          <OutlinedTextField
+          <DatePicker
             label="结束日期"
-            type="date"
             value={endDate}
-            onInput={(event) => setEndDate(eventValue(event))}
+            onChange={setEndDate}
+            min={startDate}
+            align="right"
           />
         </div>
       </div>
@@ -154,8 +235,8 @@ export interface TaskFormProps {
   onSubmit: (input: {
     name: string;
     description: string;
-    startDate: string;
-    endDate: string;
+    startDate: string | null;
+    endDate: string | null;
     priority: Priority;
   }) => void;
   onCancel: () => void;
@@ -171,6 +252,9 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
+  const [noSchedule, setNoSchedule] = useState(
+    initial ? !initial.startDate || !initial.endDate : true,
+  );
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISO());
   const [endDate, setEndDate] = useState(
     initial?.endDate ?? toISODate(addDays(new Date(), 7)),
@@ -179,12 +263,15 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
 
   const submit = () => {
     if (!name.trim()) return setError("请输入任务名称");
-    if (endDate < startDate) return setError("结束日期不能早于开始日期");
+    if (!noSchedule) {
+      if (!startDate || !endDate) return setError("请选择开始和结束日期");
+      if (endDate < startDate) return setError("结束日期不能早于开始日期");
+    }
     onSubmit({
       name: name.trim(),
       description: description.trim(),
-      startDate,
-      endDate,
+      startDate: noSchedule ? null : startDate,
+      endDate: noSchedule ? null : endDate,
       priority,
     });
   };
@@ -229,24 +316,57 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
           ))}
         </OutlinedSegmentedButtonSet>
       </div>
-      <div className="field__row">
-        <div className="field">
-          <OutlinedTextField
-            label="开始日期"
-            type="date"
-            value={startDate}
-            onInput={(event) => setStartDate(eventValue(event))}
+      <div className="field">
+        <div
+          className="row gap-8 align-center"
+          style={{ cursor: "pointer", userSelect: "none", width: "fit-content" }}
+          onClick={() => setNoSchedule((v) => !v)}
+        >
+          <Checkbox
+            id="task-no-schedule"
+            checked={noSchedule}
+            aria-label="暂不排期（进入待处理）"
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              setNoSchedule((e.target as HTMLInputElement).checked);
+            }}
           />
-        </div>
-        <div className="field">
-          <OutlinedTextField
-            label="结束日期"
-            type="date"
-            value={endDate}
-            onInput={(event) => setEndDate(eventValue(event))}
-          />
+          <label
+            htmlFor="task-no-schedule"
+            className="body-md"
+            style={{ cursor: "pointer", userSelect: "none" }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setNoSchedule((v) => !v);
+            }}
+          >
+            暂不排期（进入待处理）
+          </label>
         </div>
       </div>
+      {!noSchedule && (
+        <div className="field__row">
+          <div className="field">
+            <DatePicker
+              label="开始日期"
+              value={startDate}
+              onChange={setStartDate}
+              max={endDate}
+              align="left"
+            />
+          </div>
+          <div className="field">
+            <DatePicker
+              label="结束日期"
+              value={endDate}
+              onChange={setEndDate}
+              min={startDate}
+              align="right"
+            />
+          </div>
+        </div>
+      )}
       {error && <p className="error-text body-sm">{error}</p>}
       <FormActions onCancel={onCancel} submitLabel={initial ? "保存" : "创建任务"} />
     </form>
@@ -461,29 +581,30 @@ export function DailyPlanForm({
       </div>
 
       <div className="field">
-        <OutlinedTextField
+        <DatePicker
           label="执行日期"
-          type="date"
           value={date}
-          onInput={(event) => setDate(eventValue(event))}
+          onChange={setDate}
         />
       </div>
 
       <div className="field__row">
         <div className="field">
-          <OutlinedTextField
+          <TimePicker
             label="开始时间"
-            type="time"
             value={startTime}
-            onInput={(event) => setStartTime(eventValue(event))}
+            onChange={setStartTime}
+            max={endTime}
+            align="left"
           />
         </div>
         <div className="field">
-          <OutlinedTextField
+          <TimePicker
             label="结束时间"
-            type="time"
             value={endTime}
-            onInput={(event) => setEndTime(eventValue(event))}
+            onChange={setEndTime}
+            min={startTime}
+            align="right"
           />
         </div>
       </div>

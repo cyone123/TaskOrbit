@@ -26,6 +26,7 @@ import {
   parsePersistedState,
   pauseTimer as pauseTimerState,
   reconcileTimer,
+  reorderProjectsState,
   resetTimer as resetTimerState,
   restoreProjectState,
   resumeTimer as resumeTimerState,
@@ -42,6 +43,7 @@ import {
   updateTimerLink,
   updateVaultSettingsState,
   updateWebDavSettingsState,
+  updateAiSettingsState,
   validateAppState,
   SyncCoordinator,
   recordTombstone,
@@ -67,6 +69,7 @@ import {
   type Task,
   type VaultSettings,
   type WebDavSettings,
+  type AiSettings,
   type Tombstone,
   type SyncStatus,
   type SyncResult,
@@ -93,6 +96,7 @@ export type {
   TaskInput,
   TaskPatch,
   WebDavSettings,
+  AiSettings,
   SyncStatus,
   SyncResult,
   WebDavConnectionTestResult,
@@ -114,9 +118,12 @@ export interface StoreApi {
   syncNow: () => Promise<SyncResult>;
   testWebDavConnection: (settings?: WebDavSettings) => Promise<WebDavConnectionTestResult>;
   updateWebDavSettings: (patch: Partial<WebDavSettings>) => void;
+  updateAiSettings: (patch: Partial<AiSettings>) => void;
+  mutate: (fn: (state: AppState) => AppState) => void;
   retryLoad: () => void;
   addProject: (input: ProjectInput) => Project;
   updateProject: (id: string, patch: ProjectPatch) => void;
+  reorderProjects: (orderedIds: string[]) => void;
   archiveProject: (id: string) => void;
   restoreProject: (id: string) => void;
   deleteProject: (id: string) => void;
@@ -502,6 +509,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  const updateAiSettings = useCallback<StoreApi["updateAiSettings"]>(
+    (patch) => {
+      mutate((state) => updateAiSettingsState(state, patch));
+    },
+    [mutate],
+  );
+
   const addProject = useCallback<StoreApi["addProject"]>((input) => {
     const project = createProject(input);
     mutate((state) => appendProject(state, project));
@@ -510,6 +524,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateProject = useCallback<StoreApi["updateProject"]>((id, patch) => {
     mutate((state) => updateProjectState(state, id, patch));
+  }, [mutate]);
+
+  const reorderProjects = useCallback<StoreApi["reorderProjects"]>((orderedIds) => {
+    mutate((state) => reorderProjectsState(state, orderedIds));
   }, [mutate]);
 
   const archiveProject = useCallback<StoreApi["archiveProject"]>((id) => {
@@ -734,9 +752,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         syncNow,
         testWebDavConnection,
         updateWebDavSettings,
+        updateAiSettings,
+        mutate,
         retryLoad,
         addProject,
         updateProject,
+        reorderProjects,
         archiveProject,
         restoreProject,
         deleteProject,

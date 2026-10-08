@@ -274,7 +274,7 @@ export function ProjectNotesPanel({ project, state }: ProjectNotesPanelProps) {
     if (!dirty || !note || saving) return undefined;
     const timer = window.setTimeout(() => {
       void saveDraft();
-    }, 800);
+    }, 2000);
     return () => window.clearTimeout(timer);
   }, [dirty, draft, note, saveDraft, saving]);
 

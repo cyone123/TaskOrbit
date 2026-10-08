@@ -18,6 +18,7 @@ import {
   parseImportSnapshot,
   pauseTimer,
   reconcileTimer,
+  reorderProjectsState,
   restoreProjectState,
   serializeExportSnapshot,
   skipTimer,
@@ -85,6 +86,7 @@ interface AppStoreValue {
   removeInbox(id: string): void;
   addProject(input: ProjectInput): void;
   updateProject(id: string, input: ProjectInput): void;
+  reorderProjects(orderedIds: string[]): void;
   archiveProject(id: string): void;
   restoreProject(id: string): void;
   removeProject(id: string): void;
@@ -352,6 +354,8 @@ export function AppStoreProvider({ children }: PropsWithChildren) {
         mutate((current) => appendProject(current, createProject(input))),
       updateProject: (id, input) =>
         mutate((current) => updateProjectState(current, id, input)),
+      reorderProjects: (orderedIds) =>
+        mutate((current) => reorderProjectsState(current, orderedIds)),
       archiveProject: (id) =>
         mutate((current) => archiveProjectState(current, id)),
       restoreProject: (id) =>
@@ -465,13 +469,32 @@ export function useAppStore(): AppStoreValue {
 }
 
 export const PROJECT_COLORS = ["violet", "blue", "green", "orange", "rose"] as const;
-export const PROJECT_COLOR_HEX: Record<string, string> = {
-  violet: "#6750A4",
-  blue: "#1769AA",
-  green: "#386A20",
-  orange: "#A64500",
-  rose: "#B3261E",
-};
+export const PROJECT_COLOR_HEX: Record<string, string> = new Proxy(
+  {
+    violet: "#6750A4",
+    indigo: "#3949AB",
+    blue: "#1769AA",
+    cyan: "#00ACC1",
+    teal: "#00897B",
+    green: "#386A20",
+    lime: "#7CB342",
+    amber: "#F9A825",
+    orange: "#A64500",
+    red: "#E53935",
+    pink: "#D81B60",
+    brown: "#6D4C41",
+    rose: "#B3261E",
+  },
+  {
+    get(target, prop: string) {
+      if (typeof prop === "string") {
+        if (prop in target) return (target as any)[prop];
+        if (prop.startsWith("#") || prop.startsWith("rgb")) return prop;
+      }
+      return (target as any)[prop];
+    },
+  },
+);
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
   low: "低",

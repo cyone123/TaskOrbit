@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { ViewKey } from "@task-orbit/core";
 import { Icon } from "./components/Icon";
 import { Layout } from "./components/Layout";
@@ -7,12 +6,15 @@ import { SnackbarProvider } from "./components/ui";
 import { PomodoroNotifier } from "./desktop/PomodoroNotifier";
 import { PomodoroWindowBridge } from "./desktop/PomodoroWindowBridge";
 import { StoreProvider, useStore } from "./store/store";
+import { AiChatProvider } from "./store/ai-chat-store";
+import { ViewStateProvider, useViewState } from "./store/view-state";
 import { ThemeManager } from "./theme/theme";
 import { CalendarView } from "./views/CalendarView";
 import { PomodoroView } from "./views/PomodoroView";
 import { ProjectsView } from "./views/ProjectsView";
 import { StatsView } from "./views/StatsView";
 import { InboxView } from "./views/InboxView";
+import { SettingsView } from "./views/SettingsView";
 
 const TITLES: Record<ViewKey, string> = {
   inbox: "收集箱",
@@ -20,19 +22,21 @@ const TITLES: Record<ViewKey, string> = {
   calendar: "日历",
   pomodoro: "番茄钟",
   stats: "统计",
+  settings: "应用设置",
 };
 
 function Shell() {
-  const [view, setView] = useState<ViewKey>("projects");
+  const { currentView, setCurrentView } = useViewState();
 
   return (
-    <Layout view={view} title={TITLES[view]} onNavigate={setView}>
-      <div className="view-stage" key={view}>
-        {view === "inbox" && <InboxView />}
-        {view === "projects" && <ProjectsView />}
-        {view === "calendar" && <CalendarView />}
-        {view === "pomodoro" && <PomodoroView />}
-        {view === "stats" && <StatsView />}
+    <Layout view={currentView} title={TITLES[currentView]} onNavigate={setCurrentView}>
+      <div className="view-stage" key={currentView}>
+        {currentView === "inbox" && <InboxView />}
+        {currentView === "projects" && <ProjectsView />}
+        {currentView === "calendar" && <CalendarView />}
+        {currentView === "pomodoro" && <PomodoroView />}
+        {currentView === "stats" && <StatsView />}
+        {currentView === "settings" && <SettingsView />}
       </div>
     </Layout>
   );
@@ -114,7 +118,11 @@ export default function App() {
   return (
     <StoreProvider>
       <SnackbarProvider>
-        <BootstrapGate />
+        <AiChatProvider>
+          <ViewStateProvider>
+            <BootstrapGate />
+          </ViewStateProvider>
+        </AiChatProvider>
       </SnackbarProvider>
     </StoreProvider>
   );

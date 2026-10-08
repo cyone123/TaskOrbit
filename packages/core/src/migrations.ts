@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AI_SETTINGS,
   DEFAULT_SETTINGS,
   DEFAULT_VAULT_SETTINGS,
   DEFAULT_WEBDAV_SETTINGS,
@@ -133,8 +134,81 @@ function migrateV5ToV6(input: JsonRecord): JsonRecord {
 function migrateV6ToV7(input: JsonRecord): JsonRecord {
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 7,
     webDavSettings: { ...DEFAULT_WEBDAV_SETTINGS, ...asRecord(input.webDavSettings) },
+  };
+}
+
+/** v8 adds calendar display settings to settings. */
+function migrateV7ToV8(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: 8,
+    settings: { ...DEFAULT_SETTINGS, ...asRecord(input.settings) },
+  };
+}
+
+/** v9 adds AI assistant configuration. */
+function migrateV8ToV9(input: JsonRecord): JsonRecord {
+  return {
+    ...input,
+    version: 9,
+    aiSettings: { ...DEFAULT_AI_SETTINGS, ...asRecord(input.aiSettings) },
+  };
+}
+
+/** v10 adds customProviders and per-provider config memory to aiSettings. */
+function migrateV9ToV10(input: JsonRecord): JsonRecord {
+  const oldAi = asRecord(input.aiSettings);
+  return {
+    ...input,
+    version: 10,
+    aiSettings: {
+      ...DEFAULT_AI_SETTINGS,
+      ...oldAi,
+      customProviders: Array.isArray(oldAi.customProviders) ? oldAi.customProviders : [],
+      providersConfig:
+        typeof oldAi.providersConfig === "object" && oldAi.providersConfig !== null
+          ? oldAi.providersConfig
+          : {},
+    },
+  };
+}
+
+/** v11 links task status directly to scheduling and done state, supporting null dates. */
+function migrateV10ToV11(input: JsonRecord): JsonRecord {
+  const tasks = asArray(input.tasks).map((rawTask) => {
+    const isDone = Boolean(rawTask.done);
+    const startDate =
+      typeof rawTask.startDate === "string" && rawTask.startDate.trim()
+        ? rawTask.startDate.trim()
+        : null;
+    const endDate =
+      typeof rawTask.endDate === "string" && rawTask.endDate.trim()
+        ? rawTask.endDate.trim()
+        : null;
+
+    let status: "todo" | "in_progress" | "done";
+    if (isDone) {
+      status = "done";
+    } else if (startDate && endDate) {
+      status = "in_progress";
+    } else {
+      status = "todo";
+    }
+
+    return {
+      ...rawTask,
+      startDate,
+      endDate,
+      done: status === "done",
+      status,
+    };
+  });
+  return {
+    ...input,
+    version: STATE_VERSION,
+    tasks,
   };
 }
 
@@ -157,6 +231,10 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 4) migrated = migrateV4ToV5(migrated);
   if (version <= 5) migrated = migrateV5ToV6(migrated);
   if (version <= 6) migrated = migrateV6ToV7(migrated);
+  if (version <= 7) migrated = migrateV7ToV8(migrated);
+  if (version <= 8) migrated = migrateV8ToV9(migrated);
+  if (version <= 9) migrated = migrateV9ToV10(migrated);
+  if (version <= 10) migrated = migrateV10ToV11(migrated);
 
   return migrated;
 }

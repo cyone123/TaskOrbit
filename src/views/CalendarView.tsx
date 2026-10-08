@@ -34,11 +34,17 @@ import {
   IconButton,
   OutlinedSegmentedButton,
   OutlinedSegmentedButtonSet,
+  OutlinedSelect,
+  SelectOption,
+  TextButton,
   TonalButton,
+  eventValue,
 } from "../components/material";
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { colorByKey } from "../store/colors";
 import { useStore } from "../store/store";
+import { useAiChat } from "../store/ai-chat-store";
+import { useCalendarViewState } from "../store/view-state";
 import {
   type PlanDragMode,
   computeDraggedPlanTimes,
@@ -46,11 +52,6 @@ import {
 } from "../utils/calendarDrag";
 
 const HOUR_HEIGHT = 44;
-const DAY_START_HOUR = 6;
-const DAY_END_HOUR = 24;
-const DAY_TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR;
-const WEEK_DETAIL_START_HOUR = 6;
-const WEEK_DETAIL_END_HOUR = 24;
 
 type CalendarMode = "month" | "week" | "day";
 type WeekViewMode = "gantt" | "detail";
@@ -80,11 +81,28 @@ export function CalendarView() {
   const { state } = store;
   const { show } = useSnackbar();
 
-  const [mode, setMode] = useState<CalendarMode>("week");
-  const [weekView, setWeekView] = useState<WeekViewMode>("gantt");
-  const [monthFilter, setMonthFilter] = useState<MonthViewFilter>("all");
-  const [anchor, setAnchor] = useState<Date>(() => new Date());
+  const {
+    mode,
+    setMode,
+    weekView,
+    setWeekView,
+    monthFilter,
+    setMonthFilter,
+    anchor,
+    setAnchor,
+  } = useCalendarViewState();
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const weekDetailStartHour = state.settings.weekDetailStartHour ?? 6;
+  const weekDetailEndHour = state.settings.weekDetailEndHour ?? 24;
+  const weekDetailTotalHours = Math.max(1, weekDetailEndHour - weekDetailStartHour);
+
+  const dayStartHour = state.settings.dayStartHour ?? 6;
+  const dayEndHour = state.settings.dayEndHour ?? 24;
+  const dayTotalHours = Math.max(1, dayEndHour - dayStartHour);
+
+  const monthMaxTaskTracks = state.settings.monthMaxTaskTracks ?? 3;
+  const monthMaxDailyPlans = state.settings.monthMaxDailyPlans ?? 4;
 
   const [taskForm, setTaskForm] = useState<{
     open: boolean;
@@ -129,6 +147,15 @@ export function CalendarView() {
 
   const days = useMemo(() => weekDays(anchor), [anchor]);
   const selectedISO = toISODate(anchor);
+  const { openDrawer, sendMessage } = useAiChat();
+
+  const handleAiSchedule = () => {
+    openDrawer();
+    void sendMessage(
+      `请查看我 ${selectedISO} 的已有日程与未完成任务，识别出空闲时间段，帮我推荐最合理的每日计划时间块排期，并调用 plan_schedule_daily_plans 工具提交排期方案。`,
+    );
+  };
+
   const monthDays = useMemo(() => monthGridDays(anchor), [anchor]);
   const monthStart = useMemo(
     () => new Date(anchor.getFullYear(), anchor.getMonth(), 1),
@@ -143,9 +170,10 @@ export function CalendarView() {
     const weekEnd = addDays(weekStart, 6);
     return state.tasks
       .filter(
-        (task) =>
-          parseISODate(task.endDate) >= weekStart &&
-          parseISODate(task.startDate) <= weekEnd,
+        (task): task is Task & { startDate: string; endDate: string } =>
+          Boolean(task.startDate && task.endDate) &&
+          parseISODate(task.endDate!) >= weekStart &&
+          parseISODate(task.startDate!) <= weekEnd,
       )
       .sort((a, b) => {
         const projectA = projectById.get(a.projectId)?.startDate ?? "";
@@ -164,8 +192,9 @@ export function CalendarView() {
     const gridEnd = monthDays[monthDays.length - 1];
     return state.tasks.filter(
       (task) =>
-        parseISODate(task.endDate) >= gridStart &&
-        parseISODate(task.startDate) <= gridEnd,
+        Boolean(task.startDate && task.endDate) &&
+        parseISODate(task.endDate!) >= gridStart &&
+        parseISODate(task.startDate!) <= gridEnd,
     );
   }, [monthDays, state.tasks]);
 
@@ -188,7 +217,10 @@ export function CalendarView() {
 
   const tasksOfDay = useMemo(() => {
     return state.tasks.filter(
-      (task) => task.startDate <= selectedISO && task.endDate >= selectedISO,
+      (task) =>
+        Boolean(task.startDate && task.endDate) &&
+        task.startDate! <= selectedISO &&
+        task.endDate! >= selectedISO,
     );
   }, [state.tasks, selectedISO]);
 
@@ -222,9 +254,10 @@ export function CalendarView() {
 
   useEffect(() => {
     if (mode === "day") {
-      contentRef.current?.parentElement?.scrollTo({ top: (8 - DAY_START_HOUR) * HOUR_HEIGHT });
+      const targetHour = Math.max(dayStartHour, 8);
+      contentRef.current?.parentElement?.scrollTo({ top: (targetHour - dayStartHour) * HOUR_HEIGHT });
     }
-  }, [mode, anchor]);
+  }, [mode, anchor, dayStartHour]);
 
   const colorForProject = (projectId: string | null): string => {
     const project = projectId ? projectById.get(projectId) : null;
@@ -236,6 +269,7 @@ export function CalendarView() {
     ({ "--event-color": colorForProject(projectId) }) as CSSProperties;
 
   const rangeFor = (task: Task): BarRange | null => {
+    if (!task.startDate || !task.endDate) return null;
     const weekStart = startOfWeek(anchor);
     const start = parseISODate(task.startDate);
     const end = parseISODate(task.endDate);
@@ -346,8 +380,8 @@ export function CalendarView() {
         }
       }
 
-      const startHour = current.view === "day" ? DAY_START_HOUR : WEEK_DETAIL_START_HOUR;
-      const endHour = current.view === "day" ? DAY_END_HOUR : WEEK_DETAIL_END_HOUR;
+      const startHour = current.view === "day" ? dayStartHour : weekDetailStartHour;
+      const endHour = current.view === "day" ? dayEndHour : weekDetailEndHour;
 
       const computed = computeDraggedPlanTimes({
         mode: current.mode,
@@ -471,6 +505,9 @@ export function CalendarView() {
         </div>
 
         <div className="row gap-8 calendar-toolbar__actions">
+          <TonalButton onClick={handleAiSchedule} aria-label="AI 智能排期">
+            <Icon name="auto_awesome" size={18} slot="icon" /> AI 排期
+          </TonalButton>
           <FilledButton onClick={() => openNewPlan()}>
             <Icon name="add" size={18} slot="icon" /> 添加计划
           </FilledButton>
@@ -574,7 +611,8 @@ export function CalendarView() {
             {monthWeeks.map((week, weekIdx) => {
               const weekSegments = layoutMonthWeekTasks(state.tasks, week);
               const maxTrack = weekSegments.reduce((m, s) => Math.max(m, s.trackIndex), -1);
-              const trackCount = maxTrack + 1;
+              const trackCount = Math.min(maxTrack + 1, monthMaxTaskTracks);
+              const visibleSegments = weekSegments.filter((s) => s.trackIndex < monthMaxTaskTracks);
 
               return (
                 <div key={`week-${weekIdx}`} className="month-calendar__week-row">
@@ -618,14 +656,14 @@ export function CalendarView() {
                     </div>
 
                     {/* Multi-day Task Bars */}
-                    {showTasks && weekSegments.length > 0 && (
+                    {showTasks && visibleSegments.length > 0 && (
                       <div
                         className="month-calendar__task-tracks"
                         style={{
                           gridTemplateRows: `repeat(${trackCount}, 22px)`,
                         }}
                       >
-                        {weekSegments.map((segment) => {
+                        {visibleSegments.map((segment) => {
                           const { task, startCol, endCol, isStart, isEnd, trackIndex } = segment;
                           const project = projectById.get(task.projectId);
                           const spanCols = endCol - startCol + 1;
@@ -678,13 +716,15 @@ export function CalendarView() {
                               .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
                           : [];
 
-                        const tasksInCol = showTasks
+                        const hiddenTasksInCol = showTasks
                           ? weekSegments.filter(
-                              (s) => s.startCol <= colIdx && s.endCol >= colIdx,
+                              (s) =>
+                                s.startCol <= colIdx &&
+                                s.endCol >= colIdx &&
+                                s.trackIndex >= monthMaxTaskTracks,
                             ).length
                           : 0;
-                        const maxPlans = Math.max(1, 4 - tasksInCol);
-                        const visiblePlans = dayPlans.slice(0, maxPlans);
+                        const visiblePlans = dayPlans.slice(0, monthMaxDailyPlans);
                         const hiddenPlansCount = dayPlans.length - visiblePlans.length;
 
                         return (
@@ -698,6 +738,19 @@ export function CalendarView() {
                               }
                             }}
                           >
+                            {hiddenTasksInCol > 0 && (
+                              <button
+                                type="button"
+                                className="month-calendar__more-tasks"
+                                onClick={() => {
+                                  setAnchor(day);
+                                  setMode("day");
+                                }}
+                                title={`该日还有 ${hiddenTasksInCol} 个任务未在月视图显示，点击查看日视图`}
+                              >
+                                +{hiddenTasksInCol} 任务
+                              </button>
+                            )}
                             {visiblePlans.map((plan) => (
                               <button
                                 key={`plan-${plan.id}`}
@@ -720,7 +773,7 @@ export function CalendarView() {
                                   setMode("day");
                                 }}
                               >
-                                还有 {hiddenPlansCount} 项
+                                还有 {hiddenPlansCount} 项计划
                               </button>
                             )}
                           </div>
@@ -855,7 +908,10 @@ export function CalendarView() {
                 {days.map((day) => {
                   const iso = toISODate(day);
                   const activeTasks = state.tasks.filter(
-                    (task) => task.startDate <= iso && task.endDate >= iso,
+                    (task) =>
+                      Boolean(task.startDate && task.endDate) &&
+                      task.startDate! <= iso &&
+                      task.endDate! >= iso,
                   );
                   return (
                     <div className="week-detail__all-day-cell" key={iso}>
@@ -881,9 +937,9 @@ export function CalendarView() {
             <div className="week-detail__body">
               <div className="week-detail__time-axis">
                 {Array.from(
-                  { length: WEEK_DETAIL_END_HOUR - WEEK_DETAIL_START_HOUR },
+                  { length: weekDetailTotalHours },
                   (_, index) => {
-                    const hour = WEEK_DETAIL_START_HOUR + index;
+                    const hour = weekDetailStartHour + index;
                     return (
                       <div key={hour} className="week-detail__time" style={{ height: HOUR_HEIGHT }}>
                         {`${String(hour).padStart(2, "0")}:00`}
@@ -907,13 +963,13 @@ export function CalendarView() {
                       {plansOfWeek[dayIndex].map((plan) => {
                         const start = timeToMinutes(plan.startTime);
                         const end = timeToMinutes(plan.endTime);
-                        const visibleStart = Math.max(start, WEEK_DETAIL_START_HOUR * 60);
-                        const visibleEnd = Math.min(end, WEEK_DETAIL_END_HOUR * 60);
+                        const visibleStart = Math.max(start, weekDetailStartHour * 60);
+                        const visibleEnd = Math.min(end, weekDetailEndHour * 60);
                         const layout = layoutsOfWeek[dayIndex].get(plan.id) ?? {
                           column: 0,
                           columnCount: 1,
                         };
-                        const top = ((visibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                        const top = ((visibleStart - weekDetailStartHour * 60) / 60) * HOUR_HEIGHT;
                         const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                         if (visibleEnd <= visibleStart) return null;
 
@@ -966,9 +1022,9 @@ export function CalendarView() {
                         (() => {
                           const pStart = timeToMinutes(dragPreview.startTime);
                           const pEnd = timeToMinutes(dragPreview.endTime);
-                          const pVisibleStart = Math.max(pStart, WEEK_DETAIL_START_HOUR * 60);
-                          const pVisibleEnd = Math.min(pEnd, WEEK_DETAIL_END_HOUR * 60);
-                          const pTop = ((pVisibleStart - WEEK_DETAIL_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                          const pVisibleStart = Math.max(pStart, weekDetailStartHour * 60);
+                          const pVisibleEnd = Math.min(pEnd, weekDetailEndHour * 60);
+                          const pTop = ((pVisibleStart - weekDetailStartHour * 60) / 60) * HOUR_HEIGHT;
                           const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
 
                           return (
@@ -1010,10 +1066,10 @@ export function CalendarView() {
             <div className="timeline">
               <div
                 className="timeline__time-axis"
-                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
+                style={{ height: dayTotalHours * HOUR_HEIGHT }}
               >
-                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => {
-                  const hour = DAY_START_HOUR + index;
+                {Array.from({ length: dayTotalHours }, (_, index) => {
+                  const hour = dayStartHour + index;
                   return (
                     <div key={hour} className="timeline__hour" style={{ height: HOUR_HEIGHT }}>
                       {`${String(hour).padStart(2, "0")}:00`}
@@ -1024,9 +1080,9 @@ export function CalendarView() {
               <div
                 ref={timelineColRef}
                 className="timeline__col"
-                style={{ height: DAY_TOTAL_HOURS * HOUR_HEIGHT }}
+                style={{ height: dayTotalHours * HOUR_HEIGHT }}
               >
-                {Array.from({ length: DAY_TOTAL_HOURS }, (_, index) => (
+                {Array.from({ length: dayTotalHours }, (_, index) => (
                   <div
                     key={index}
                     className="timeline__grid-row"
@@ -1045,12 +1101,12 @@ export function CalendarView() {
                 {plansOfDay.map((plan) => {
                   const start = timeToMinutes(plan.startTime);
                   const end = timeToMinutes(plan.endTime);
-                  const visibleStart = Math.max(start, DAY_START_HOUR * 60);
-                  const visibleEnd = Math.min(end, DAY_END_HOUR * 60);
+                  const visibleStart = Math.max(start, dayStartHour * 60);
+                  const visibleEnd = Math.min(end, dayEndHour * 60);
                   if (visibleEnd <= visibleStart) return null;
 
                   const layout = layoutOfDay.get(plan.id) ?? { column: 0, columnCount: 1 };
-                  const top = ((visibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                  const top = ((visibleStart - dayStartHour * 60) / 60) * HOUR_HEIGHT;
                   const height = Math.max(((visibleEnd - visibleStart) / 60) * HOUR_HEIGHT - 4, 24);
                   const project = plan.projectId ? projectById.get(plan.projectId) : null;
                   const isThisDragging =
@@ -1109,9 +1165,9 @@ export function CalendarView() {
                   (() => {
                     const pStart = timeToMinutes(dragPreview.startTime);
                     const pEnd = timeToMinutes(dragPreview.endTime);
-                    const pVisibleStart = Math.max(pStart, DAY_START_HOUR * 60);
-                    const pVisibleEnd = Math.min(pEnd, DAY_END_HOUR * 60);
-                    const pTop = ((pVisibleStart - DAY_START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                    const pVisibleStart = Math.max(pStart, dayStartHour * 60);
+                    const pVisibleEnd = Math.min(pEnd, dayEndHour * 60);
+                    const pTop = ((pVisibleStart - dayStartHour * 60) / 60) * HOUR_HEIGHT;
                     const pHeight = Math.max(((pVisibleEnd - pVisibleStart) / 60) * HOUR_HEIGHT - 4, 24);
 
                     return (
@@ -1272,3 +1328,4 @@ export function CalendarView() {
     </div>
   );
 }
+
