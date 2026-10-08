@@ -456,6 +456,8 @@ fun ProjectDetailScreen(
             val startDate by viewModel.taskStartDate.collectAsState()
             val endDate by viewModel.taskEndDate.collectAsState()
             val priority by viewModel.taskPriority.collectAsState()
+            val scheduled by viewModel.taskScheduled.collectAsState()
+            val formError by viewModel.taskFormError.collectAsState()
 
             Column(
                 modifier = Modifier
@@ -489,7 +491,11 @@ fun ProjectDetailScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TaskOrbitCheckbox(checked = scheduled, onCheckedChange = { viewModel.taskScheduled.value = it })
+                    Text("安排任务日期", style = MaterialTheme.typography.bodyLarge)
+                }
+                if (scheduled) Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -506,6 +512,8 @@ fun ProjectDetailScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                formError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

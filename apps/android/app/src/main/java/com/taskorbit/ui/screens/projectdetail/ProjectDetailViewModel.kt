@@ -102,6 +102,8 @@ class ProjectDetailViewModel(
     val taskStartDate = MutableStateFlow(DateTimeUtils.todayISO())
     val taskEndDate = MutableStateFlow(DateTimeUtils.todayISO())
     val taskPriority = MutableStateFlow(Priority.MEDIUM)
+    val taskScheduled = MutableStateFlow(false)
+    val taskFormError = MutableStateFlow<String?>(null)
 
     // 编辑项目表单状态
     val isProjectFormOpen = MutableStateFlow(false)
@@ -125,6 +127,8 @@ class ProjectDetailViewModel(
     fun openNewTaskForm() {
         val proj = project.value ?: return
         editingTaskId = null
+        taskScheduled.value = false
+        taskFormError.value = null
         taskName.value = ""
         taskDescription.value = ""
         taskStartDate.value = if (DateTimeUtils.todayISO() < proj.startDate) proj.startDate else DateTimeUtils.todayISO()
@@ -135,6 +139,8 @@ class ProjectDetailViewModel(
 
     fun openEditTaskForm(task: Task) {
         editingTaskId = task.id
+        taskScheduled.value = task.startDate != null && task.endDate != null
+        taskFormError.value = null
         taskName.value = task.name
         taskDescription.value = task.description
         taskStartDate.value = task.startDate.orEmpty()
@@ -151,6 +157,15 @@ class ProjectDetailViewModel(
     fun submitTask() {
         val name = taskName.value.trim()
         if (name.isEmpty()) return
+        val start = if (taskScheduled.value) taskStartDate.value.trim().takeIf { it.isNotEmpty() } else null
+        val end = if (taskScheduled.value) taskEndDate.value.trim().takeIf { it.isNotEmpty() } else null
+        try {
+            if (taskScheduled.value) require(start != null && end != null) { "请填写起止日期。" }
+            TaskDomain.validateSchedule(start, end)
+        } catch (e: Exception) {
+            taskFormError.value = e.message ?: "请填写有效的日期。"
+            return
+        }
 
         val id = editingTaskId
         if (id != null) {
@@ -159,8 +174,9 @@ class ProjectDetailViewModel(
                 patch = TaskPatch(
                     name = name,
                     description = taskDescription.value.trim(),
-                    startDate = taskStartDate.value,
-                    endDate = taskEndDate.value,
+                    startDate = start,
+                    endDate = end,
+                    clearSchedule = !taskScheduled.value,
                     priority = taskPriority.value
                 )
             )
@@ -170,8 +186,8 @@ class ProjectDetailViewModel(
                     projectId = projectId,
                     name = name,
                     description = taskDescription.value.trim(),
-                    startDate = taskStartDate.value,
-                    endDate = taskEndDate.value,
+                    startDate = start,
+                    endDate = end,
                     priority = taskPriority.value
                 )
             )

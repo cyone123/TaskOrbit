@@ -4,13 +4,15 @@ import com.taskorbit.data.common.IdGenerator
 import com.taskorbit.domain.model.AppState
 import com.taskorbit.domain.model.Priority
 import com.taskorbit.domain.model.Task
+import com.taskorbit.domain.model.TaskStatus
+import com.taskorbit.domain.model.deriveTaskStatus
 
 data class TaskInput(
     val projectId: String,
     val name: String,
     val description: String = "",
-    val startDate: String,
-    val endDate: String,
+    val startDate: String? = null,
+    val endDate: String? = null,
     val priority: Priority = Priority.MEDIUM
 )
 
@@ -20,7 +22,9 @@ data class TaskPatch(
     val startDate: String? = null,
     val endDate: String? = null,
     val priority: Priority? = null,
-    val done: Boolean? = null
+    val done: Boolean? = null,
+    val status: TaskStatus? = null,
+    val clearSchedule: Boolean = false
 )
 
 object TaskDomain {
@@ -31,13 +35,16 @@ object TaskDomain {
     ): Task {
         val trimmedName = input.name.trim()
         require(trimmedName.isNotEmpty()) { "任务名称不能为空。" }
+        val start = normalizeDate(input.startDate)
+        val end = normalizeDate(input.endDate)
+        validateSchedule(start, end)
         return Task(
             id = IdGenerator.uid("t_"),
             projectId = input.projectId,
             name = trimmedName,
             description = input.description.trim(),
-            startDate = input.startDate,
-            endDate = input.endDate,
+            startDate = start,
+            endDate = end,
             done = false,
             priority = input.priority,
             createdAt = createdAt,
@@ -60,6 +67,17 @@ object TaskDomain {
         patch: TaskPatch,
         updatedAt: Long = System.currentTimeMillis()
     ): AppState {
+        val current = state.tasks.find { it.id == id } ?: return state
+        val clear = patch.clearSchedule || patch.status == TaskStatus.TODO
+        val start = if (clear && patch.startDate == null) null else normalizeDate(patch.startDate ?: current.startDate)
+        val end = if (clear && patch.endDate == null) null else normalizeDate(patch.endDate ?: current.endDate)
+        validateSchedule(start, end)
+        val done = when (patch.status) {
+            TaskStatus.DONE -> true
+            TaskStatus.TODO, TaskStatus.IN_PROGRESS -> false
+            null -> patch.done ?: current.done
+        }
+        val status = deriveTaskStatus(done, start, end)
         val nextTasks = state.tasks.map { task ->
             if (task.id == id) {
                 val nextName = patch.name?.trim() ?: task.name
@@ -67,10 +85,11 @@ object TaskDomain {
                 task.copy(
                     name = nextName,
                     description = patch.description?.trim() ?: task.description,
-                    startDate = patch.startDate ?: task.startDate,
-                    endDate = patch.endDate ?: task.endDate,
+                    startDate = start,
+                    endDate = end,
                     priority = patch.priority ?: task.priority,
-                    done = patch.done ?: task.done,
+                    done = done,
+                    status = status,
                     updatedAt = updatedAt
                 )
             } else {
@@ -79,8 +98,8 @@ object TaskDomain {
         }
 
         // 级联同步任务下每日计划的完成状态
-        val nextPlans = if (patch.done != null) {
-            val targetDone = patch.done
+        val nextPlans = if (done != current.done) {
+            val targetDone = done
             state.dailyPlans.map { plan ->
                 if (plan.taskId == id && plan.done != targetDone) {
                     plan.copy(done = targetDone, updatedAt = updatedAt)
@@ -93,6 +112,17 @@ object TaskDomain {
         }
 
         return state.copy(tasks = nextTasks, dailyPlans = nextPlans)
+    }
+
+    private fun normalizeDate(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun validateSchedule(start: String?, end: String?) {
+        require((start == null) == (end == null)) { "任务起止日期必须同时提供或同时为空。" }
+        if (start != null && end != null) {
+            val startDate = java.time.LocalDate.parse(start)
+            val endDate = java.time.LocalDate.parse(end)
+            require(!endDate.isBefore(startDate)) { "结束日期不能早于开始日期。" }
+        }
     }
 
     fun toggleTaskState(state: AppState, id: String, done: Boolean): AppState {
