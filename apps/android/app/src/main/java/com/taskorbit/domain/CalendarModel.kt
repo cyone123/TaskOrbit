@@ -146,7 +146,7 @@ object CalendarModel {
     fun tasksByDate(tasks: List<Task>, days: List<LocalDate>): Map<LocalDate, List<Task>> {
         val map = days.associateWith { day ->
             val iso = day.format(DATE_FORMATTER)
-            tasks.filter { it.startDate <= iso && it.endDate >= iso }
+            tasks.filter { it.startDate != null && it.endDate != null && it.startDate <= iso && it.endDate >= iso }
         }
         return map
     }
@@ -192,8 +192,8 @@ object CalendarModel {
         // 筛选落入本周并计算有效跨列范围的任务
         val candidateTasks = tasks.mapNotNull { task ->
             val range = taskRangeInWeek(task, weekDays) ?: return@mapNotNull null
-            val isStart = task.startDate >= weekStartIso
-            val isEnd = task.endDate <= weekEndIso
+            val isStart = (task.startDate ?: return@mapNotNull null) >= weekStartIso
+            val isEnd = (task.endDate ?: return@mapNotNull null) <= weekEndIso
             Triple(task, range, Pair(isStart, isEnd))
         }
 

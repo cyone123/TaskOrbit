@@ -71,7 +71,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     ) { state, weekDays ->
         val startIso = weekDays.first().format(dateFormatter)
         val endIso = weekDays.last().format(dateFormatter)
-        state.tasks.filter { it.endDate >= startIso && it.startDate <= endIso }
+        state.tasks.filter { it.startDate != null && it.endDate != null && it.endDate >= startIso && it.startDate <= endIso }
             .sortedWith(compareBy<Task> { it.startDate }.thenBy { it.name })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -99,7 +99,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         else {
             val startIso = days.first().format(dateFormatter)
             val endIso = days.last().format(dateFormatter)
-            state.tasks.filter { it.endDate >= startIso && it.startDate <= endIso }
+            state.tasks.filter { it.startDate != null && it.endDate != null && it.endDate >= startIso && it.startDate <= endIso }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -108,7 +108,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         selectedDate
     ) { state, selDate ->
         val iso = selDate.format(dateFormatter)
-        state.tasks.filter { it.startDate <= iso && it.endDate >= iso }
+        state.tasks.filter { it.startDate != null && it.endDate != null && it.startDate <= iso && it.endDate >= iso }
             .sortedWith(compareBy<Task> { it.done }.thenBy { it.startDate })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

@@ -95,7 +95,7 @@ class TransferEngineTest {
         """.trimIndent()
 
         val imported = TransferEngine.parseImportSnapshot(legacyJson)
-        assertEquals(7, imported.version)
+        assertEquals(11, imported.version)
         assertEquals(30, imported.settings.focusMinutes)
         assertEquals("dark", imported.settings.theme)
         assertNotNull(imported.vaultSettings)

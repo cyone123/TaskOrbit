@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object MigrationManager {
-    const val CURRENT_VERSION = 7
+    const val CURRENT_VERSION = com.taskorbit.domain.model.STATE_VERSION
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -40,6 +40,10 @@ object MigrationManager {
         if (version <= 4) migrated = migrateV4ToV5(migrated)
         if (version <= 5) migrated = migrateV5ToV6(migrated)
         if (version <= 6) migrated = migrateV6ToV7(migrated)
+        if (version <= 7) migrated = migrateV7ToV8(migrated)
+        if (version <= 8) migrated = migrateV8ToV9(migrated)
+        if (version <= 9) migrated = migrateV9ToV10(migrated)
+        if (version <= 10) migrated = migrateV10ToV11(migrated)
 
         return migrated.toString()
     }
@@ -114,9 +118,9 @@ object MigrationManager {
                     put("enabled", JsonPrimitive(false))
                     put("rootPath", JsonNull)
                     put("vaultName", JsonNull)
-                    put("notesFolder", JsonPrimitive("Notes"))
+                    put("notesFolder", JsonPrimitive("Task Orbit/Notes"))
                     put("autoReload", JsonPrimitive(true))
-                    put("openWithObsidian", JsonPrimitive(false))
+                    put("openWithObsidian", JsonPrimitive(true))
                 })
             }
         }
@@ -135,18 +139,63 @@ object MigrationManager {
     private fun migrateV6ToV7(input: JsonObject): JsonObject {
         return buildJsonObject {
             input.forEach { (k, v) -> put(k, v) }
-            put("version", JsonPrimitive(CURRENT_VERSION))
+            put("version", JsonPrimitive(7))
             if ("webDavSettings" !in input) {
                 put("webDavSettings", buildJsonObject {
                     put("enabled", JsonPrimitive(false))
                     put("serverUrl", JsonPrimitive(""))
                     put("username", JsonPrimitive(""))
                     put("password", JsonPrimitive(""))
-                    put("remoteDir", JsonPrimitive("TaskOrbit"))
-                    put("autoSync", JsonPrimitive(false))
-                    put("syncIntervalMinutes", JsonPrimitive(30))
+                    put("remoteDir", JsonPrimitive("/taskorbit"))
+                    put("autoSync", JsonPrimitive(true))
+                    put("syncIntervalMinutes", JsonPrimitive(15))
                 })
             }
         }
+    }
+
+    private fun withDefaults(input: JsonObject, version: Int, key: String, defaults: JsonObject): JsonObject =
+        JsonObject(input + mapOf(
+            "version" to JsonPrimitive(version),
+            key to JsonObject(defaults + (input[key] as? JsonObject ?: JsonObject(emptyMap())))
+        ))
+
+    private fun aiDefaults(): JsonObject = json.encodeToJsonElement(
+        com.taskorbit.domain.model.AiSettings.serializer(), com.taskorbit.domain.model.AiSettings()
+    ).jsonObject
+
+    private fun migrateV7ToV8(input: JsonObject): JsonObject = withDefaults(
+        input, 8, "settings", json.encodeToJsonElement(
+            com.taskorbit.domain.model.Settings.serializer(), com.taskorbit.domain.model.Settings()
+        ).jsonObject
+    )
+
+    private fun migrateV8ToV9(input: JsonObject): JsonObject = withDefaults(input, 9, "aiSettings", aiDefaults())
+
+    private fun migrateV9ToV10(input: JsonObject): JsonObject {
+        val ai = input["aiSettings"] as? JsonObject ?: JsonObject(emptyMap())
+        val migrated = withDefaults(input, 10, "aiSettings", aiDefaults())
+        return JsonObject(migrated + ("aiSettings" to JsonObject(migrated.getValue("aiSettings").jsonObject + mapOf(
+            "customProviders" to (ai["customProviders"] as? JsonArray ?: JsonArray(emptyList())),
+            "providersConfig" to (ai["providersConfig"] as? JsonObject ?: JsonObject(emptyMap()))
+        ))))
+    }
+
+    private fun migrateV10ToV11(input: JsonObject): JsonObject {
+        val tasks = JsonArray((input["tasks"] as? JsonArray ?: JsonArray(emptyList())).map { element ->
+            val task = element.jsonObject
+            fun date(key: String): String? = (task[key] as? JsonPrimitive)
+                ?.takeUnless { it is JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
+            val start = date("startDate")
+            val end = date("endDate")
+            val done = (task["done"] as? JsonPrimitive)?.content == "true"
+            val status = if (done) "done" else if (start != null && end != null) "in_progress" else "todo"
+            JsonObject(task + mapOf(
+                "startDate" to (start?.let(::JsonPrimitive) ?: JsonNull),
+                "endDate" to (end?.let(::JsonPrimitive) ?: JsonNull),
+                "done" to JsonPrimitive(done), "status" to JsonPrimitive(status)
+            ))
+        })
+        return JsonObject(input + mapOf("version" to JsonPrimitive(11), "tasks" to tasks))
     }
 }

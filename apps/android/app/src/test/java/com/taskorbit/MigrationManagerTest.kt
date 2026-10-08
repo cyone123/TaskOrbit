@@ -12,7 +12,7 @@ import org.junit.Test
 class MigrationManagerTest {
 
     @Test
-    fun `migrate v1 state to v7 with complete default fields`() {
+    fun `migrate v1 state to v11 with complete default fields`() {
         val rawV1 = """
             {
                 "version": 1,
@@ -38,7 +38,7 @@ class MigrationManagerTest {
         val migratedJson = MigrationManager.migrate(rawV1)
         val root = Json.parseToJsonElement(migratedJson).jsonObject
 
-        assertEquals(7, root["version"]?.jsonPrimitive?.intOrNull)
+        assertEquals(11, root["version"]?.jsonPrimitive?.intOrNull)
         assertNotNull(root["webDavSettings"])
         assertNotNull(root["inboxItems"])
         assertNotNull(root["vaultSettings"])

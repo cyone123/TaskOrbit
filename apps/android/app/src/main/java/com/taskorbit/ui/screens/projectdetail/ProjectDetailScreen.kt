@@ -720,7 +720,8 @@ private fun TaskRowItem(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = ProjectDomain.relativeRangeLabel(task.startDate, task.endDate),
+                                text = if (task.startDate == null || task.endDate == null) "未排期"
+                                    else ProjectDomain.relativeRangeLabel(task.startDate, task.endDate),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

@@ -3,6 +3,8 @@ package com.taskorbit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+const val STATE_VERSION = 11
+
 @Serializable
 enum class Priority {
     @SerialName("low") LOW,
@@ -78,13 +80,27 @@ data class Task(
     val projectId: String,
     val name: String,
     val description: String = "",
-    val startDate: String, // YYYY-MM-DD
-    val endDate: String,   // YYYY-MM-DD
+    val startDate: String? = null, // YYYY-MM-DD or unscheduled
+    val endDate: String? = null,
     val done: Boolean = false,
+    val status: TaskStatus = deriveTaskStatus(done, startDate, endDate),
     val priority: Priority = Priority.MEDIUM,
     val createdAt: Long,
     val updatedAt: Long
 )
+
+@Serializable
+enum class TaskStatus {
+    @SerialName("todo") TODO,
+    @SerialName("in_progress") IN_PROGRESS,
+    @SerialName("done") DONE
+}
+
+fun deriveTaskStatus(done: Boolean, startDate: String?, endDate: String?): TaskStatus = when {
+    done -> TaskStatus.DONE
+    !startDate.isNullOrBlank() && !endDate.isNullOrBlank() -> TaskStatus.IN_PROGRESS
+    else -> TaskStatus.TODO
+}
 
 @Serializable
 enum class InboxItemKind {
@@ -170,7 +186,13 @@ data class Settings(
     val focusMinutes: Int = 25,
     val shortBreakMinutes: Int = 5,
     val longBreakMinutes: Int = 15,
-    val longBreakInterval: Int = 4
+    val longBreakInterval: Int = 4,
+    val weekDetailStartHour: Int = 6,
+    val weekDetailEndHour: Int = 24,
+    val dayStartHour: Int = 6,
+    val dayEndHour: Int = 24,
+    val monthMaxTaskTracks: Int = 3,
+    val monthMaxDailyPlans: Int = 4
 )
 
 @Serializable
@@ -178,9 +200,9 @@ data class VaultSettings(
     val enabled: Boolean = false,
     val rootPath: String? = null,
     val vaultName: String? = null,
-    val notesFolder: String = "Notes",
+    val notesFolder: String = "Task Orbit/Notes",
     val autoReload: Boolean = true,
-    val openWithObsidian: Boolean = false
+    val openWithObsidian: Boolean = true
 )
 
 @Serializable
@@ -189,9 +211,42 @@ data class WebDavSettings(
     val serverUrl: String = "",
     val username: String = "",
     val password: String = "",
-    val remoteDir: String = "TaskOrbit",
-    val autoSync: Boolean = false,
-    val syncIntervalMinutes: Int = 30
+    val remoteDir: String = "/taskorbit",
+    val autoSync: Boolean = true,
+    val syncIntervalMinutes: Int = 15
+)
+
+@Serializable
+data class AiProviderConfig(
+    val protocol: String? = null,
+    val baseUrl: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val temperature: Double? = null
+)
+
+@Serializable
+data class CustomAiProvider(
+    val id: String,
+    val name: String,
+    val protocol: String? = null,
+    val baseUrl: String = "",
+    val apiKey: String = "",
+    val model: String = "",
+    val temperature: Double = 0.7
+)
+
+@Serializable
+data class AiSettings(
+    val enabled: Boolean = false,
+    val provider: String = "deepseek",
+    val protocol: String? = null,
+    val baseUrl: String = "https://api.deepseek.com/v1",
+    val apiKey: String = "",
+    val model: String = "deepseek-chat",
+    val temperature: Double = 0.7,
+    val customProviders: List<CustomAiProvider> = emptyList(),
+    val providersConfig: Map<String, AiProviderConfig> = emptyMap()
 )
 
 @Serializable
@@ -211,7 +266,7 @@ data class Tombstone(
 
 @Serializable
 data class AppState(
-    val version: Int = 7,
+    val version: Int = STATE_VERSION,
     val projects: List<Project> = emptyList(),
     val tasks: List<Task> = emptyList(),
     val dailyPlans: List<DailyPlan> = emptyList(),
@@ -220,5 +275,6 @@ data class AppState(
     val settings: Settings = Settings(),
     val vaultSettings: VaultSettings = VaultSettings(),
     val activeTimer: ActiveTimer? = null,
-    val webDavSettings: WebDavSettings = WebDavSettings()
+    val webDavSettings: WebDavSettings = WebDavSettings(),
+    val aiSettings: AiSettings = AiSettings()
 )

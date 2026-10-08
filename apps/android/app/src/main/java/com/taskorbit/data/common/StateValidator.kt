@@ -3,7 +3,7 @@ package com.taskorbit.data.common
 import com.taskorbit.domain.model.AppState
 
 object StateValidator {
-    const val CURRENT_VERSION = 7
+    const val CURRENT_VERSION = com.taskorbit.domain.model.STATE_VERSION
 
     class ValidationException(message: String) : IllegalArgumentException(message)
 

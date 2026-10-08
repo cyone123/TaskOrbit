@@ -137,8 +137,8 @@ class ProjectDetailViewModel(
         editingTaskId = task.id
         taskName.value = task.name
         taskDescription.value = task.description
-        taskStartDate.value = task.startDate
-        taskEndDate.value = task.endDate
+        taskStartDate.value = task.startDate.orEmpty()
+        taskEndDate.value = task.endDate.orEmpty()
         taskPriority.value = task.priority
         isTaskFormOpen.value = true
     }
