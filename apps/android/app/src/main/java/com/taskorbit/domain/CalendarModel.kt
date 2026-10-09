@@ -171,7 +171,7 @@ object CalendarModel {
 
     /**
      * 月视图周行中多天连续任务条（Spanning Task Bars）贪心槽位排布算法：
-     * 1. 筛选落入该周的任务，跨多天任务优先分配顶部连续槽位；
+     * 1. 筛选落入该周的任务，按起始列分配连续槽位，同日起始时长任务优先；
      * 2. 在不重叠前提下尽量复用槽位；
      * 3. 计算超限溢出（overflow），超过最大可见槽位展示 +N 提示。
      */
@@ -180,7 +180,7 @@ object CalendarModel {
         weekDays: List<LocalDate>,
         maxVisibleSlots: Int = 3
     ): WeekSpanningLayout {
-        if (tasks.isEmpty() || weekDays.isEmpty()) {
+        if (tasks.isEmpty() || weekDays.size != 7) {
             return WeekSpanningLayout(emptyList(), emptyMap(), 0)
         }
 
@@ -191,9 +191,14 @@ object CalendarModel {
 
         // 筛选落入本周并计算有效跨列范围的任务
         val candidateTasks = tasks.mapNotNull { task ->
-            val range = taskRangeInWeek(task, weekDays) ?: return@mapNotNull null
-            val isStart = (task.startDate ?: return@mapNotNull null) >= weekStartIso
-            val isEnd = (task.endDate ?: return@mapNotNull null) <= weekEndIso
+            val start = task.startDate ?: return@mapNotNull null
+            val end = task.endDate ?: return@mapNotNull null
+            val rawStart = minOf(start, end)
+            val rawEnd = maxOf(start, end)
+            val range = taskRangeInWeek(task.copy(startDate = rawStart, endDate = rawEnd), weekDays)
+                ?: return@mapNotNull null
+            val isStart = rawStart >= weekStartIso
+            val isEnd = rawEnd <= weekEndIso
             Triple(task, range, Pair(isStart, isEnd))
         }
 
@@ -201,48 +206,29 @@ object CalendarModel {
             return WeekSpanningLayout(emptyList(), emptyMap(), 0)
         }
 
-        // 排序：多天跨度优先（保持跨天长条在上方稳定连贯），其次按起始列、起始日期与任务 ID 排序
+        // 按起始列贪心复用槽位，保证所需轨道数等于最大同时重叠数。
+        // 跨度优先可能将互不重叠的长任务放到同一轨道，迫使后续交错的短任务额外开轨。
         val sorted = candidateTasks.sortedWith(
-            compareByDescending<Triple<Task, Pair<Int, Int>, Pair<Boolean, Boolean>>> { it.second.second - it.second.first + 1 }
-                .thenBy { it.second.first }
+            compareBy<Triple<Task, Pair<Int, Int>, Pair<Boolean, Boolean>>> { it.second.first }
+                .thenByDescending { it.second.second - it.second.first + 1 }
                 .thenBy { it.first.startDate }
                 .thenBy { it.first.id }
         )
 
-        val slots = mutableListOf<BooleanArray>()
+        // 与桌面端 layoutMonthWeekTasks 一致：任务在本周保持固定轨道，
+        // 仅当上一任务已在起始列之前结束时，复用最靠上的轨道。
+        val trackEnds = mutableListOf<Int>()
         val allSegments = mutableListOf<SpanningTaskSegment>()
-        val dayCounts = IntArray(7)
 
         for ((task, range, bounds) in sorted) {
             val (startCol, endCol) = range
             val (isStart, isEnd) = bounds
-
-            for (c in startCol..endCol) {
-                dayCounts[c]++
-            }
-
-            var assignedSlot = -1
-            for (s in slots.indices) {
-                var canFit = true
-                for (c in startCol..endCol) {
-                    if (slots[s][c]) {
-                        canFit = false
-                        break
-                    }
-                }
-                if (canFit) {
-                    assignedSlot = s
-                    break
-                }
-            }
-
+            var assignedSlot = trackEnds.indexOfFirst { it < startCol }
             if (assignedSlot == -1) {
-                assignedSlot = slots.size
-                slots.add(BooleanArray(7))
-            }
-
-            for (c in startCol..endCol) {
-                slots[assignedSlot][c] = true
+                assignedSlot = trackEnds.size
+                trackEnds.add(endCol)
+            } else {
+                trackEnds[assignedSlot] = endCol
             }
 
             allSegments.add(
@@ -257,32 +243,20 @@ object CalendarModel {
             )
         }
 
-        // 确定各天是否存在溢出（超出 maxVisibleSlots）
-        val overflowMap = mutableMapOf<Int, Int>()
-        for (c in 0..6) {
-            if (dayCounts[c] > maxVisibleSlots) {
-                // 超出的任务数量（由于最后 1 个可见槽位用于展示 "+N" 胶囊，因此多出来的任务数是 dayCounts[c] - (maxVisibleSlots - 1)）
-                overflowMap[c] = dayCounts[c] - (maxVisibleSlots - 1)
-            }
-        }
+        // 与桌面端一致，逐日统计被轨道上限隐藏的任务，不按当天任务总数推算。
+        val hiddenSegments = allSegments.filter { it.slot >= maxVisibleSlots }
+        val overflowMap = (0..6).mapNotNull { col ->
+            val count = hiddenSegments.count { col in it.startCol..it.endCol }
+            if (count > 0) col to count else null
+        }.toMap()
 
-        // 筛选可见的横条：
-        // 1. 如果 slot < maxVisibleSlots - 1（如 slot 0, 1），始终可见
-        // 2. 如果 slot == maxVisibleSlots - 1（如 slot 2），仅在其跨越的列中没有任意一列发生溢出时保留；若存在溢出列，则该列由 "+N" 承载
-        val visibleSegments = allSegments.filter { seg ->
-            if (seg.slot < maxVisibleSlots - 1) {
-                true
-            } else if (seg.slot == maxVisibleSlots - 1) {
-                (seg.startCol..seg.endCol).none { c -> overflowMap.containsKey(c) }
-            } else {
-                false
-            }
-        }
+        // 所有设置范围内的任务轨道完整显示，保持跨天横条连续。
+        val visibleSegments = allSegments.filter { it.slot < maxVisibleSlots }
 
         return WeekSpanningLayout(
             visibleSegments = visibleSegments,
             overflowPerCol = overflowMap,
-            totalSlots = slots.size
+            totalSlots = trackEnds.size
         )
     }
 }

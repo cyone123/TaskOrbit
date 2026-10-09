@@ -77,6 +77,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             .sortedWith(compareBy<Task> { it.startDate }.thenBy { it.name })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val plansByDateInMonth: StateFlow<Map<LocalDate, List<DailyPlan>>> = combine(
+        repository.state,
+        monthDays
+    ) { state, days ->
+        val grouped = state.dailyPlans.groupBy { it.date }
+        days.associateWith { day ->
+            val iso = day.format(dateFormatter)
+            grouped[iso]?.sortedBy { CalendarModel.timeToMinutes(it.startTime) } ?: emptyList()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     val monthPlanCounts: StateFlow<Map<String, Int>> = repository.state
         .map { state ->
             val counts = mutableMapOf<String, Int>()
@@ -101,7 +112,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         else {
             val startIso = days.first().format(dateFormatter)
             val endIso = days.last().format(dateFormatter)
-            state.tasks.filter { it.startDate != null && it.endDate != null && it.endDate >= startIso && it.startDate <= endIso }
+            state.tasks.filter { task ->
+                val start = task.startDate
+                val end = task.endDate
+                start != null && end != null && maxOf(start, end) >= startIso && minOf(start, end) <= endIso
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

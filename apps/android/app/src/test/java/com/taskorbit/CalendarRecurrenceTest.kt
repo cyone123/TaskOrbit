@@ -251,6 +251,106 @@ class CalendarRecurrenceTest {
     }
 
     @Test
+    fun `interleaved tasks use only the maximum concurrent tracks`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23))
+        val tasks = listOf(
+            spanningTask("a", "2026-09-20", "2026-09-22"),
+            spanningTask("b", "2026-09-22", "2026-09-23"),
+            spanningTask("c", "2026-09-23", "2026-09-24"),
+            spanningTask("d", "2026-09-24", "2026-09-26")
+        )
+
+        val layout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 2)
+
+        assertEquals(2, layout.totalSlots)
+        assertEquals(4, layout.visibleSegments.size)
+        assertTrue(layout.overflowPerCol.isEmpty())
+    }
+
+    @Test
+    fun `overflow indicator does not consume the last task track`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23))
+        val tasks = listOf(
+            spanningTask("a", "2026-09-20", "2026-09-26"),
+            spanningTask("b", "2026-09-20", "2026-09-26"),
+            spanningTask("c", "2026-09-20", "2026-09-26"),
+            spanningTask("d", "2026-09-23", "2026-09-23")
+        )
+
+        val layout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 3)
+        val lastTrack = layout.visibleSegments.single { it.task.id == "c" }
+
+        assertEquals(mapOf(3 to 1), layout.overflowPerCol)
+        assertEquals(0, lastTrack.startCol)
+        assertEquals(6, lastTrack.endCol)
+        assertTrue(lastTrack.isStart)
+        assertTrue(lastTrack.isEnd)
+        for (col in 0..6) {
+            val visibleCount = layout.visibleSegments.count { col in it.startCol..it.endCol }
+            assertEquals(3, visibleCount)
+        }
+    }
+
+    @Test
+    fun `hidden continuing tasks remain counted after other tracks end`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23))
+        val tasks = listOf(
+            spanningTask("a", "2026-09-20", "2026-09-22"),
+            spanningTask("b", "2026-09-21", "2026-09-24")
+        )
+
+        val layout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 1)
+
+        assertEquals(mapOf(1 to 1, 2 to 1, 3 to 1, 4 to 1), layout.overflowPerCol)
+        val visible = layout.visibleSegments.single()
+        assertEquals("a", visible.task.id)
+        assertEquals(0, visible.startCol)
+        assertEquals(2, visible.endCol)
+        assertTrue(visible.isStart)
+        assertTrue(visible.isEnd)
+    }
+
+    private fun spanningTask(id: String, startDate: String, endDate: String) = Task(
+        id = id, projectId = "p", name = id, startDate = startDate, endDate = endDate,
+        createdAt = 0, updatedAt = 0
+    )
+
+    @Test
+    fun `month tracks match desktop fixed tracks and daily hidden counts`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23), java.time.DayOfWeek.MONDAY)
+        val tasks = listOf(
+            spanningTask("d", "2026-09-25", "2026-09-27"),
+            spanningTask("c", "2026-09-22", "2026-09-25"),
+            spanningTask("b", "2026-09-18", "2026-09-22"),
+            spanningTask("a", "2026-09-21", "2026-09-24")
+        )
+
+        val fullLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 3)
+        assertEquals(listOf("a" to 0, "b" to 1, "c" to 2, "d" to 0),
+            fullLayout.visibleSegments.map { it.task.id to it.slot })
+        assertFalse(fullLayout.visibleSegments.single { it.task.id == "b" }.isStart)
+
+        val limitedLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = 2)
+        assertEquals(listOf("a", "b", "d"), limitedLayout.visibleSegments.map { it.task.id })
+        assertEquals(mapOf(1 to 1, 2 to 1, 3 to 1, 4 to 1), limitedLayout.overflowPerCol)
+        // 周五低轨道已空出，桌面端仍保持 c 在轨道 2，避免跨天横条跳轨。
+        assertEquals(1, limitedLayout.visibleSegments.count { 4 in it.startCol..it.endCol })
+    }
+
+    @Test
+    fun `month tracks normalize reversed dates like desktop`() {
+        val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23), java.time.DayOfWeek.MONDAY)
+        val layout = CalendarModel.layoutSpanningTasksInWeek(
+            listOf(spanningTask("a", "2026-09-23", "2026-09-18")), weekDays
+        )
+        val segment = layout.visibleSegments.single()
+        assertEquals(0, segment.startCol)
+        assertEquals(2, segment.endCol)
+        assertFalse(segment.isStart)
+        assertTrue(segment.isEnd)
+    }
+
+    @Test
     fun `layoutSpanningTasksInWeek marks continuation boundaries across weeks and calculates overflow`() {
         val weekDays = CalendarModel.weekDays(LocalDate.of(2026, 9, 23)) // Sun 2026-09-20 to Sat 2026-09-26
 
@@ -270,7 +370,8 @@ class CalendarRecurrenceTest {
         val tD = Task(id = "d", projectId = "p", name = "D", startDate = "2026-09-23", endDate = "2026-09-23", createdAt = 0, updatedAt = 0)
 
         val overflowLayout = CalendarModel.layoutSpanningTasksInWeek(listOf(tA, tB, tC, tD), weekDays, maxVisibleSlots = 3)
-        // 4 个任务超出 maxVisibleSlots=3，最后 1 个槽位作为 +N 胶囊，溢出数 = 4 - 2 = 2
-        assertEquals(2, overflowLayout.overflowPerCol[3])
+        // 3 条任务轨道全部可见，额外的任务通过独立 +N 行显示。
+        assertEquals(3, overflowLayout.visibleSegments.size)
+        assertEquals(1, overflowLayout.overflowPerCol[3])
     }
 }

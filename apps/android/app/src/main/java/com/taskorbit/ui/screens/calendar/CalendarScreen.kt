@@ -162,6 +162,7 @@ fun CalendarScreen(
     val plansOfWeek by viewModel.plansOfWeek.collectAsState()
     val tasksInWeek by viewModel.tasksInWeek.collectAsState()
     val monthPlanCounts by viewModel.monthPlanCounts.collectAsState()
+    val plansByDateInMonth by viewModel.plansByDateInMonth.collectAsState()
     val tasksByDateInMonth by viewModel.tasksByDateInMonth.collectAsState()
     val tasksInMonth by viewModel.tasksInMonth.collectAsState()
     val tasksOfDay by viewModel.tasksOfDay.collectAsState()
@@ -301,6 +302,7 @@ fun CalendarScreen(
                             MonthCalendarView(
                                 settings = settings,
                                 plansOfDay = plansOfDay,
+                                plansByDate = plansByDateInMonth,
                                 onPlanClick = viewModel::openEditPlanForm,
                                 anchorDate = anchorDate,
                                 selectedDate = selectedDate,
@@ -1694,6 +1696,16 @@ private fun WeekGanttView(
     }
 }
 
+private object MonthCalendarLayoutTokens {
+    val DateHeaderHeight = 24.dp
+    val ContentTop = 25.dp
+    val ItemHeight = 13.dp
+    val ItemGap = 2.dp
+    val SectionGap = 1.dp
+    val BottomPadding = 3.dp
+    val MinimumWeekHeight = 64.dp
+}
+
 /**
  * 月视图：42 天月历网格（展示多天连续横幅任务条）与选中日期任务清单联动
  */
@@ -1701,6 +1713,7 @@ private fun WeekGanttView(
 private fun MonthCalendarView(
     settings: Settings,
     plansOfDay: List<DailyPlan>,
+    plansByDate: Map<LocalDate, List<DailyPlan>>,
     onPlanClick: (DailyPlan) -> Unit,
     anchorDate: LocalDate,
     selectedDate: LocalDate,
@@ -1714,7 +1727,8 @@ private fun MonthCalendarView(
 ) {
     val today = LocalDate.now()
     val currentMonth = anchorDate.monthValue
-    val scrollState = key(anchorDate) { rememberScrollState() }
+    // 同月内选择日期保留滚动位置，切换月份才创建新的滚动状态。
+    val scrollState = key(anchorDate.withDayOfMonth(1)) { rememberScrollState() }
 
     Column(
         modifier = modifier.verticalScroll(scrollState)
@@ -1737,21 +1751,41 @@ private fun MonthCalendarView(
             }
         }
 
-        // 42 天网格（按周分行呈现连续跨天横条）
+        // 42 天网格（按周分行呈现连续跨天横条与每日计划）
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp)
         ) {
             val rows = monthDays.chunked(7)
-            val dateHeaderHeight = 24.dp
-            val slotHeight = 13.dp
-            val slotGap = 2.dp
-            val slotTopBase = 25.dp
-            val weekRowHeight = slotTopBase + (slotHeight + slotGap) * settings.monthMaxTaskTracks + slotGap
+            val dateHeaderHeight = MonthCalendarLayoutTokens.DateHeaderHeight
+            val slotTopBase = MonthCalendarLayoutTokens.ContentTop
+            val taskSlotHeight = MonthCalendarLayoutTokens.ItemHeight
+            val taskSlotGap = MonthCalendarLayoutTokens.ItemGap
+            val maxTaskTracks = settings.monthMaxTaskTracks.coerceIn(1, 10)
+
+            val planSlotHeight = MonthCalendarLayoutTokens.ItemHeight
+            val planSlotGap = MonthCalendarLayoutTokens.ItemGap
+            val maxDailyPlans = settings.monthMaxDailyPlans.coerceIn(1, 20)
 
             rows.forEach { weekDays ->
-                val spanningLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = settings.monthMaxTaskTracks)
+                val spanningLayout = CalendarModel.layoutSpanningTasksInWeek(tasks, weekDays, maxVisibleSlots = maxTaskTracks)
+                val visibleTrackCount = minOf(spanningLayout.totalSlots, maxTaskTracks)
+                val tasksHeight = (taskSlotHeight + taskSlotGap) * visibleTrackCount
+                val taskOverflowHeight = if (spanningLayout.overflowPerCol.isNotEmpty()) {
+                    taskSlotHeight + taskSlotGap
+                } else 0.dp
+                val plansTopBase = slotTopBase + tasksHeight + taskOverflowHeight + MonthCalendarLayoutTokens.SectionGap
+                val weekPlanCount = weekDays.maxOfOrNull { plansByDate[it]?.size ?: 0 } ?: 0
+                val visiblePlanCount = minOf(weekPlanCount, maxDailyPlans)
+                val plansHeight = (planSlotHeight + planSlotGap) * visiblePlanCount
+                val planOverflowHeight = if (weekPlanCount > maxDailyPlans) {
+                    planSlotHeight + planSlotGap
+                } else 0.dp
+                val weekRowHeight = maxOf(
+                    MonthCalendarLayoutTokens.MinimumWeekHeight,
+                    plansTopBase + plansHeight + planOverflowHeight + MonthCalendarLayoutTokens.BottomPadding
+                )
 
                 BoxWithConstraints(
                     modifier = Modifier
@@ -1834,7 +1868,7 @@ private fun MonthCalendarView(
                         }
                     }
 
-                    // 2. 顶层：跨天连续横幅条（Spanning Task Bars）
+                    // 2. 跨天连续横幅条（Spanning Task Bars）
                     spanningLayout.visibleSegments.forEach { segment ->
                         val startCol = segment.startCol
                         val endCol = segment.endCol
@@ -1845,7 +1879,7 @@ private fun MonthCalendarView(
 
                         val left = columnWidth * startCol + startMargin
                         val width = columnWidth * span - startMargin - endMargin
-                        val top = slotTopBase + (slotHeight + slotGap) * segment.slot
+                        val top = slotTopBase + (taskSlotHeight + taskSlotGap) * segment.slot
 
                         val barShape = RoundedCornerShape(
                             topStart = if (segment.isStart) 3.dp else 0.dp,
@@ -1862,7 +1896,7 @@ private fun MonthCalendarView(
                             modifier = Modifier
                                 .offset(x = left, y = top)
                                 .width(width)
-                                .height(slotHeight)
+                                .height(taskSlotHeight)
                                 .clip(barShape)
                                 .background(barColor)
                                 .clickable { onSelectDate(weekDays[startCol]) }
@@ -1884,42 +1918,188 @@ private fun MonthCalendarView(
                     spanningLayout.overflowPerCol.forEach { (col, overflowCount) ->
                         val left = columnWidth * col + 2.dp
                         val width = columnWidth - 4.dp
-                        val top = slotTopBase + (slotHeight + slotGap) * (settings.monthMaxTaskTracks - 1)
+                        val top = slotTopBase + tasksHeight
 
                         Box(
                             modifier = Modifier
                                 .offset(x = left, y = top)
                                 .width(width)
-                                .height(slotHeight)
+                                .height(taskSlotHeight)
                                 .clip(RoundedCornerShape(3.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                 .clickable { onSelectDate(weekDays[col]) },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "+$overflowCount",
+                                text = "+$overflowCount 任务",
                                 style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1
                             )
                         }
                     }
+
+                    // 4. 每日计划网格（展示在任务横幅下方）
+                    weekDays.forEachIndexed { col, day ->
+                        val dayPlans = plansByDate[day] ?: emptyList()
+                        if (dayPlans.isNotEmpty()) {
+                            val left = columnWidth * col + 2.dp
+                            val width = columnWidth - 4.dp
+
+                            val visiblePlans = dayPlans.take(maxDailyPlans)
+                            val planOverflowCount = (dayPlans.size - maxDailyPlans).coerceAtLeast(0)
+
+                            visiblePlans.forEachIndexed { planIdx, plan ->
+                                val top = plansTopBase + (planSlotHeight + planSlotGap) * planIdx
+                                val colorKey = getProjectColor(plan.projectId)
+                                val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                                val planBgColor = accent.copy(alpha = if (plan.done) 0.12f else 0.22f)
+                                val planBorderColor = accent.copy(alpha = if (plan.done) 0.25f else 0.55f)
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = left, y = top)
+                                        .width(width)
+                                        .height(planSlotHeight)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(planBgColor)
+                                        .border(
+                                            width = 0.5.dp,
+                                            color = planBorderColor,
+                                            shape = RoundedCornerShape(3.dp)
+                                        )
+                                        .clickable { onPlanClick(plan) }
+                                        .padding(horizontal = 2.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(3.5.dp)
+                                                .clip(CircleShape)
+                                                .background(accent)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = plan.name,
+                                            style = TextStyle(fontSize = 7.5.sp, fontWeight = FontWeight.Normal),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (planOverflowCount > 0) {
+                                val top = plansTopBase + plansHeight
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = left, y = top)
+                                        .width(width)
+                                        .height(planSlotHeight)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                        .clickable { onSelectDate(day) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "+$planOverflowCount 计划",
+                                        style = TextStyle(fontSize = 7.sp, fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        Text("每日计划 (${plansOfDay.size})", style = MaterialTheme.typography.titleSmall)
-        plansOfDay.sortedBy { it.startTime }.take(settings.monthMaxDailyPlans).forEach { plan ->
-            TaskOrbitButton("${plan.startTime} ${plan.name}", onClick = { onPlanClick(plan) }, variant = com.taskorbit.ui.components.ButtonVariant.TEXT)
+        val dateTitle = selectedDate.format(DateTimeFormatter.ofPattern("M月d日"))
+
+        // 选中日期的每日计划清单
+        Text(
+            text = "$dateTitle 计划 (${plansOfDay.size})",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+
+        if (plansOfDay.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "选中的日期没有计划",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                plansOfDay.forEach { plan ->
+                    val colorKey = getProjectColor(plan.projectId)
+                    val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+
+                    TaskOrbitCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPlanClick(plan) },
+                        variant = CardVariant.OUTLINED,
+                        shape = ShapeTokens.Medium
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(accent)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = plan.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = if (plan.done) TextDecoration.LineThrough else TextDecoration.None
+                                )
+                                Text(
+                                    text = "${plan.startTime} ~ ${plan.endTime}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
-        if (plansOfDay.size > settings.monthMaxDailyPlans) {
-            Text("还有 ${plansOfDay.size - settings.monthMaxDailyPlans} 个计划，可在日视图查看", style = MaterialTheme.typography.bodySmall)
-        }
+
         // 选中日期的任务清单
         Text(
-            text = "${selectedDate.format(DateTimeFormatter.ofPattern("M月d日"))} 任务 (${tasksOfDay.size})",
+            text = "$dateTitle 任务 (${tasksOfDay.size})",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -2236,6 +2416,8 @@ fun CalendarSettingsSheet(
     var dayEndHour by remember { mutableIntStateOf(settings.dayEndHour) }
     var weekDetailStartHour by remember { mutableIntStateOf(settings.weekDetailStartHour) }
     var weekDetailEndHour by remember { mutableIntStateOf(settings.weekDetailEndHour) }
+    var monthMaxTaskTracks by remember { mutableIntStateOf(settings.monthMaxTaskTracks) }
+    var monthMaxDailyPlans by remember { mutableIntStateOf(settings.monthMaxDailyPlans) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -2327,6 +2509,32 @@ fun CalendarSettingsSheet(
                 }
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "月视图显示限制",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            CalendarSliderRow(
+                label = "最多任务轨道数",
+                value = monthMaxTaskTracks,
+                range = 1..10,
+                formatValue = { "$it 条" },
+                onValueChange = { monthMaxTaskTracks = it }
+            )
+
+            CalendarSliderRow(
+                label = "最多每日计划数",
+                value = monthMaxDailyPlans,
+                range = 1..20,
+                formatValue = { "$it 个" },
+                onValueChange = { monthMaxDailyPlans = it }
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
@@ -2347,7 +2555,9 @@ fun CalendarSettingsSheet(
                             dayStartHour = dayStartHour,
                             dayEndHour = dayEndHour,
                             weekDetailStartHour = weekDetailStartHour,
-                            weekDetailEndHour = weekDetailEndHour
+                            weekDetailEndHour = weekDetailEndHour,
+                            monthMaxTaskTracks = monthMaxTaskTracks,
+                            monthMaxDailyPlans = monthMaxDailyPlans
                         )
                         onSave(updated)
                     },
