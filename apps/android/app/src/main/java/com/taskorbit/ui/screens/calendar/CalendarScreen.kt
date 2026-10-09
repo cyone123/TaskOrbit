@@ -607,6 +607,7 @@ private fun TimelineWaveCursor(
 private fun DraggablePlanBlock(
     plan: DailyPlan,
     startHour: Int,
+    endHour: Int,
     hourHeight: Dp,
     layout: com.taskorbit.domain.PlanColumnLayout,
     accent: Color,
@@ -625,9 +626,12 @@ private fun DraggablePlanBlock(
     val currentOnReschedule by rememberUpdatedState(onReschedulePlan)
     val currentFloatSpringSpec by rememberUpdatedState(floatSpringSpec)
 
-    val startMin = CalendarModel.timeToMinutes(plan.startTime) - startHour * 60
-    val endMin = CalendarModel.timeToMinutes(plan.endTime) - startHour * 60
-    val durationMin = (endMin - startMin).coerceAtLeast(15)
+    val origStartMin = CalendarModel.timeToMinutes(plan.startTime)
+    val origEndMin = CalendarModel.timeToMinutes(plan.endTime)
+    val clampedStartMin = maxOf(origStartMin, startHour * 60)
+    val clampedEndMin = minOf(origEndMin, endHour * 60)
+    val startMin = clampedStartMin - startHour * 60
+    val durationMin = (clampedEndMin - clampedStartMin).coerceAtLeast(15)
 
     val baseTopOffsetDp = (startMin.toFloat() / 60f) * hourHeight.value
     val blockHeightDp = (durationMin.toFloat() / 60f) * hourHeight.value
@@ -657,8 +661,9 @@ private fun DraggablePlanBlock(
     val originalStartTotalMin = CalendarModel.timeToMinutes(plan.startTime)
     val planDurationMin = CalendarModel.timeToMinutes(plan.endTime) - originalStartTotalMin
     val rawPreviewStartMin = originalStartTotalMin + currentDeltaMin
-    val maxStart = maxOf(0, ((1439 - planDurationMin) / 15) * 15)
-    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(0, maxStart)
+    val minStartSlot = startHour * 60
+    val maxStart = maxOf(minStartSlot, ((endHour * 60 - planDurationMin) / 15) * 15)
+    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(minStartSlot, maxStart)
     val snappedPreviewEndMin = snappedPreviewStartMin + planDurationMin
 
     val previewStartStr = CalendarModel.minutesToTime(snappedPreviewStartMin)
@@ -735,8 +740,9 @@ private fun DraggablePlanBlock(
                             val durMin = (origEndMin - origStartMin).coerceAtLeast(15)
                             val deltaMin = (finalDragOffsetY * minutesPerPx).roundToInt()
                             val rawStartMin = origStartMin + deltaMin
-                            val maxStartSlot = maxOf(0, ((1439 - durMin) / 15) * 15)
-                            val targetStartMin = (((rawStartMin + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+                            val minStartSlot = startHour * 60
+                            val maxStartSlot = maxOf(minStartSlot, ((endHour * 60 - durMin) / 15) * 15)
+                            val targetStartMin = (((rawStartMin + 7) / 15) * 15).coerceIn(minStartSlot, maxStartSlot)
                             val targetEndMin = targetStartMin + durMin
 
                             val targetSnapOffsetY = ((targetStartMin - origStartMin).toFloat() / 60f) * hourHeightPx
@@ -894,16 +900,18 @@ private fun DayTimelineView(
         }
     }
 
-    // 动态小时范围：若是今天，保证当前小时必定包含在视图之内（自动扩展边界，即使在清晨、深夜或不同时区）
-    val (startHour, endHour) = remember(plans, isToday, currentTime.hour, settings) {
-        CalendarModel.visibleHourRange(
-            plans = plans,
-            includeHour = if (isToday) currentTime.hour else null,
-            preferredStart = settings.dayStartHour,
-            preferredEnd = settings.dayEndHour
-        )
+    // 按照用户设置严格显示日视图时间范围
+    val startHour = settings.dayStartHour
+    val endHour = settings.dayEndHour
+
+    val visiblePlans = remember(plans, startHour, endHour) {
+        plans.filter { plan ->
+            val pStart = CalendarModel.timeToMinutes(plan.startTime)
+            val pEnd = CalendarModel.timeToMinutes(plan.endTime)
+            pEnd > startHour * 60 && pStart < endHour * 60
+        }
     }
-    val layouts = remember(plans) { CalendarModel.layoutPlanColumns(plans) }
+    val layouts = remember(visiblePlans) { CalendarModel.layoutPlanColumns(visiblePlans) }
 
     val scrollState = rememberScrollState()
 
@@ -926,7 +934,7 @@ private fun DayTimelineView(
                 .fillMaxWidth()
                 .padding(start = 54.dp, end = 16.dp, top = 16.dp, bottom = 88.dp)
         ) {
-            for (hour in startHour..endHour) {
+            for (hour in startHour until endHour) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -940,6 +948,12 @@ private fun DayTimelineView(
                     )
                 }
             }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            )
         }
 
         // 小时时间文字标注
@@ -948,7 +962,7 @@ private fun DayTimelineView(
                 .width(54.dp)
                 .padding(top = 8.dp)
         ) {
-            for (hour in startHour..endHour) {
+            for (hour in startHour until endHour) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -962,6 +976,16 @@ private fun DayTimelineView(
                     )
                 }
             }
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = String.format("%02d:00", endHour),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         // 渲染计划色块
@@ -970,7 +994,7 @@ private fun DayTimelineView(
                 .fillMaxWidth()
                 .padding(start = 60.dp, end = 16.dp, top = 16.dp)
         ) {
-            if (plans.isEmpty()) {
+            if (visiblePlans.isEmpty()) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -990,14 +1014,14 @@ private fun DayTimelineView(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "今日暂无日程计划，点击右下角按钮添加安排",
+                            text = if (plans.isEmpty()) "今日暂无日程计划，点击右下角按钮添加安排" else "当前时间段内暂无计划安排",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             } else {
-                plans.forEach { plan ->
+                visiblePlans.forEach { plan ->
                     key(plan.id) {
                         val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
                         val colorKey = getProjectColor(plan.projectId)
@@ -1006,6 +1030,7 @@ private fun DayTimelineView(
                         DraggablePlanBlock(
                             plan = plan,
                             startHour = startHour,
+                            endHour = endHour,
                             hourHeight = hourHeight,
                             layout = layout,
                             accent = accent,
@@ -1021,20 +1046,23 @@ private fun DayTimelineView(
         if (isToday) {
             val currentMinutes = currentTime.hour * 60 + currentTime.minute
             val visibleStartMinutes = startHour * 60
-            val currentOffsetDp = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
-            TimelineWaveCursor(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 46.dp, end = 16.dp)
-                    .offset {
-                        IntOffset(
-                            x = 0,
-                            y = (8f + currentOffsetDp).dp.roundToPx()
-                        )
-                    }
-                    .zIndex(20f),
-                color = MaterialTheme.colorScheme.error
-            )
+            val visibleEndMinutes = endHour * 60
+            if (currentMinutes in visibleStartMinutes..visibleEndMinutes) {
+                val currentOffsetDp = ((currentMinutes - visibleStartMinutes).toFloat() / 60f) * hourHeight.value
+                TimelineWaveCursor(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 46.dp, end = 16.dp)
+                        .offset {
+                            IntOffset(
+                                x = 0,
+                                y = (8f + currentOffsetDp).dp.roundToPx()
+                            )
+                        }
+                        .zIndex(20f),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
@@ -1046,6 +1074,7 @@ private fun DayTimelineView(
 @Composable
 private fun DraggableWeekPlanBlock(
     startHour: Int,
+    endHour: Int,
     plan: DailyPlan,
     dayIndex: Int,
     daysOfWeek: List<LocalDate>,
@@ -1068,11 +1097,14 @@ private fun DraggableWeekPlanBlock(
     val currentOnReschedule by rememberUpdatedState(onReschedulePlan)
     val currentFloatSpringSpec by rememberUpdatedState(floatSpringSpec)
 
-    val startMin = CalendarModel.timeToMinutes(plan.startTime)
-    val endMin = CalendarModel.timeToMinutes(plan.endTime)
-    val durationMin = (endMin - startMin).coerceAtLeast(15)
+    val origStartMin = CalendarModel.timeToMinutes(plan.startTime)
+    val origEndMin = CalendarModel.timeToMinutes(plan.endTime)
+    val clampedStartMin = maxOf(origStartMin, startHour * 60)
+    val clampedEndMin = minOf(origEndMin, endHour * 60)
+    val startMin = clampedStartMin - startHour * 60
+    val durationMin = (clampedEndMin - clampedStartMin).coerceAtLeast(15)
 
-    val baseTopOffsetDp = ((startMin - startHour * 60).toFloat() / 60f) * hourHeight.value
+    val baseTopOffsetDp = (startMin.toFloat() / 60f) * hourHeight.value
     val blockHeightDp = (durationMin.toFloat() / 60f) * hourHeight.value
 
     val subColWidthDp = columnWidth / layout.columnCount
@@ -1109,8 +1141,9 @@ private fun DraggableWeekPlanBlock(
     val originalStartTotalMin = CalendarModel.timeToMinutes(plan.startTime)
     val planDurationMin = (CalendarModel.timeToMinutes(plan.endTime) - originalStartTotalMin).coerceAtLeast(15)
     val rawPreviewStartMin = originalStartTotalMin + currentDeltaMin
-    val maxStart = maxOf(0, ((1439 - planDurationMin) / 15) * 15)
-    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(0, maxStart)
+    val minStartSlot = startHour * 60
+    val maxStart = maxOf(minStartSlot, ((endHour * 60 - planDurationMin) / 15) * 15)
+    val snappedPreviewStartMin = (((rawPreviewStartMin + 7) / 15) * 15).coerceIn(minStartSlot, maxStart)
     val snappedPreviewEndMin = snappedPreviewStartMin + planDurationMin
 
     val previewStartStr = CalendarModel.minutesToTime(snappedPreviewStartMin)
@@ -1200,8 +1233,9 @@ private fun DraggableWeekPlanBlock(
 
                             val dMin = (finalDragOffsetY * minutesPerPx).roundToInt()
                             val rStartMin = origStartMin + dMin
-                            val maxStartSlot = maxOf(0, ((1439 - durMin) / 15) * 15)
-                            val targetStartMin = (((rStartMin + 7) / 15) * 15).coerceIn(0, maxStartSlot)
+                            val minStartSlot = startHour * 60
+                            val maxStartSlot = maxOf(minStartSlot, ((endHour * 60 - durMin) / 15) * 15)
+                            val targetStartMin = (((rStartMin + 7) / 15) * 15).coerceIn(minStartSlot, maxStartSlot)
                             val targetEndMin = targetStartMin + durMin
 
                             val dShift = (finalDragOffsetX / colWidthPx).roundToInt()
@@ -1342,7 +1376,8 @@ private fun WeekPlansView(
     val today = LocalDate.now()
     val hourHeight = 60.dp
     val hourGutterWidth = 38.dp
-    val (startHour, endHour) = CalendarModel.visibleHourRange(plansOfWeek.values.flatten(), preferredStart = settings.weekDetailStartHour, preferredEnd = settings.weekDetailEndHour)
+    val startHour = settings.weekDetailStartHour
+    val endHour = settings.weekDetailEndHour
     val totalHeight = hourHeight * (endHour - startHour)
     val density = LocalDensity.current
     val vScrollState = rememberScrollState()
@@ -1439,7 +1474,7 @@ private fun WeekPlansView(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(totalHeight)
+                    .height(totalHeight + 16.dp)
             ) {
                 // 1. 小时标尺与整点横向对齐线
                 for (h in startHour until endHour) {
@@ -1471,6 +1506,30 @@ private fun WeekPlansView(
                     )
                 }
 
+                // 底部闭合小时标签与横线
+                val bottomOffset = hourHeight * (endHour - startHour)
+                Box(
+                    modifier = Modifier
+                        .width(hourGutterWidth)
+                        .offset(y = bottomOffset)
+                        .padding(end = 6.dp),
+                    contentAlignment = Alignment.TopEnd
+                ) {
+                    Text(
+                        text = String.format("%02d", endHour),
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = bottomOffset)
+                        .padding(start = hourGutterWidth)
+                        .height(0.8.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                )
+
                 // 2. 7 列纵向微弱分割线
                 for (i in 0..6) {
                     val leftOffset = hourGutterWidth + columnWidth * i
@@ -1478,14 +1537,18 @@ private fun WeekPlansView(
                         modifier = Modifier
                             .offset(x = leftOffset)
                             .width(0.8.dp)
-                            .fillMaxHeight()
+                            .height(bottomOffset)
                             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
                     )
                 }
 
                 // 3. 各天计划卡片（支持拖拽与重叠分列）
                 daysOfWeek.forEachIndexed { dayIdx, day ->
-                    val dayPlans = plansOfWeek[day] ?: emptyList()
+                    val dayPlans = (plansOfWeek[day] ?: emptyList()).filter { plan ->
+                        val pStart = CalendarModel.timeToMinutes(plan.startTime)
+                        val pEnd = CalendarModel.timeToMinutes(plan.endTime)
+                        pEnd > startHour * 60 && pStart < endHour * 60
+                    }
                     val layouts = CalendarModel.layoutPlanColumns(dayPlans)
 
                     dayPlans.forEach { plan ->
@@ -1496,6 +1559,7 @@ private fun WeekPlansView(
                         key(plan.id) {
                             DraggableWeekPlanBlock(
                                 startHour = startHour,
+                                endHour = endHour,
                                 plan = plan,
                                 dayIndex = dayIdx,
                                 daysOfWeek = daysOfWeek,
@@ -2172,8 +2236,6 @@ fun CalendarSettingsSheet(
     var dayEndHour by remember { mutableIntStateOf(settings.dayEndHour) }
     var weekDetailStartHour by remember { mutableIntStateOf(settings.weekDetailStartHour) }
     var weekDetailEndHour by remember { mutableIntStateOf(settings.weekDetailEndHour) }
-    var monthMaxTaskTracks by remember { mutableIntStateOf(settings.monthMaxTaskTracks) }
-    var monthMaxDailyPlans by remember { mutableIntStateOf(settings.monthMaxDailyPlans) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -2265,32 +2327,6 @@ fun CalendarSettingsSheet(
                 }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "月视图显示限制",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            CalendarSliderRow(
-                label = "最多任务轨道数",
-                value = monthMaxTaskTracks,
-                range = 1..10,
-                formatValue = { "$it 条" },
-                onValueChange = { monthMaxTaskTracks = it }
-            )
-
-            CalendarSliderRow(
-                label = "最多每日计划数",
-                value = monthMaxDailyPlans,
-                range = 1..20,
-                formatValue = { "$it 个" },
-                onValueChange = { monthMaxDailyPlans = it }
-            )
-
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
@@ -2311,9 +2347,7 @@ fun CalendarSettingsSheet(
                             dayStartHour = dayStartHour,
                             dayEndHour = dayEndHour,
                             weekDetailStartHour = weekDetailStartHour,
-                            weekDetailEndHour = weekDetailEndHour,
-                            monthMaxTaskTracks = monthMaxTaskTracks,
-                            monthMaxDailyPlans = monthMaxDailyPlans
+                            weekDetailEndHour = weekDetailEndHour
                         )
                         onSave(updated)
                     },
