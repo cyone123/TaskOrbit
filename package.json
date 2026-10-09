@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm --filter @task-orbit/core build && pnpm --filter @task-orbit/mobile typecheck && tsc --noEmit && vite build",
+    "build": "pnpm check:icons && pnpm --filter @task-orbit/core build && pnpm --filter @task-orbit/mobile typecheck && tsc --noEmit && vite build",
     "test": "vitest run",
     "mobile": "pnpm --filter @task-orbit/mobile start",
     "mobile:android": "pnpm --filter @task-orbit/mobile android",
@@ -13,7 +13,9 @@
     "mobile:check": "pnpm --filter @task-orbit/mobile typecheck",
     "preview": "vite preview",
     "tauri": "tauri",
-    "generate:tokens": "node scripts/generate-theme-tokens.mjs"
+    "generate:tokens": "node scripts/generate-theme-tokens.mjs",
+    "generate:icons": "node scripts/generate-icon-font.mjs",
+    "check:icons": "node scripts/generate-icon-font.mjs --check"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",
