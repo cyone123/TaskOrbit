@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_COLORS, colorByKey, contrastText, normalizeHex } from "./colors";
+import { PROJECT_COLORS, colorByKey, contrastText, hexToHsv, hsvToHex, normalizeHex } from "./colors";
 
 describe("colors helper", () => {
   it("resolves preset colors by key", () => {
@@ -39,5 +39,21 @@ describe("colors helper", () => {
     expect(contrastText("#6750A4")).toBe("#FFFFFF");
     expect(contrastText("#fff")).toBe("#1D1B20");
     expect(contrastText("#000")).toBe("#FFFFFF");
+  });
+
+  it("converts HSV to hex and vice versa", () => {
+    const hex = "#ff5722";
+    const hsv = hexToHsv(hex);
+    expect(hsv.h).toBeGreaterThanOrEqual(13);
+    expect(hsv.h).toBeLessThanOrEqual(16);
+    expect(hsv.s).toBeCloseTo(0.86, 1);
+    expect(hsv.v).toBeCloseTo(1, 1);
+
+    const backHex = hsvToHex(hsv.h, hsv.s, hsv.v);
+    expect(backHex).toBe(hex);
+
+    // Black and White
+    expect(hsvToHex(0, 0, 0)).toBe("#000000");
+    expect(hsvToHex(0, 0, 1)).toBe("#ffffff");
   });
 });

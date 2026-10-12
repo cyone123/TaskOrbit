@@ -53,3 +53,87 @@ export function contrastText(hex: string): string {
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   return lum > 0.6 ? "#1D1B20" : "#FFFFFF";
 }
+
+/** Convert HSV (h: 0..360, s: 0..1, v: 0..1) to RGB (0..255). */
+export function hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: number } {
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(1, s));
+  v = Math.max(0, Math.min(1, v));
+
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+
+  if (h < 60) {
+    r1 = c;
+    g1 = x;
+    b1 = 0;
+  } else if (h < 120) {
+    r1 = x;
+    g1 = c;
+    b1 = 0;
+  } else if (h < 180) {
+    r1 = 0;
+    g1 = c;
+    b1 = x;
+  } else if (h < 240) {
+    r1 = 0;
+    g1 = x;
+    b1 = c;
+  } else if (h < 300) {
+    r1 = x;
+    g1 = 0;
+    b1 = c;
+  } else {
+    r1 = c;
+    g1 = 0;
+    b1 = x;
+  }
+
+  return {
+    r: Math.round((r1 + m) * 255),
+    g: Math.round((g1 + m) * 255),
+    b: Math.round((b1 + m) * 255),
+  };
+}
+
+/** Convert HSV to 7-char lowercase hex code `#rrggbb`. */
+export function hsvToHex(h: number, s: number, v: number): string {
+  const { r, g, b } = hsvToRgb(h, s, v);
+  const toHex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/** Convert hex code to HSV (h: 0..360, s: 0..1, v: 0..1). */
+export function hexToHsv(hex: string): { h: number; s: number; v: number } {
+  const normalized = normalizeHex(hex);
+  const r = parseInt(normalized.slice(1, 3), 16) / 255;
+  const g = parseInt(normalized.slice(3, 5), 16) / 255;
+  const b = parseInt(normalized.slice(5, 7), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+
+  let h = 0;
+  if (delta !== 0) {
+    if (max === r) {
+      h = ((g - b) / delta) % 6;
+    } else if (max === g) {
+      h = (b - r) / delta + 2;
+    } else {
+      h = (r - g) / delta + 4;
+    }
+    h = h * 60;
+    if (h < 0) h += 360;
+  }
+
+  const s = max === 0 ? 0 : delta / max;
+  const v = max;
+
+  return { h, s, v };
+}
