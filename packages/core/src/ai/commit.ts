@@ -18,9 +18,6 @@ import type {
 } from "./types";
 
 function finalizeInboxItem(state: AppState, item: InboxItem, now: number): AppState {
-  if (item.kind === "note") {
-    return deleteInboxItemState(state, item.id);
-  }
   return updateInboxItemState(state, item.id, { done: true }, now);
 }
 
@@ -141,6 +138,19 @@ export function commitInboxProposal(
 
         nextState = appendDailyPlan(nextState, plan);
         nextState = finalizeInboxItem(nextState, item, now);
+        break;
+      }
+
+      case "assign_project": {
+        const targetProjectId = proposal.targetProjectId || proposal.taskData?.projectId;
+        if (!targetProjectId) {
+          continue;
+        }
+        const project = nextState.projects.find((p) => p.id === targetProjectId && !p.archived);
+        if (!project) {
+          continue;
+        }
+        nextState = updateInboxItemState(nextState, item.id, { projectId: project.id }, now);
         break;
       }
 

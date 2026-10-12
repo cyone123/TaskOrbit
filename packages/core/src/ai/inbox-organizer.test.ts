@@ -137,9 +137,10 @@ describe("commitInboxProposal", () => {
     const nextState = commitInboxProposal(state, payload, 6000);
     expect(() => validateAppState(nextState)).not.toThrow();
 
-    // Notes that are organized into plans are cleaned up from inbox (avoiding illegal note.done: true)
+    // Items organized into plans are marked as done
     const updatedItem = nextState.inboxItems.find((i) => i.id === "i_2");
-    expect(updatedItem).toBeUndefined();
+    expect(updatedItem).toBeDefined();
+    expect(updatedItem?.done).toBe(true);
 
     const newPlan = nextState.dailyPlans.find((p) => p.name === "图书馆查资料");
     expect(newPlan).toBeDefined();
@@ -224,11 +225,31 @@ describe("commitInboxProposal", () => {
     const nextState = commitInboxProposal(state, payload);
     expect(() => validateAppState(nextState)).not.toThrow();
 
-    // i_1 and i_3 are marked done, i_2 (note) is cleanly organized and removed
-    expect(nextState.inboxItems.length).toBe(2);
+    // All 3 items are preserved and marked done
+    expect(nextState.inboxItems.length).toBe(3);
     expect(nextState.inboxItems.every((i) => i.done)).toBe(true);
     expect(nextState.tasks.length).toBe(1);
     expect(nextState.dailyPlans.length).toBe(1);
+  });
+
+  it("supports assign_project action to link inbox item with an active project", () => {
+    const state = createMockState();
+    const payload: InboxOrganizationProposalPayload = {
+      proposals: [
+        {
+          inboxItemId: "i_1",
+          action: "assign_project",
+          targetProjectId: "p_main",
+        },
+      ],
+    };
+
+    const nextState = commitInboxProposal(state, payload);
+    expect(() => validateAppState(nextState)).not.toThrow();
+
+    const assigned = nextState.inboxItems.find((i) => i.id === "i_1");
+    expect(assigned?.projectId).toBe("p_main");
+    expect(assigned?.done).toBe(false);
   });
 
   it("gracefully falls back when task target project is invalid or archived", () => {

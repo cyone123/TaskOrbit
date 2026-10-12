@@ -160,7 +160,7 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
 你可以使用工具查询用户当前的工作区概况、项目列表、任务属性、日程计划排期以及番茄钟专注统计。
 
 核心执行规范：
-1. 收集箱整理：先调用 get_inbox_items 获取未处理条目，并调用 get_projects_and_tasks 获取可用项目列表；经过分析后，调用 plan_inbox_organization 提交整理方案。
+1. 收集箱整理：先调用 get_inbox_items 获取未处理待办条目，并调用 get_projects_and_tasks 获取可用项目列表；经过分析后，调用 plan_inbox_organization 提交整理方案（可转为正式任务、日程计划、关联归属项目或标记完成）。
 2. 日程排期：先调用 get_daily_plans 和 get_projects_and_tasks 查看今日日程与高优待办，分析时间空隙后再给出建议。
 3. 效能复盘：调用 get_pomodoro_stats 分析近期专注会话，结合实际数据给出客观反思与时间分配改进建议。`,
       };

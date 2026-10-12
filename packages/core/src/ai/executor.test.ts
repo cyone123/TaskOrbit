@@ -113,7 +113,7 @@ function createMockState(): AppState {
     kind: "todo",
     content: "未完成待办",
     done: false,
-    projectId: null,
+    projectId: "p_1",
     createdAt: 1000,
     updatedAt: 1000,
   };
@@ -215,13 +215,19 @@ describe("executeReadTool", () => {
     expect(doneOnly.total).toBe(1);
     expect(doneOnly.items[0].content).toBe("已完成待办");
 
-    // note kind only
-    const notes = executeReadTool(state, "get_inbox_items", { kind: "note" }, testNow) as {
+    // projectId filter
+    const projectItems = executeReadTool(
+      state,
+      "get_inbox_items",
+      { projectId: "p_1" },
+      testNow,
+    ) as {
       total: number;
       items: InboxItem[];
     };
-    expect(notes.total).toBe(1);
-    expect(notes.items[0].kind).toBe("note");
+    expect(projectItems.total).toBe(1);
+    expect(projectItems.items[0].content).toBe("未完成待办");
+    expect(projectItems.items[0].projectId).toBe("p_1");
   });
 
   it("executes get_projects_and_tasks", () => {

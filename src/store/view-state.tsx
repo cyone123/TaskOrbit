@@ -43,12 +43,18 @@ export interface CalendarViewState {
   anchorISO: string;
 }
 
+export type InboxStatusFilterKey = "all" | "active" | "completed";
 export type InboxFilterKey = "all" | "todo" | "note";
 
 export interface InboxViewState {
-  mode: "todo" | "note";
-  filter: InboxFilterKey;
+  statusFilter: InboxStatusFilterKey;
+  projectFilter: string; // "all" | "none" | projectId
   draft: string;
+  draftProjectId: string | null;
+  /** @deprecated Transitional compatibility */
+  mode: "todo" | "note";
+  /** @deprecated Transitional compatibility */
+  filter: InboxFilterKey;
 }
 
 export type SettingsTabKey = "all" | "appearance" | "calendar" | "pomodoro" | "ai" | "data";
@@ -92,9 +98,12 @@ export interface PersistedViewState {
     anchorISO?: string;
   };
   inbox?: {
+    statusFilter?: InboxStatusFilterKey;
+    projectFilter?: string;
+    draft?: string;
+    draftProjectId?: string | null;
     mode?: "todo" | "note";
     filter?: InboxFilterKey;
-    draft?: string;
   };
   settings?: {
     activeTab?: SettingsTabKey;
@@ -128,9 +137,12 @@ export const DEFAULT_VIEW_STATE: DesktopViewState = {
     anchorISO: todayISO(),
   },
   inbox: {
+    statusFilter: "all",
+    projectFilter: "all",
+    draft: "",
+    draftProjectId: null,
     mode: "todo",
     filter: "all",
-    draft: "",
   },
   settings: {
     activeTab: "all",
@@ -170,9 +182,12 @@ export function loadSavedViewState(): DesktopViewState {
         anchorISO: parsed.calendar?.anchorISO ?? todayISO(),
       },
       inbox: {
+        statusFilter: parsed.inbox?.statusFilter ?? "all",
+        projectFilter: parsed.inbox?.projectFilter ?? "all",
+        draft: parsed.inbox?.draft ?? "",
+        draftProjectId: parsed.inbox?.draftProjectId ?? null,
         mode: parsed.inbox?.mode ?? "todo",
         filter: parsed.inbox?.filter ?? "all",
-        draft: parsed.inbox?.draft ?? "",
       },
       settings: {
         activeTab: parsed.settings?.activeTab ?? "all",
@@ -209,9 +224,12 @@ export function serializeViewState(state: DesktopViewState): string {
       anchorISO: state.calendar.anchorISO,
     },
     inbox: {
+      statusFilter: state.inbox.statusFilter,
+      projectFilter: state.inbox.projectFilter,
+      draft: state.inbox.draft,
+      draftProjectId: state.inbox.draftProjectId,
       mode: state.inbox.mode,
       filter: state.inbox.filter,
-      draft: state.inbox.draft,
     },
     settings: {
       activeTab: state.settings.activeTab,
@@ -676,6 +694,36 @@ export function useInboxViewState() {
         );
       };
 
+  const setStatusFilter = useCallback(
+    (val: InboxStatusFilterKey | ((prev: InboxStatusFilterKey) => InboxStatusFilterKey)) => {
+      update((prev) => ({
+        ...prev,
+        statusFilter: typeof val === "function" ? val(prev.statusFilter) : val,
+      }));
+    },
+    [update],
+  );
+
+  const setProjectFilter = useCallback(
+    (val: string | ((prev: string) => string)) => {
+      update((prev) => ({
+        ...prev,
+        projectFilter: typeof val === "function" ? val(prev.projectFilter) : val,
+      }));
+    },
+    [update],
+  );
+
+  const setDraftProjectId = useCallback(
+    (val: string | null | ((prev: string | null) => string | null)) => {
+      update((prev) => ({
+        ...prev,
+        draftProjectId: typeof val === "function" ? val(prev.draftProjectId) : val,
+      }));
+    },
+    [update],
+  );
+
   const setMode = useCallback(
     (val: "todo" | "note" | ((prev: "todo" | "note") => "todo" | "note")) => {
       update((prev) => ({
@@ -707,12 +755,18 @@ export function useInboxViewState() {
   );
 
   return {
-    mode: state.mode,
-    setMode,
-    filter: state.filter,
-    setFilter,
+    statusFilter: state.statusFilter ?? "all",
+    setStatusFilter,
+    projectFilter: state.projectFilter ?? "all",
+    setProjectFilter,
     draft: state.draft,
     setDraft,
+    draftProjectId: state.draftProjectId ?? null,
+    setDraftProjectId,
+    mode: state.mode ?? "todo",
+    setMode,
+    filter: state.filter ?? "all",
+    setFilter,
   };
 }
 

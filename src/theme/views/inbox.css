@@ -97,6 +97,7 @@ md-filled-card.inbox-capture-card {
     var(--md-surface) 55%,
     transparent
   );
+  width: 100%;
 }
 
 .inbox-card-heading {
@@ -142,16 +143,6 @@ md-filled-card.inbox-capture-card {
   background: color-mix(in srgb, var(--md-primary) 12%, transparent);
 }
 
-.inbox-capture__modes {
-  width: 100%;
-  margin-bottom: 18px;
-}
-
-.inbox-capture__modes md-outlined-segmented-button {
-  min-width: 0;
-  flex: 1;
-}
-
 .inbox-capture__form {
   display: flex;
   flex-direction: column;
@@ -176,9 +167,8 @@ md-filled-card.inbox-list-card {
 
 .inbox-list-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
+  flex-direction: column;
+  gap: 14px;
   padding: 20px 22px 16px;
   border-bottom: 1px solid var(--md-outline-variant);
 }
@@ -192,10 +182,58 @@ md-filled-card.inbox-list-card {
   margin-top: 3px;
 }
 
+.inbox-filters-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-space-2);
+  width: 100%;
+}
+
+.inbox-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sys-space-2);
+  flex-wrap: wrap;
+}
+
+.inbox-filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-on-surface-variant);
+  flex-shrink: 0;
+  min-width: 32px;
+}
+
 .inbox-filters {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   max-width: 100%;
   flex-wrap: wrap;
+}
+
+.inbox-chip-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-chip-project__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--shape-full);
+  flex-shrink: 0;
+}
+
+.inbox-project-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inbox-project-option__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--shape-full);
+  flex-shrink: 0;
 }
 
 .inbox-section {
@@ -252,10 +290,10 @@ md-filled-card.inbox-list-card {
   display: grid;
   min-width: 0;
   grid-template-columns: 32px minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 8px;
-  min-height: 64px;
-  padding: 5px 6px 5px 2px;
+  min-height: 56px;
+  padding: 8px 6px 8px 4px;
   border-radius: var(--shape-md);
   transition:
     background-color var(--sys-motion-hover-duration) var(--sys-motion-hover-easing),
@@ -278,18 +316,8 @@ md-filled-card.inbox-list-card {
 .inbox-item__checkbox {
   --md-checkbox-container-size: 22px;
   --md-checkbox-icon-size: 16px;
-  margin-left: 3px;
-}
-
-.inbox-item__icon {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  margin-left: 3px;
-  place-items: center;
-  border-radius: 9px;
-  color: var(--md-primary);
-  background: var(--md-primary-container);
+  margin-top: 4px;
+  margin-left: 2px;
 }
 
 .inbox-item__body {
@@ -299,8 +327,8 @@ md-filled-card.inbox-list-card {
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
-  padding: 7px 8px;
+  gap: 4px;
+  padding: 4px 6px;
   border-radius: var(--shape-sm);
   color: var(--md-on-surface);
   text-align: left;
@@ -316,17 +344,7 @@ md-filled-card.inbox-list-card {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   line-height: 1.5;
-}
-
-.inbox-item--note .inbox-item__content {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inbox-item__meta {
-  color: var(--md-on-surface-variant);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .inbox-item.is-done .inbox-item__content {
@@ -334,10 +352,40 @@ md-filled-card.inbox-list-card {
   text-decoration: line-through;
 }
 
+.inbox-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-on-surface-variant);
+  font-size: 11px;
+  line-height: 16px;
+  flex-wrap: wrap;
+}
+
+.inbox-item__project-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: var(--shape-full);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--md-surface-container-high);
+  border: 1px solid var(--md-outline-variant);
+}
+
+.inbox-item__project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--shape-full);
+  flex-shrink: 0;
+}
+
 .inbox-item__actions {
   display: flex;
   align-items: center;
   gap: 0;
+  margin-top: 2px;
   opacity: 0.65;
   transition: opacity var(--sys-motion-hover-duration) var(--sys-motion-easing-standard);
 }
@@ -380,15 +428,9 @@ md-filled-card.inbox-list-card {
   margin-top: var(--sys-space-4);
 }
 
-.inbox-edit-dialog--note {
-  width: min(720px, calc(100vw - 48px));
-  max-width: min(720px, calc(100vw - 48px));
-  min-height: min(480px, calc(100vh - 80px));
-}
-
-.inbox-edit-dialog--note .material-dialog__content {
-  display: flex;
-  flex-direction: column;
+.inbox-edit-dialog {
+  width: min(560px, calc(100vw - 48px));
+  max-width: min(560px, calc(100vw - 48px));
 }
 
 .inbox-edit-dialog__form {
@@ -397,12 +439,12 @@ md-filled-card.inbox-list-card {
   width: 100%;
 }
 
-.inbox-edit-dialog--note .inbox-edit-dialog__form {
-  flex: 1;
+.inbox-edit-dialog__project {
+  margin-top: 16px;
 }
 
-.inbox-edit-dialog--note md-outlined-text-field {
-  flex: 1;
+.inbox-edit-dialog md-outlined-select {
+  width: 100%;
 }
 
 @media (max-width: 900px) {
@@ -427,7 +469,6 @@ md-filled-card.inbox-list-card {
 
   .inbox-list-toolbar {
     align-items: stretch;
-    flex-direction: column;
     padding: 18px 16px 14px;
   }
 

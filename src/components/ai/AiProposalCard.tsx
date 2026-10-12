@@ -21,13 +21,14 @@ const PRIORITY_LABELS: Record<string, string> = {
 function InboxProposalItemRow({ item }: { item: InboxOrganizationProposalItem }) {
   const isTask = item.action === "convert_to_task";
   const isPlan = item.action === "convert_to_daily_plan";
+  const isAssign = item.action === "assign_project";
   const isDone = item.action === "mark_done";
 
   return (
     <div className="ai-proposal-item">
       {/* Source item header */}
       <div className="ai-proposal-item__source row items-center gap-6">
-        <span className="ai-proposal-item__tag">原待办</span>
+        <span className="ai-proposal-item__tag">待办</span>
         <span className="ai-proposal-item__content truncate" title={item.sourceContent}>
           {item.sourceContent || `ID: ${item.inboxItemId}`}
         </span>
@@ -40,6 +41,23 @@ function InboxProposalItemRow({ item }: { item: InboxOrganizationProposalItem })
         </div>
 
         <div className="ai-proposal-item__result col gap-4" style={{ flex: 1, minWidth: 0 }}>
+          {isAssign && (
+            <>
+              <div className="row items-center gap-6 flex-wrap">
+                <span className="ai-action-chip ai-action-chip--task">归入项目</span>
+                <span className="ai-proposal-item__name font-medium">
+                  {item.targetProjectName || "关联项目"}
+                </span>
+              </div>
+              <div className="row items-center gap-8 body-xs muted flex-wrap mt-2">
+                <span className="row items-center gap-4">
+                  <Icon name="folder" size={14} />
+                  <span>保留在收集箱并建立项目关联</span>
+                </span>
+              </div>
+            </>
+          )}
+
           {isTask && item.taskData && (
             <>
               <div className="row items-center gap-6 flex-wrap">

@@ -19,18 +19,17 @@ export const READ_ONLY_TOOLS: AiToolDefinition[] = [
     function: {
       name: "get_inbox_items",
       description:
-        "获取收集箱中的碎片条目列表，可筛选待办 (todo) 或备忘 (note)，以及是否已处理完成。",
+        "获取收集箱中的待办条目列表，可筛选是否已完成以及是否关联特定项目。",
       parameters: {
         type: "object",
         properties: {
-          kind: {
+          projectId: {
             type: "string",
-            enum: ["all", "todo", "note"],
-            description: "条目类型筛选，默认为 all（全部）",
+            description: "可选的项目 ID 筛选。传入具体项目 ID 则仅获取该项目关联的收集箱待办，传空或不传表示不按项目限制",
           },
           done: {
             type: "boolean",
-            description: "是否已处理完成。默认为 false（仅获取未处理项）",
+            description: "是否已完成。默认为 false（仅获取未完成项）",
           },
         },
       },
@@ -138,11 +137,16 @@ export const INBOX_ORGANIZATION_TOOL: AiToolDefinition = {
                 enum: [
                   "convert_to_task",
                   "convert_to_daily_plan",
+                  "assign_project",
                   "mark_done",
                   "dismiss",
                 ],
                 description:
-                  "处理动作：convert_to_task（转为任务）、convert_to_daily_plan（转为每日计划）、mark_done（标记完成）、dismiss（仅在收集箱保留）",
+                  "处理动作：convert_to_task（转为项目正式任务）、convert_to_daily_plan（转为每日日程计划）、assign_project（关联到指定项目并保留在收集箱）、mark_done（标记完成）、dismiss（仅在收集箱保留）",
+              },
+              targetProjectId: {
+                type: "string",
+                description: "当 action 为 assign_project 时的目标项目 ID",
               },
               targetProjectName: {
                 type: "string",
