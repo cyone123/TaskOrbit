@@ -17,6 +17,7 @@ import {
   TextButton,
   eventValue,
 } from "../components/material";
+import { DailyPlanForm, TaskForm } from "../components/forms";
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
@@ -55,6 +56,8 @@ function InboxItemRow({
   project,
   leaving = false,
   onToggle,
+  onConvertToTask,
+  onConvertToPlan,
   onEdit,
   onDelete,
 }: {
@@ -62,6 +65,8 @@ function InboxItemRow({
   project?: Project | null;
   leaving?: boolean;
   onToggle: () => void;
+  onConvertToTask: () => void;
+  onConvertToPlan: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -109,6 +114,12 @@ function InboxItemRow({
         <Ripple />
       </button>
       <div className="inbox-item__actions">
+        <IconButton aria-label="转为任务" title="转为任务" onClick={onConvertToTask}>
+          <Icon name="assignment" size={18} />
+        </IconButton>
+        <IconButton aria-label="转为每日计划" title="转为每日计划" onClick={onConvertToPlan}>
+          <Icon name="calendar_today" size={18} />
+        </IconButton>
         <IconButton aria-label="编辑" title="编辑" onClick={onEdit}>
           <Icon name="edit" size={18} />
         </IconButton>
@@ -203,6 +214,14 @@ function InboxEditDialog({
               setProjectId(val ? val : null);
             }}
           >
+            {projectId && (
+              <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                <span
+                  className="inbox-project-option__dot"
+                  style={{ backgroundColor: colorByKey(projects.find((p) => p.id === projectId)?.color) }}
+                />
+              </span>
+            )}
             <SelectOption value="" selected={!projectId}>
               <span slot="headline">不关联项目</span>
             </SelectOption>
@@ -343,12 +362,26 @@ export function InboxView() {
   const [deleteTarget, setDeleteTarget] = useState<InboxItem | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [convertingTaskItem, setConvertingTaskItem] = useState<InboxItem | null>(null);
+  const [convertingPlanItem, setConvertingPlanItem] = useState<InboxItem | null>(null);
   const captureInputRef = useRef<MdOutlinedTextField | null>(null);
 
   const activeProjects = useMemo(
     () => store.state.projects.filter((p) => !p.archived),
     [store.state.projects],
   );
+
+  const handleConvertToTask = (item: InboxItem) => {
+    if (activeProjects.length === 0) {
+      show("请先创建一个项目后再转为任务");
+      return;
+    }
+    setConvertingTaskItem(item);
+  };
+
+  const handleConvertToPlan = (item: InboxItem) => {
+    setConvertingPlanItem(item);
+  };
 
   const projectMap = useMemo(() => {
     const map = new Map<string, Project>();
@@ -523,6 +556,14 @@ export function InboxView() {
                 setDraftProjectId(val ? val : null);
               }}
             >
+              {draftProjectId && (
+                <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                  <span
+                    className="inbox-project-option__dot"
+                    style={{ backgroundColor: colorByKey(activeProjects.find((p) => p.id === draftProjectId)?.color) }}
+                  />
+                </span>
+              )}
               <SelectOption value="" selected={!draftProjectId}>
                 <span slot="headline">不关联项目</span>
               </SelectOption>
@@ -637,6 +678,8 @@ export function InboxView() {
                   project={item.projectId ? projectMap.get(item.projectId) : null}
                   leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
+                  onConvertToTask={() => handleConvertToTask(item)}
+                  onConvertToPlan={() => handleConvertToPlan(item)}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
                 />
@@ -653,6 +696,8 @@ export function InboxView() {
                   project={item.projectId ? projectMap.get(item.projectId) : null}
                   leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
+                  onConvertToTask={() => handleConvertToTask(item)}
+                  onConvertToPlan={() => handleConvertToPlan(item)}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
                 />
@@ -710,6 +755,64 @@ export function InboxView() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
+
+      <Dialog
+        open={convertingTaskItem !== null}
+        onClose={() => setConvertingTaskItem(null)}
+        title="转为任务"
+      >
+        {convertingTaskItem && (
+          <TaskForm
+            key={convertingTaskItem.id}
+            allowChangeProject
+            projects={activeProjects}
+            projectId={convertingTaskItem.projectId ?? activeProjects[0]?.id ?? ""}
+            defaultName={getItemTitle(convertingTaskItem)}
+            defaultDescription={convertingTaskItem.description ?? ""}
+            onCancel={() => setConvertingTaskItem(null)}
+            onSubmit={(input) => {
+              const targetProjectId = input.projectId || convertingTaskItem.projectId || activeProjects[0]?.id;
+              if (!targetProjectId) {
+                show("请选择所属项目");
+                return;
+              }
+              store.addTask({
+                projectId: targetProjectId,
+                name: input.name,
+                description: input.description,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                priority: input.priority,
+              });
+              store.deleteInboxItem(convertingTaskItem.id);
+              setConvertingTaskItem(null);
+              show(`已将待办转为任务「${input.name}」`);
+            }}
+          />
+        )}
+      </Dialog>
+
+      <Dialog
+        open={convertingPlanItem !== null}
+        onClose={() => setConvertingPlanItem(null)}
+        title="转为每日计划"
+      >
+        {convertingPlanItem && (
+          <DailyPlanForm
+            key={convertingPlanItem.id}
+            defaultProjectId={convertingPlanItem.projectId}
+            defaultName={getItemTitle(convertingPlanItem)}
+            defaultDescription={convertingPlanItem.description ?? ""}
+            onCancel={() => setConvertingPlanItem(null)}
+            onSubmit={(input) => {
+              store.addDailyPlan(input);
+              store.deleteInboxItem(convertingPlanItem.id);
+              setConvertingPlanItem(null);
+              show(`已将待办转为每日计划「${input.name}」`);
+            }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

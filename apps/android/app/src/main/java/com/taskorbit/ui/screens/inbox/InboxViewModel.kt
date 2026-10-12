@@ -4,8 +4,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.taskorbit.data.repository.AppStateRepository
+import com.taskorbit.domain.DailyPlanInput
+import com.taskorbit.domain.TaskInput
 import com.taskorbit.domain.model.InboxItem
+import com.taskorbit.domain.model.Priority
 import com.taskorbit.domain.model.Project
+import com.taskorbit.domain.model.Task
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +33,10 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
 
     val projects: StateFlow<List<Project>> = repository.state
         .map { it.projects.filter { p -> !p.archived } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val tasks: StateFlow<List<Task>> = repository.state
+        .map { it.tasks }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val pendingCount: StateFlow<Int> = repository.state
@@ -139,5 +147,51 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
             description = lines.getOrNull(1)?.trim().orEmpty(),
             projectId = projectId
         )
+    }
+
+    fun convertToTask(
+        inboxItemId: String,
+        projectId: String,
+        name: String,
+        description: String,
+        startDate: String?,
+        endDate: String?,
+        priority: Priority
+    ) {
+        repository.addTask(
+            TaskInput(
+                projectId = projectId,
+                name = name.trim(),
+                description = description.trim(),
+                startDate = startDate,
+                endDate = endDate,
+                priority = priority
+            )
+        )
+        repository.removeInbox(inboxItemId)
+    }
+
+    fun convertToDailyPlan(
+        inboxItemId: String,
+        projectId: String?,
+        taskId: String?,
+        name: String,
+        description: String,
+        date: String,
+        startTime: String,
+        endTime: String
+    ) {
+        repository.addPlans(
+            DailyPlanInput(
+                projectId = projectId,
+                taskId = taskId,
+                name = name.trim(),
+                description = description.trim(),
+                date = date,
+                startTime = startTime,
+                endTime = endTime
+            )
+        )
+        repository.removeInbox(inboxItemId)
     }
 }

@@ -26,6 +26,21 @@
   font-size: 12px;
 }
 
+.project-select-option,
+.inbox-project-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-select-option__dot,
+.inbox-project-option__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--shape-full);
+  flex-shrink: 0;
+}
+
 /* ============================================================================
    Text fields
    ========================================================================== */

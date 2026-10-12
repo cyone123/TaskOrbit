@@ -73,4 +73,40 @@ describe("TaskForm", () => {
     expect(html).toContain('for="task-no-schedule"');
     expect(html).toContain("暂不排期（进入待处理）");
   });
+
+  it("renders project selector when allowChangeProject is true and populates defaults", () => {
+    const projects = [
+      createProject({
+        name: "主项目",
+        description: "",
+        color: "#6750A4",
+        startDate: "2026-10-01",
+        endDate: "2026-10-15",
+      }),
+      createProject({
+        name: "副项目",
+        description: "",
+        color: "#2196F3",
+        startDate: "2026-10-01",
+        endDate: "2026-10-15",
+      }),
+    ];
+
+    const html = renderToStaticMarkup(
+      <TaskForm
+        allowChangeProject
+        projects={projects}
+        projectId={projects[1].id}
+        defaultName="待办转化任务"
+        defaultDescription="转化描述内容"
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />
+    );
+
+    expect(html).toContain("md-outlined-select");
+    expect(html).toContain("project-select-option__dot");
+    expect(html).toContain("主项目");
+    expect(html).toContain("副项目");
+  });
 });
