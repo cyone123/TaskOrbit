@@ -58,5 +58,9 @@ describe("InboxView component render", () => {
     expect(html).toContain("全部待办");
     expect(html).toContain("待处理");
     expect(html).toContain("已完成");
+
+    // Project filter button
+    expect(html).toContain("按项目筛选");
   });
 });
+

@@ -32,16 +32,22 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -124,6 +130,7 @@ fun InboxScreen(
     val editingItem by viewModel.editingItem.collectAsState()
 
     var isFabMenuExpanded by remember { mutableStateOf(false) }
+    var showProjectFilterSheet by remember { mutableStateOf(false) }
 
     val filteredItems = remember(items, statusFilter, projectFilter) {
         items.filter { item ->
@@ -196,6 +203,14 @@ fun InboxScreen(
                 FloatingActionButtonMenuItem(
                     onClick = {
                         isFabMenuExpanded = false
+                        showProjectFilterSheet = true
+                    },
+                    text = { Text("项目筛选") },
+                    icon = { Icon(Icons.Outlined.Tune, contentDescription = null) }
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        isFabMenuExpanded = false
                         onNavigateToPomodoro?.invoke()
                     },
                     text = { Text("开启专注") },
@@ -251,43 +266,59 @@ fun InboxScreen(
                 }
             }
 
-            // 项目分类横向过滤栏
-            val relevantProjects = remember(projects, projectCounts, projectFilter) {
-                projects.filter { (projectCounts[it.id] ?: 0) > 0 || projectFilter == it.id }
-            }
-            if (relevantProjects.isNotEmpty() || unassignedCount > 0) {
-                LazyRow(
+            // 当应用了项目筛选时，展示当前筛选项目徽标及清除按钮
+            if (projectFilter != "all" && projectFilter != null) {
+                val filterProjectName = remember(projectFilter, projects) {
+                    if (projectFilter == "none") "未关联项目"
+                    else projects.find { it.id == projectFilter }?.name ?: "已选项目"
+                }
+                val primaryColor = MaterialTheme.colorScheme.primary
+                val filterColor = remember(projectFilter, projects, primaryColor) {
+                    if (projectFilter == "none") primaryColor
+                    else {
+                        val p = projects.find { it.id == projectFilter }
+                        p?.let { PROJECT_COLOR_MAP[it.color] } ?: primaryColor
+                    }
+                }
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    item {
-                        TaskOrbitFilterChip(
-                            selected = projectFilter == "all" || projectFilter == null,
-                            onClick = { viewModel.onProjectFilterChange("all") },
-                            label = "全部项目"
-                        )
-                    }
-                    item {
-                        TaskOrbitFilterChip(
-                            selected = projectFilter == "none",
-                            onClick = { viewModel.onProjectFilterChange("none") },
-                            label = "未关联 $unassignedCount"
-                        )
-                    }
-                    items(
-                        items = relevantProjects,
-                        key = { it.id }
-                    ) { project ->
-                        val count = projectCounts[project.id] ?: 0
-                        TaskOrbitFilterChip(
-                            selected = projectFilter == project.id,
-                            onClick = { viewModel.onProjectFilterChange(project.id) },
-                            label = "${project.name} $count"
-                        )
+                    Surface(
+                        shape = CircleShape,
+                        color = filterColor.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, filterColor.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(filterColor)
+                            )
+                            Text(
+                                text = "项目: $filterProjectName",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = filterColor
+                            )
+                            IconButton(
+                                onClick = { viewModel.onProjectFilterChange("all") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "清除项目筛选",
+                                    tint = filterColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -338,6 +369,20 @@ fun InboxScreen(
         }
     }
 
+    // 项目筛选 BottomSheet
+    if (showProjectFilterSheet) {
+        InboxProjectFilterBottomSheet(
+            projects = projects,
+            projectCounts = projectCounts,
+            unassignedCount = unassignedCount,
+            selectedProjectFilter = projectFilter,
+            onDismiss = { showProjectFilterSheet = false },
+            onSelect = { selected ->
+                viewModel.onProjectFilterChange(selected)
+            }
+        )
+    }
+
     // 编辑待办 BottomSheet
     editingItem?.let { item ->
         InboxEditBottomSheet(
@@ -348,6 +393,150 @@ fun InboxScreen(
                 viewModel.saveEditing(item.id, newContent, newProjectId)
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InboxProjectFilterBottomSheet(
+    projects: List<Project>,
+    projectCounts: Map<String?, Int>,
+    unassignedCount: Int,
+    selectedProjectFilter: String?,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    TaskOrbitBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "按项目筛选",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ProjectFilterOptionItem(
+                title = "全部项目",
+                count = null,
+                color = null,
+                isSelected = selectedProjectFilter == "all" || selectedProjectFilter == null,
+                onClick = {
+                    onSelect("all")
+                    onDismiss()
+                }
+            )
+
+            ProjectFilterOptionItem(
+                title = "未关联项目",
+                count = unassignedCount,
+                color = null,
+                isSelected = selectedProjectFilter == "none",
+                onClick = {
+                    onSelect("none")
+                    onDismiss()
+                }
+            )
+
+            if (projects.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                projects.forEach { project ->
+                    val count = projectCounts[project.id] ?: 0
+                    val color = PROJECT_COLOR_MAP[project.color] ?: MaterialTheme.colorScheme.primary
+                    ProjectFilterOptionItem(
+                        title = project.name,
+                        count = count,
+                        color = color,
+                        isSelected = selectedProjectFilter == project.id,
+                        onClick = {
+                            onSelect(project.id)
+                            onDismiss()
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProjectFilterOptionItem(
+    title: String,
+    count: Int?,
+    color: Color?,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bouncyClickable(onClick = onClick),
+        shape = ShapeTokens.Medium,
+        color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (color != null) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (count != null) {
+                Text(
+                    text = "$count 条",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "已选中",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 

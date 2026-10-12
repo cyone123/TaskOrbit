@@ -209,6 +209,100 @@ function InboxEditDialog({
   );
 }
 
+function ProjectFilterDialog({
+  open,
+  projects,
+  projectCounts,
+  unassignedCount,
+  selectedProjectId,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  projects: Project[];
+  projectCounts: Map<string, number>;
+  unassignedCount: number;
+  selectedProjectId: string;
+  onClose: () => void;
+  onSelect: (projectId: string) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <Dialog
+      open
+      compact
+      onClose={onClose}
+      title="按项目筛选"
+      className="inbox-project-filter-dialog"
+      actions={<TextButton onClick={onClose}>关闭</TextButton>}
+    >
+      <div className="inbox-project-filter-list" role="listbox">
+        <button
+          type="button"
+          className={`inbox-project-filter-item ${selectedProjectId === "all" ? "is-selected" : ""}`}
+          onClick={() => {
+            onSelect("all");
+            onClose();
+          }}
+        >
+          <span className="inbox-project-filter-item__icon">
+            <Icon name="folder_open" size={18} />
+          </span>
+          <span className="inbox-project-filter-item__name">全部项目</span>
+          {selectedProjectId === "all" && <Icon name="check" size={18} />}
+          <Ripple />
+        </button>
+
+        <button
+          type="button"
+          className={`inbox-project-filter-item ${selectedProjectId === "none" ? "is-selected" : ""}`}
+          onClick={() => {
+            onSelect("none");
+            onClose();
+          }}
+        >
+          <span className="inbox-project-filter-item__icon">
+            <Icon name="folder_off" size={18} />
+          </span>
+          <span className="inbox-project-filter-item__name">未关联项目</span>
+          <span className="inbox-project-filter-item__count">{unassignedCount} 条</span>
+          {selectedProjectId === "none" && <Icon name="check" size={18} />}
+          <Ripple />
+        </button>
+
+        {projects.length > 0 && <div className="inbox-project-filter-divider" />}
+
+        {projects.map((project) => {
+          const count = projectCounts.get(project.id) ?? 0;
+          const isSelected = selectedProjectId === project.id;
+          const color = colorByKey(project.color);
+          return (
+            <button
+              key={project.id}
+              type="button"
+              className={`inbox-project-filter-item ${isSelected ? "is-selected" : ""}`}
+              onClick={() => {
+                onSelect(project.id);
+                onClose();
+              }}
+            >
+              <span
+                className="inbox-project-filter-item__dot"
+                style={{ backgroundColor: color }}
+              />
+              <span className="inbox-project-filter-item__name">{project.name}</span>
+              <span className="inbox-project-filter-item__count">{count} 条</span>
+              {isSelected && <Icon name="check" size={18} />}
+              <Ripple />
+            </button>
+          );
+        })}
+      </div>
+    </Dialog>
+  );
+}
+
 export function InboxView() {
   const store = useStore();
   const { show } = useSnackbar();
@@ -226,6 +320,7 @@ export function InboxView() {
   const [editing, setEditing] = useState<InboxItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InboxItem | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const captureInputRef = useRef<MdOutlinedTextField | null>(null);
 
   const activeProjects = useMemo(
@@ -256,11 +351,10 @@ export function InboxView() {
     return map;
   }, [store.state.inboxItems]);
 
-  const filterProjects = useMemo(() => {
-    return activeProjects.filter(
-      (p) => (projectItemCounts.get(p.id) ?? 0) > 0 || projectFilter === p.id,
-    );
-  }, [activeProjects, projectItemCounts, projectFilter]);
+  const selectedFilterProject = useMemo(() => {
+    if (projectFilter === "all" || projectFilter === "none") return null;
+    return store.state.projects.find((p) => p.id === projectFilter) ?? null;
+  }, [projectFilter, store.state.projects]);
 
   const visibleItems = useMemo(
     () =>
@@ -440,80 +534,67 @@ export function InboxView() {
                 </TonalButton>
               }
             />
-            <div className="inbox-filters-group">
-              <div className="inbox-filter-row">
-                <span className="inbox-filter-label">状态</span>
-                <ChipSet className="inbox-filters" role="tablist" aria-label="按状态筛选">
-                  <FilterChip
-                    role="tab"
-                    aria-selected={statusFilter === "all"}
-                    selected={statusFilter === "all"}
-                    onClick={() => setStatusFilter("all")}
-                  >
-                    全部 · {totalCount}
-                  </FilterChip>
-                  <FilterChip
-                    role="tab"
-                    aria-selected={statusFilter === "active"}
-                    selected={statusFilter === "active"}
-                    onClick={() => setStatusFilter("active")}
-                  >
-                    待处理 · {activeCount}
-                  </FilterChip>
-                  <FilterChip
-                    role="tab"
-                    aria-selected={statusFilter === "completed"}
-                    selected={statusFilter === "completed"}
-                    onClick={() => setStatusFilter("completed")}
-                  >
-                    已完成 · {completedCount}
-                  </FilterChip>
-                </ChipSet>
-              </div>
+            <div className="inbox-toolbar-filter-row">
+              <ChipSet className="inbox-filters" role="tablist" aria-label="按状态筛选">
+                <FilterChip
+                  role="tab"
+                  aria-selected={statusFilter === "all"}
+                  selected={statusFilter === "all"}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  全部 · {totalCount}
+                </FilterChip>
+                <FilterChip
+                  role="tab"
+                  aria-selected={statusFilter === "active"}
+                  selected={statusFilter === "active"}
+                  onClick={() => setStatusFilter("active")}
+                >
+                  待处理 · {activeCount}
+                </FilterChip>
+                <FilterChip
+                  role="tab"
+                  aria-selected={statusFilter === "completed"}
+                  selected={statusFilter === "completed"}
+                  onClick={() => setStatusFilter("completed")}
+                >
+                  已完成 · {completedCount}
+                </FilterChip>
+              </ChipSet>
 
-              {(filterProjects.length > 0 || unassignedCount > 0) && (
-                <div className="inbox-filter-row">
-                  <span className="inbox-filter-label">项目</span>
-                  <ChipSet className="inbox-filters" role="tablist" aria-label="按项目筛选">
-                    <FilterChip
-                      role="tab"
-                      aria-selected={projectFilter === "all"}
-                      selected={projectFilter === "all"}
-                      onClick={() => setProjectFilter("all")}
-                    >
-                      全部项目
-                    </FilterChip>
-                    <FilterChip
-                      role="tab"
-                      aria-selected={projectFilter === "none"}
-                      selected={projectFilter === "none"}
-                      onClick={() => setProjectFilter("none")}
-                    >
-                      未关联 · {unassignedCount}
-                    </FilterChip>
-                    {filterProjects.map((p) => {
-                      const count = projectItemCounts.get(p.id) ?? 0;
-                      return (
-                        <FilterChip
-                          key={p.id}
-                          role="tab"
-                          aria-selected={projectFilter === p.id}
-                          selected={projectFilter === p.id}
-                          onClick={() => setProjectFilter(p.id)}
-                        >
-                          <span className="inbox-chip-project">
-                            <span
-                              className="inbox-chip-project__dot"
-                              style={{ backgroundColor: colorByKey(p.color) }}
-                            />
-                            {p.name} · {count}
-                          </span>
-                        </FilterChip>
-                      );
-                    })}
-                  </ChipSet>
-                </div>
-              )}
+              <div className="inbox-filter-right">
+                <TonalButton
+                  className={`inbox-project-filter-trigger ${projectFilter !== "all" ? "is-filtered" : ""}`}
+                  onClick={() => setFilterDialogOpen(true)}
+                  aria-label="按项目筛选待办"
+                >
+                  <Icon name="tune" size={18} slot="icon" />
+                  {selectedFilterProject ? (
+                    <span className="inbox-btn-project">
+                      <span
+                        className="inbox-chip-project__dot"
+                        style={{ backgroundColor: colorByKey(selectedFilterProject.color) }}
+                      />
+                      {selectedFilterProject.name}
+                    </span>
+                  ) : projectFilter === "none" ? (
+                    "未关联"
+                  ) : (
+                    "按项目筛选"
+                  )}
+                  <Icon name="arrow_drop_down" size={18} slot="icon" />
+                </TonalButton>
+
+                {projectFilter !== "all" && (
+                  <IconButton
+                    aria-label="清除项目筛选"
+                    title="清除项目筛选"
+                    onClick={() => setProjectFilter("all")}
+                  >
+                    <Icon name="close" size={16} />
+                  </IconButton>
+                )}
+              </div>
             </div>
           </div>
 
@@ -569,6 +650,16 @@ export function InboxView() {
           )}
         </FilledCard>
       </div>
+
+      <ProjectFilterDialog
+        open={filterDialogOpen}
+        projects={activeProjects}
+        projectCounts={projectItemCounts}
+        unassignedCount={unassignedCount}
+        selectedProjectId={projectFilter}
+        onClose={() => setFilterDialogOpen(false)}
+        onSelect={(id) => setProjectFilter(id)}
+      />
 
       <InboxEditDialog
         key={editing?.id ?? "no-edit"}
