@@ -77,6 +77,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.taskorbit.domain.CalendarModel
 import com.taskorbit.domain.ProjectDomain
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontFamily
 import com.taskorbit.domain.model.DailyPlan
 import com.taskorbit.domain.model.DailyPlanRepeat
 import com.taskorbit.domain.model.Priority
@@ -96,6 +99,8 @@ import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.components.TaskOrbitWavyProgressBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
+import com.taskorbit.ui.theme.isPresetProjectColor
+import com.taskorbit.ui.theme.resolveProjectColor
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -143,7 +148,7 @@ fun ProjectDetailScreen(
     }
 
     val currentProject = project!!
-    val accent = PROJECT_COLOR_MAP[currentProject.color] ?: MaterialTheme.colorScheme.primary
+    val accent = resolveProjectColor(currentProject.color, MaterialTheme.colorScheme.primary)
 
     Scaffold(
         topBar = {
@@ -564,6 +569,7 @@ fun ProjectDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
                 Text("编辑项目信息", style = MaterialTheme.typography.titleLarge)
@@ -590,7 +596,20 @@ fun ProjectDetailScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("项目主题色", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("项目主题色", style = MaterialTheme.typography.labelLarge)
+                    if (!isPresetProjectColor(color)) {
+                        Text(
+                            text = color.uppercase(),
+                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 ColorPickerRow(
                     selectedColor = color,
                     onColorSelected = { viewModel.editColor.value = it }

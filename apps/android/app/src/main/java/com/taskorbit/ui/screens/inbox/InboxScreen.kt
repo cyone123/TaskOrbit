@@ -108,6 +108,7 @@ import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
 import com.taskorbit.ui.theme.bouncyClickable
+import com.taskorbit.ui.theme.resolveProjectColor
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -309,7 +310,7 @@ fun InboxScreen(
                     if (projectFilter == "none") primaryColor
                     else {
                         val p = projects.find { it.id == projectFilter }
-                        p?.let { PROJECT_COLOR_MAP[it.color] } ?: primaryColor
+                        p?.let { resolveProjectColor(it.color, primaryColor) } ?: primaryColor
                     }
                 }
                 Row(
@@ -559,7 +560,7 @@ private fun InboxProjectFilterBottomSheet(
 
                 projects.forEach { project ->
                     val count = projectCounts[project.id] ?: 0
-                    val color = PROJECT_COLOR_MAP[project.color] ?: MaterialTheme.colorScheme.primary
+                    val color = resolveProjectColor(project.color, MaterialTheme.colorScheme.primary)
                     ProjectFilterOptionItem(
                         title = project.name,
                         count = count,
@@ -809,7 +810,7 @@ private fun InboxComposerCard(
                                         selected = draftProjectId == project.id,
                                         onClick = { onDraftProjectChange(project.id) },
                                         label = project.name,
-                                        leadingDotColor = PROJECT_COLOR_MAP[project.color] ?: MaterialTheme.colorScheme.primary
+                                        leadingDotColor = resolveProjectColor(project.color, MaterialTheme.colorScheme.primary)
                                     )
                                 }
                             }
@@ -843,7 +844,7 @@ private fun InboxItemRow(
     onMoreActions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val projectColor = project?.let { PROJECT_COLOR_MAP[it.color] ?: MaterialTheme.colorScheme.primary }
+    val projectColor = project?.let { resolveProjectColor(it.color, MaterialTheme.colorScheme.primary) }
 
     TaskOrbitCard(
         modifier = modifier
@@ -1031,7 +1032,7 @@ private fun InboxEditBottomSheet(
                     items = projects,
                     key = { it.id }
                 ) { project ->
-                    val projColor = PROJECT_COLOR_MAP[project.color] ?: MaterialTheme.colorScheme.primary
+                    val projColor = resolveProjectColor(project.color, MaterialTheme.colorScheme.primary)
                     TaskOrbitFilterChip(
                         selected = selectedProjectId == project.id,
                         onClick = { selectedProjectId = project.id },
@@ -1254,7 +1255,7 @@ private fun InboxConvertToTaskBottomSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     val currentProject = projects.find { it.id == selectedProjectId }
-                    val currentProjectColor = currentProject?.let { PROJECT_COLOR_MAP[it.color] ?: MaterialTheme.colorScheme.primary }
+                    val currentProjectColor = currentProject?.let { resolveProjectColor(it.color, MaterialTheme.colorScheme.primary) }
                     OutlinedTextField(
                         value = currentProject?.name ?: "请选择项目",
                         onValueChange = {},
@@ -1280,7 +1281,7 @@ private fun InboxConvertToTaskBottomSheet(
                         onDismissRequest = { projectDropdownExpanded = false }
                     ) {
                         projects.forEach { proj ->
-                            val projColor = PROJECT_COLOR_MAP[proj.color] ?: MaterialTheme.colorScheme.primary
+                            val projColor = resolveProjectColor(proj.color, MaterialTheme.colorScheme.primary)
                             DropdownMenuItem(
                                 leadingIcon = {
                                     Box(
@@ -1538,7 +1539,7 @@ private fun InboxConvertToDailyPlanBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val currentProject = projects.find { it.id == selectedProjectId }
-                val currentProjectColor = currentProject?.let { PROJECT_COLOR_MAP[it.color] ?: MaterialTheme.colorScheme.primary }
+                val currentProjectColor = currentProject?.let { resolveProjectColor(it.color, MaterialTheme.colorScheme.primary) }
                 OutlinedTextField(
                     value = currentProject?.name ?: "无项目（独立计划）",
                     onValueChange = {},
@@ -1572,7 +1573,7 @@ private fun InboxConvertToDailyPlanBottomSheet(
                         }
                     )
                     projects.forEach { proj ->
-                        val projColor = PROJECT_COLOR_MAP[proj.color] ?: MaterialTheme.colorScheme.primary
+                        val projColor = resolveProjectColor(proj.color, MaterialTheme.colorScheme.primary)
                         DropdownMenuItem(
                             leadingIcon = {
                                 Box(

@@ -138,6 +138,7 @@ import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
 import com.taskorbit.ui.theme.bouncyClickable
+import com.taskorbit.ui.theme.resolveProjectColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -1027,7 +1028,7 @@ private fun DayTimelineView(
                     key(plan.id) {
                         val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
                         val colorKey = getProjectColor(plan.projectId)
-                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                        val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
 
                         DraggablePlanBlock(
                             plan = plan,
@@ -1556,7 +1557,7 @@ private fun WeekPlansView(
                     dayPlans.forEach { plan ->
                         val layout = layouts[plan.id] ?: com.taskorbit.domain.PlanColumnLayout(0, 1)
                         val colorKey = getProjectColor(plan.projectId)
-                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                        val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
 
                         key(plan.id) {
                             DraggableWeekPlanBlock(
@@ -1638,7 +1639,7 @@ private fun WeekGanttView(
             items(tasks, key = { it.id }) { task ->
                 val range = CalendarModel.taskRangeInWeek(task, daysOfWeek)
                 val colorKey = getProjectColor(task.projectId)
-                val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
 
                 Row(
                     modifier = Modifier
@@ -1889,7 +1890,7 @@ private fun MonthCalendarView(
                         )
 
                         val colorKey = getProjectColor(segment.task.projectId)
-                        val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                        val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
                         val barColor = accent.copy(alpha = if (segment.task.done) 0.35f else 0.88f)
 
                         Box(
@@ -1952,7 +1953,7 @@ private fun MonthCalendarView(
                             visiblePlans.forEachIndexed { planIdx, plan ->
                                 val top = plansTopBase + (planSlotHeight + planSlotGap) * planIdx
                                 val colorKey = getProjectColor(plan.projectId)
-                                val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                                val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
                                 val planBgColor = accent.copy(alpha = if (plan.done) 0.12f else 0.22f)
                                 val planBorderColor = accent.copy(alpha = if (plan.done) 0.25f else 0.55f)
 
@@ -2056,7 +2057,7 @@ private fun MonthCalendarView(
             ) {
                 plansOfDay.forEach { plan ->
                     val colorKey = getProjectColor(plan.projectId)
-                    val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                    val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
 
                     TaskOrbitCard(
                         modifier = Modifier
@@ -2127,7 +2128,7 @@ private fun MonthCalendarView(
             ) {
                 tasksOfDay.forEach { task ->
                     val colorKey = getProjectColor(task.projectId)
-                    val accent = PROJECT_COLOR_MAP[colorKey] ?: MaterialTheme.colorScheme.primary
+                    val accent = resolveProjectColor(colorKey, MaterialTheme.colorScheme.primary)
 
                     TaskOrbitCard(
                         modifier = Modifier.fillMaxWidth(),

@@ -99,6 +99,7 @@ import com.taskorbit.domain.OverviewStats
 import com.taskorbit.domain.ProjectTimeDistribution
 import com.taskorbit.domain.StatsEngine
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
+import com.taskorbit.ui.theme.resolveProjectColor
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -491,7 +492,7 @@ fun ProjectDistributionSection(distribution: List<ProjectTimeDistribution>) {
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     distribution.forEach { item ->
-                        val barColor = PROJECT_COLOR_MAP[item.projectColor] ?: MaterialTheme.colorScheme.primary
+                        val barColor = resolveProjectColor(item.projectColor, MaterialTheme.colorScheme.primary)
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

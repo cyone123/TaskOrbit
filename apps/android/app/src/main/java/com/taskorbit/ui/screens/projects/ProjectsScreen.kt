@@ -47,6 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,6 +70,8 @@ import com.taskorbit.ui.components.TaskOrbitWavyProgressBar
 import com.taskorbit.ui.components.TaskOrbitTopAppBar
 import com.taskorbit.ui.theme.PROJECT_COLOR_MAP
 import com.taskorbit.ui.theme.ShapeTokens
+import com.taskorbit.ui.theme.isPresetProjectColor
+import com.taskorbit.ui.theme.resolveProjectColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,7 +162,7 @@ fun ProjectsScreen(
                         val progress = viewModel.getProjectProgress(project.id)
                         val taskCount = viewModel.getTaskCount(project.id)
                         val planCount = viewModel.getPlanCount(project.id)
-                        val accent = PROJECT_COLOR_MAP[project.color] ?: MaterialTheme.colorScheme.primary
+                        val accent = resolveProjectColor(project.color, MaterialTheme.colorScheme.primary)
 
                         ProjectItemCard(
                             project = project,
@@ -237,6 +242,7 @@ fun ProjectsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
                 Text(
@@ -267,11 +273,24 @@ fun ProjectsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "项目主题色",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "项目主题色",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (!isPresetProjectColor(color)) {
+                        Text(
+                            text = color.uppercase(),
+                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 ColorPickerRow(
                     selectedColor = color,

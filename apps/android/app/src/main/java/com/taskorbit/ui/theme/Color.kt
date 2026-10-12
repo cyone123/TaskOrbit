@@ -3,6 +3,8 @@ package com.taskorbit.ui.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import java.util.Locale
+import kotlin.math.roundToInt
 
 // MD3 Light Colors
 val MdThemeLightPrimary = Color(0xFF525A92)
@@ -119,12 +121,16 @@ val OnInfoDark = Color(0xFF003354)
 val InfoContainerDark = Color(0xFF004A77)
 val OnInfoContainerDark = Color(0xFFCEE5FF)
 
-// Project Color Palette (align with core/domain)
+// Project Color Palette (align with core/domain and desktop)
 val PROJECT_COLOR_MAP = mapOf(
     "violet" to Color(0xFF6750A4),
+    "indigo" to Color(0xFF3949AB),
     "blue" to Color(0xFF1D6FBE),
+    "cyan" to Color(0xFF00ACC1),
     "teal" to Color(0xFF006A60),
     "green" to Color(0xFF2E6C31),
+    "lime" to Color(0xFF7CB342),
+    "amber" to Color(0xFFF9A825),
     "yellow" to Color(0xFF725C00),
     "orange" to Color(0xFF8A5100),
     "red" to Color(0xFFBA1A1A),
@@ -132,6 +138,149 @@ val PROJECT_COLOR_MAP = mapOf(
     "brown" to Color(0xFF6F5B40),
     "gray" to Color(0xFF5A5F62)
 )
+
+/**
+ * 解析 16 进制颜色字符串（如 "#FF5722" 或 "FF5722"，支持 3/6/8 位），返回 Color。
+ */
+fun parseHexColor(hex: String?): Color? {
+    if (hex.isNullOrBlank()) return null
+    val clean = hex.trim().removePrefix("#")
+    return when (clean.length) {
+        6 -> {
+            val r = clean.substring(0, 2).toIntOrNull(16) ?: return null
+            val g = clean.substring(2, 4).toIntOrNull(16) ?: return null
+            val b = clean.substring(4, 6).toIntOrNull(16) ?: return null
+            Color(r, g, b)
+        }
+        8 -> {
+            val a = clean.substring(0, 2).toIntOrNull(16) ?: return null
+            val r = clean.substring(2, 4).toIntOrNull(16) ?: return null
+            val g = clean.substring(4, 6).toIntOrNull(16) ?: return null
+            val b = clean.substring(6, 8).toIntOrNull(16) ?: return null
+            Color(r, g, b, a)
+        }
+        3 -> {
+            val r = clean.substring(0, 1).repeat(2).toIntOrNull(16) ?: return null
+            val g = clean.substring(1, 2).repeat(2).toIntOrNull(16) ?: return null
+            val b = clean.substring(2, 3).repeat(2).toIntOrNull(16) ?: return null
+            Color(r, g, b)
+        }
+        else -> null
+    }
+}
+
+/**
+ * 判断是否为预设项目颜色标识符
+ */
+fun isPresetProjectColor(color: String?): Boolean {
+    if (color.isNullOrBlank()) return false
+    return PROJECT_COLOR_MAP.containsKey(color)
+}
+
+/**
+ * 解析项目颜色（预设 key 或 16 进制自定义颜色）
+ */
+fun resolveProjectColor(colorKeyOrHex: String?, fallback: Color = Color(0xFF6750A4)): Color {
+    if (colorKeyOrHex.isNullOrBlank()) return fallback
+    return PROJECT_COLOR_MAP[colorKeyOrHex] ?: parseHexColor(colorKeyOrHex) ?: fallback
+}
+
+/**
+ * 规范化 16 进制颜色为标准的 7 字符 "#rrggbb" 格式
+ */
+fun normalizeProjectHex(hex: String?, fallback: String = "#6750a4"): String {
+    if (hex.isNullOrBlank()) return fallback
+    val trimmed = hex.trim()
+    if (!trimmed.startsWith("#")) {
+        PROJECT_COLOR_MAP[trimmed]?.let {
+            return colorToHex(it).lowercase(Locale.ROOT)
+        }
+    }
+    val clean = trimmed.removePrefix("#")
+    return when (clean.length) {
+        3 -> {
+            val r = clean.substring(0, 1).repeat(2)
+            val g = clean.substring(1, 2).repeat(2)
+            val b = clean.substring(2, 3).repeat(2)
+            "#$r$g$b".lowercase(Locale.ROOT)
+        }
+        6 -> "#$clean".lowercase(Locale.ROOT)
+        8 -> "#${clean.substring(2)}".lowercase(Locale.ROOT)
+        else -> fallback
+    }
+}
+
+/**
+ * 根据背景色明度计算对比前景色（深色或白色），确保文字与图标清晰可见
+ */
+fun contrastTextColor(color: Color): Color {
+    val lum = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
+    return if (lum > 0.6f) Color(0xFF1D1B20) else Color.White
+}
+
+/**
+ * HSV 颜色空间转 Compose Color
+ * hue: 0f..360f, saturation: 0f..1f, value: 0f..1f
+ */
+fun hsvToColor(hue: Float, saturation: Float, value: Float): Color {
+    val h = (hue % 360f + 360f) % 360f
+    val s = saturation.coerceIn(0f, 1f)
+    val v = value.coerceIn(0f, 1f)
+
+    val c = v * s
+    val x = c * (1f - kotlin.math.abs((h / 60f) % 2f - 1f))
+    val m = v - c
+
+    val (r1, g1, b1) = when {
+        h < 60f -> Triple(c, x, 0f)
+        h < 120f -> Triple(x, c, 0f)
+        h < 180f -> Triple(0f, c, x)
+        h < 240f -> Triple(0f, x, c)
+        h < 300f -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+
+    val r = ((r1 + m) * 255f).roundToInt().coerceIn(0, 255)
+    val g = ((g1 + m) * 255f).roundToInt().coerceIn(0, 255)
+    val b = ((b1 + m) * 255f).roundToInt().coerceIn(0, 255)
+
+    return Color(r, g, b)
+}
+
+/**
+ * Compose Color 转 HSV (hue: 0f..360f, saturation: 0f..1f, value: 0f..1f)
+ */
+fun colorToHsv(color: Color): Triple<Float, Float, Float> {
+    val r = color.red
+    val g = color.green
+    val b = color.blue
+
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val delta = max - min
+
+    val hue = when {
+        delta == 0f -> 0f
+        max == r -> (60f * ((g - b) / delta) + 360f) % 360f
+        max == g -> (60f * ((b - r) / delta) + 120f) % 360f
+        else -> (60f * ((r - g) / delta) + 240f) % 360f
+    }
+
+    val saturation = if (max == 0f) 0f else delta / max
+    val value = max
+
+    return Triple(hue, saturation, value)
+}
+
+/**
+ * Compose Color 转 16 进制颜色字符串 "#rrggbb"
+ */
+fun colorToHex(color: Color): String {
+    val r = (color.red * 255f).roundToInt().coerceIn(0, 255)
+    val g = (color.green * 255f).roundToInt().coerceIn(0, 255)
+    val b = (color.blue * 255f).roundToInt().coerceIn(0, 255)
+    return String.format(Locale.ROOT, "#%02x%02x%02x", r, g, b)
+}
 
 val TaskOrbitLightColorScheme = lightColorScheme(
     primary = MdThemeLightPrimary,
