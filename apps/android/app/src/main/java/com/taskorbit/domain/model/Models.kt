@@ -5,7 +5,7 @@ package com.taskorbit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val STATE_VERSION = 11
+const val STATE_VERSION = 12
 
 @Serializable
 enum class Priority {
@@ -119,11 +119,15 @@ enum class InboxItemKind {
 @Serializable
 data class InboxItem(
     val id: String,
-    val kind: InboxItemKind = InboxItemKind.TODO,
-    val content: String,
+    val title: String = "",
+    val description: String = "",
     val done: Boolean = false,
-    val createdAt: Long,
-    val updatedAt: Long
+    val projectId: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val content: String = if (description.isNotBlank()) "$title\n$description" else title,
+    @Deprecated("Converged to single todo model; retained for transitional compatibility.")
+    val kind: InboxItemKind = InboxItemKind.TODO
 )
 
 @Serializable

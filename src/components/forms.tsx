@@ -231,13 +231,18 @@ export function ProjectForm({ initial, onSubmit, onCancel }: ProjectFormProps) {
 
 export interface TaskFormProps {
   initial?: Task | null;
-  projectId: string;
+  projectId?: string;
+  allowChangeProject?: boolean;
+  projects?: Project[];
+  defaultName?: string;
+  defaultDescription?: string;
   onSubmit: (input: {
     name: string;
     description: string;
     startDate: string | null;
     endDate: string | null;
     priority: Priority;
+    projectId?: string;
   }) => void;
   onCancel: () => void;
 }
@@ -248,9 +253,21 @@ const PRIORITIES: { key: Priority; label: string; color: string }[] = [
   { key: "low", label: "低", color: "var(--color-success)" },
 ];
 
-export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+export function TaskForm({
+  initial,
+  projectId = "",
+  allowChangeProject = false,
+  projects = [],
+  defaultName = "",
+  defaultDescription = "",
+  onSubmit,
+  onCancel,
+}: TaskFormProps) {
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    initial?.projectId ?? projectId ?? projects[0]?.id ?? "",
+  );
+  const [name, setName] = useState(initial?.name ?? defaultName);
+  const [description, setDescription] = useState(initial?.description ?? defaultDescription);
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
   const [noSchedule, setNoSchedule] = useState(
     initial ? !initial.startDate || !initial.endDate : true,
@@ -262,6 +279,9 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
   const [error, setError] = useState("");
 
   const submit = () => {
+    if (allowChangeProject && !selectedProjectId) {
+      return setError("请选择所属项目");
+    }
     if (!name.trim()) return setError("请输入任务名称");
     if (!noSchedule) {
       if (!startDate || !endDate) return setError("请选择开始和结束日期");
@@ -273,8 +293,13 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
       startDate: noSchedule ? null : startDate,
       endDate: noSchedule ? null : endDate,
       priority,
+      projectId: allowChangeProject ? selectedProjectId : (projectId || selectedProjectId),
     });
   };
+
+  const selectedProjectColor = selectedProjectId
+    ? colorByKey(projects.find((p) => p.id === selectedProjectId)?.color)
+    : null;
 
   return (
     <form
@@ -283,6 +308,36 @@ export function TaskForm({ initial, onSubmit, onCancel }: TaskFormProps) {
         submit();
       }}
     >
+      {allowChangeProject && (
+        <div className="field">
+          <OutlinedSelect
+            label="所属项目"
+            value={selectedProjectId}
+            onChange={(event) => setSelectedProjectId(eventValue(event))}
+            menuPositioning="fixed"
+          >
+            {selectedProjectColor && (
+              <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                <span
+                  className="project-select-option__dot"
+                  style={{ backgroundColor: selectedProjectColor }}
+                />
+              </span>
+            )}
+            {projects.map((p) => (
+              <SelectOption key={p.id} value={p.id} selected={selectedProjectId === p.id}>
+                <span slot="headline" className="project-select-option">
+                  <span
+                    className="project-select-option__dot"
+                    style={{ backgroundColor: colorByKey(p.color) }}
+                  />
+                  {p.name}
+                </span>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
+        </div>
+      )}
       <div className="field">
         <OutlinedTextField
           label="名称"
@@ -384,6 +439,8 @@ export interface DailyPlanFormProps {
   lockProject?: boolean;
   lockTask?: boolean;
   defaultDate?: string;
+  defaultName?: string;
+  defaultDescription?: string;
   onSubmit: (input: {
     projectId: string | null;
     taskId: string | null;
@@ -406,12 +463,14 @@ export function DailyPlanForm({
   lockProject = false,
   lockTask = false,
   defaultDate,
+  defaultName = "",
+  defaultDescription = "",
   onSubmit,
   onCancel,
 }: DailyPlanFormProps) {
   const { state } = useStore();
-  const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [name, setName] = useState(initial?.name ?? defaultName);
+  const [description, setDescription] = useState(initial?.description ?? defaultDescription);
   const [projectId, setProjectId] = useState<string>(initial?.projectId ?? defaultProjectId ?? "");
   const [taskId, setTaskId] = useState<string>(initial?.taskId ?? defaultTaskId ?? "");
   const [date, setDate] = useState(initial?.date ?? defaultDate ?? todayISO());
@@ -540,12 +599,26 @@ export function DailyPlanForm({
               onChange={(event) => changeProject(eventValue(event))}
               menuPositioning="fixed"
             >
+              {projectId && (
+                <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                  <span
+                    className="project-select-option__dot"
+                    style={{ backgroundColor: colorByKey(state.projects.find((p) => p.id === projectId)?.color) }}
+                  />
+                </span>
+              )}
               <SelectOption value="" selected={projectId === ""}>
                 <span slot="headline">无项目（独立）</span>
               </SelectOption>
               {state.projects.filter((p) => !p.archived).map((p) => (
                 <SelectOption key={p.id} value={p.id} selected={projectId === p.id}>
-                  <span slot="headline">{p.name}</span>
+                  <span slot="headline" className="project-select-option">
+                    <span
+                      className="project-select-option__dot"
+                      style={{ backgroundColor: colorByKey(p.color) }}
+                    />
+                    {p.name}
+                  </span>
                 </SelectOption>
               ))}
             </OutlinedSelect>

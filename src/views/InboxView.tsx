@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import type { InboxItem, InboxItemKind } from "@task-orbit/core";
+import type { InboxItem, Project } from "@task-orbit/core";
 import type { MdOutlinedTextField } from "@material/web/textfield/outlined-text-field.js";
 import { Icon } from "../components/Icon";
 import {
@@ -9,23 +9,23 @@ import {
   FilledCard,
   FilterChip,
   IconButton,
-  OutlinedSegmentedButton,
-  OutlinedSegmentedButtonSet,
+  OutlinedSelect,
   OutlinedTextField,
   Ripple,
+  SelectOption,
   TonalButton,
   TextButton,
   eventValue,
 } from "../components/material";
+import { DailyPlanForm, TaskForm } from "../components/forms";
 import { Badge, ConfirmDialog, Dialog, EmptyState, SectionHeader, useSnackbar } from "../components/ui";
 import { useStore } from "../store/store";
 import { useAiChat } from "../store/ai-chat-store";
 import { useInboxViewState } from "../store/view-state";
+import { colorByKey } from "../store/colors";
 
 /** Keep in sync with --sys-motion-selection-duration used by .inbox-item exit. */
 const ITEM_EXIT_MS = 200;
-
-type InboxFilter = "all" | "todo" | "note";
 
 function formatItemDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -43,55 +43,83 @@ export function getFirstLine(content: string): string {
   return (line ?? content.split(/\r?\n/)[0] ?? "").trim();
 }
 
+export function getItemTitle(item: InboxItem): string {
+  if (item.title) return item.title;
+  if (item.content) {
+    return getFirstLine(item.content);
+  }
+  return "未命名待办";
+}
+
 function InboxItemRow({
   item,
+  project,
   leaving = false,
   onToggle,
+  onConvertToTask,
+  onConvertToPlan,
   onEdit,
   onDelete,
 }: {
   item: InboxItem;
+  project?: Project | null;
   leaving?: boolean;
   onToggle: () => void;
+  onConvertToTask: () => void;
+  onConvertToPlan: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const isTodo = item.kind === "todo";
-  const displayContent = isTodo ? item.content : (getFirstLine(item.content) || item.content);
+  const projectColor = project ? colorByKey(project.color) : undefined;
+  const title = getItemTitle(item);
+
   return (
     <div
-      className={`inbox-item ${isTodo ? "inbox-item--todo" : "inbox-item--note"} ${item.done ? "is-done" : ""} ${leaving ? "is-leaving" : ""}`}
+      className={`inbox-item ${item.done ? "is-done" : ""} ${leaving ? "is-leaving" : ""}`}
     >
-      {isTodo ? (
-        <Checkbox
-          className="inbox-item__checkbox"
-          checked={item.done}
-          aria-label={`标记「${item.content}」${item.done ? "未完成" : "已完成"}`}
-          onChange={onToggle}
-        />
-      ) : (
-        <span className="inbox-item__icon" aria-hidden="true">
-          <Icon name="sticky_note_2" size={19} />
-        </span>
-      )}
+      <Checkbox
+        className="inbox-item__checkbox"
+        checked={item.done}
+        aria-label={`标记「${title}」${item.done ? "未完成" : "已完成"}`}
+        onChange={onToggle}
+      />
       <button
         type="button"
         className="inbox-item__body"
         onClick={onEdit}
-        aria-label={`编辑${isTodo ? "待办" : "备忘"}：${displayContent}`}
+        aria-label={`编辑待办：${title}`}
       >
-        <span
-          className="inbox-item__content"
-          title={!isTodo ? item.content : undefined}
-        >
-          {displayContent}
-        </span>
+        <span className="inbox-item__title">{title}</span>
+        {item.description ? (
+          <span className="inbox-item__description">{item.description}</span>
+        ) : null}
         <span className="inbox-item__meta">
-          {isTodo ? "待办" : "备忘"} · {formatItemDate(item.updatedAt)}
+          {project && (
+            <span
+              className="inbox-item__project-tag"
+              style={{
+                color: projectColor,
+                borderColor: `color-mix(in srgb, ${projectColor} 30%, transparent)`,
+              }}
+            >
+              <span
+                className="inbox-item__project-dot"
+                style={{ backgroundColor: projectColor }}
+              />
+              {project.name}
+            </span>
+          )}
+          <span>{formatItemDate(item.updatedAt)}</span>
         </span>
         <Ripple />
       </button>
       <div className="inbox-item__actions">
+        <IconButton aria-label="转为任务" title="转为任务" onClick={onConvertToTask}>
+          <Icon name="assignment" size={18} />
+        </IconButton>
+        <IconButton aria-label="转为每日计划" title="转为每日计划" onClick={onConvertToPlan}>
+          <Icon name="calendar_today" size={18} />
+        </IconButton>
         <IconButton aria-label="编辑" title="编辑" onClick={onEdit}>
           <Icon name="edit" size={18} />
         </IconButton>
@@ -105,35 +133,37 @@ function InboxItemRow({
 
 function InboxEditDialog({
   item,
+  projects,
   onClose,
   onSave,
 }: {
   item: InboxItem | null;
+  projects: Project[];
   onClose: () => void;
-  onSave: (content: string) => void;
+  onSave: (patch: { title: string; description: string; projectId: string | null }) => void;
 }) {
-  const [content, setContent] = useState(item?.content ?? "");
+  const [title, setTitle] = useState(item?.title ?? (item ? getItemTitle(item) : ""));
+  const [description, setDescription] = useState(item?.description ?? "");
+  const [projectId, setProjectId] = useState<string | null>(item?.projectId ?? null);
   const [error, setError] = useState("");
 
   if (!item) return null;
 
-  const isNote = item.kind === "note";
-
   const save = () => {
-    const nextContent = content.trim();
-    if (!nextContent) {
-      setError(isNote ? "请写下备忘内容" : "请写下待办内容");
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      setError("请写下待办标题");
       return;
     }
-    onSave(nextContent);
+    onSave({ title: nextTitle, description: description.trim(), projectId });
   };
 
   return (
     <Dialog
       open
       onClose={onClose}
-      title={isNote ? "编辑备忘" : "编辑待办"}
-      className={isNote ? "inbox-edit-dialog inbox-edit-dialog--note" : "inbox-edit-dialog"}
+      title="编辑待办"
+      className="inbox-edit-dialog"
       actions={
         <>
           <TextButton onClick={onClose}>取消</TextButton>
@@ -156,18 +186,158 @@ function InboxEditDialog({
       >
         <OutlinedTextField
           className="inbox-edit-dialog__field"
-          label={isNote ? "备忘内容" : "待办内容"}
-          type={isNote ? "textarea" : "text"}
-          rows={isNote ? 12 : undefined}
-          value={content}
+          label="待办标题"
+          value={title}
           onInput={(event) => {
-            setContent(eventValue(event));
+            setTitle(eventValue(event));
             setError("");
           }}
           autoFocus
         />
+        <OutlinedTextField
+          className="inbox-edit-dialog__field"
+          label="待办描述（可选）"
+          type="textarea"
+          rows={4}
+          value={description}
+          onInput={(event) => {
+            setDescription(eventValue(event));
+          }}
+          placeholder="补充详细说明…"
+        />
+        <div className="inbox-edit-dialog__project">
+          <OutlinedSelect
+            label="关联项目"
+            value={projectId ?? ""}
+            onChange={(event) => {
+              const val = eventValue(event);
+              setProjectId(val ? val : null);
+            }}
+          >
+            {projectId && (
+              <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                <span
+                  className="inbox-project-option__dot"
+                  style={{ backgroundColor: colorByKey(projects.find((p) => p.id === projectId)?.color) }}
+                />
+              </span>
+            )}
+            <SelectOption value="" selected={!projectId}>
+              <span slot="headline">不关联项目</span>
+            </SelectOption>
+            {projects.map((p) => (
+              <SelectOption
+                key={p.id}
+                value={p.id}
+                selected={projectId === p.id}
+              >
+                <span slot="headline" className="inbox-project-option">
+                  <span
+                    className="inbox-project-option__dot"
+                    style={{ backgroundColor: colorByKey(p.color) }}
+                  />
+                  {p.name}
+                </span>
+              </SelectOption>
+            ))}
+          </OutlinedSelect>
+        </div>
         {error && <p className="error-text body-sm mt-8">{error}</p>}
       </form>
+    </Dialog>
+  );
+}
+
+function ProjectFilterDialog({
+  open,
+  projects,
+  projectCounts,
+  unassignedCount,
+  selectedProjectId,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  projects: Project[];
+  projectCounts: Map<string, number>;
+  unassignedCount: number;
+  selectedProjectId: string;
+  onClose: () => void;
+  onSelect: (projectId: string) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <Dialog
+      open
+      compact
+      onClose={onClose}
+      title="按项目筛选"
+      className="inbox-project-filter-dialog"
+      actions={<TextButton onClick={onClose}>关闭</TextButton>}
+    >
+      <div className="inbox-project-filter-list" role="listbox">
+        <button
+          type="button"
+          className={`inbox-project-filter-item ${selectedProjectId === "all" ? "is-selected" : ""}`}
+          onClick={() => {
+            onSelect("all");
+            onClose();
+          }}
+        >
+          <span className="inbox-project-filter-item__icon">
+            <Icon name="folder_open" size={18} />
+          </span>
+          <span className="inbox-project-filter-item__name">全部项目</span>
+          {selectedProjectId === "all" && <Icon name="check" size={18} />}
+          <Ripple />
+        </button>
+
+        <button
+          type="button"
+          className={`inbox-project-filter-item ${selectedProjectId === "none" ? "is-selected" : ""}`}
+          onClick={() => {
+            onSelect("none");
+            onClose();
+          }}
+        >
+          <span className="inbox-project-filter-item__icon">
+            <Icon name="folder_off" size={18} />
+          </span>
+          <span className="inbox-project-filter-item__name">未关联项目</span>
+          <span className="inbox-project-filter-item__count">{unassignedCount} 条</span>
+          {selectedProjectId === "none" && <Icon name="check" size={18} />}
+          <Ripple />
+        </button>
+
+        {projects.length > 0 && <div className="inbox-project-filter-divider" />}
+
+        {projects.map((project) => {
+          const count = projectCounts.get(project.id) ?? 0;
+          const isSelected = selectedProjectId === project.id;
+          const color = colorByKey(project.color);
+          return (
+            <button
+              key={project.id}
+              type="button"
+              className={`inbox-project-filter-item ${isSelected ? "is-selected" : ""}`}
+              onClick={() => {
+                onSelect(project.id);
+                onClose();
+              }}
+            >
+              <span
+                className="inbox-project-filter-item__dot"
+                style={{ backgroundColor: color }}
+              />
+              <span className="inbox-project-filter-item__name">{project.name}</span>
+              <span className="inbox-project-filter-item__count">{count} 条</span>
+              {isSelected && <Icon name="check" size={18} />}
+              <Ripple />
+            </button>
+          );
+        })}
+      </div>
     </Dialog>
   );
 }
@@ -176,48 +346,106 @@ export function InboxView() {
   const store = useStore();
   const { show } = useSnackbar();
   const {
-    mode,
-    setMode,
+    statusFilter,
+    setStatusFilter,
+    projectFilter,
+    setProjectFilter,
     draft,
     setDraft,
-    filter,
-    setFilter,
+    draftDescription,
+    setDraftDescription,
+    draftProjectId,
+    setDraftProjectId,
   } = useInboxViewState();
+
   const [editing, setEditing] = useState<InboxItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InboxItem | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [convertingTaskItem, setConvertingTaskItem] = useState<InboxItem | null>(null);
+  const [convertingPlanItem, setConvertingPlanItem] = useState<InboxItem | null>(null);
   const captureInputRef = useRef<MdOutlinedTextField | null>(null);
 
-  const todoCount = store.state.inboxItems.filter(
-    (item) => item.kind === "todo" && !item.done,
-  ).length;
-  const noteCount = store.state.inboxItems.filter((item) => item.kind === "note").length;
-  const completedCount = store.state.inboxItems.filter(
-    (item) => item.kind === "todo" && item.done,
-  ).length;
+  const activeProjects = useMemo(
+    () => store.state.projects.filter((p) => !p.archived),
+    [store.state.projects],
+  );
+
+  const handleConvertToTask = (item: InboxItem) => {
+    if (activeProjects.length === 0) {
+      show("请先创建一个项目后再转为任务");
+      return;
+    }
+    setConvertingTaskItem(item);
+  };
+
+  const handleConvertToPlan = (item: InboxItem) => {
+    setConvertingPlanItem(item);
+  };
+
+  const projectMap = useMemo(() => {
+    const map = new Map<string, Project>();
+    for (const p of store.state.projects) {
+      map.set(p.id, p);
+    }
+    return map;
+  }, [store.state.projects]);
+
+  const totalCount = store.state.inboxItems.length;
+  const activeCount = store.state.inboxItems.filter((item) => !item.done).length;
+  const completedCount = store.state.inboxItems.filter((item) => item.done).length;
+  const unassignedCount = store.state.inboxItems.filter((item) => item.projectId === null).length;
+
+  const projectItemCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of store.state.inboxItems) {
+      if (item.projectId) {
+        map.set(item.projectId, (map.get(item.projectId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [store.state.inboxItems]);
+
+  const selectedFilterProject = useMemo(() => {
+    if (projectFilter === "all" || projectFilter === "none") return null;
+    return store.state.projects.find((p) => p.id === projectFilter) ?? null;
+  }, [projectFilter, store.state.projects]);
 
   const visibleItems = useMemo(
     () =>
       store.state.inboxItems.filter((item) => {
-        if (filter === "all") return true;
-        return item.kind === filter;
+        if (statusFilter === "active" && item.done) return false;
+        if (statusFilter === "completed" && !item.done) return false;
+
+        if (projectFilter === "none" && item.projectId !== null) return false;
+        if (
+          projectFilter !== "all" &&
+          projectFilter !== "none" &&
+          item.projectId !== projectFilter
+        ) {
+          return false;
+        }
+
+        return true;
       }),
-    [filter, store.state.inboxItems],
+    [statusFilter, projectFilter, store.state.inboxItems],
   );
-  const pendingItems = visibleItems.filter((item) => item.kind === "note" || !item.done);
-  const completedItems = visibleItems.filter((item) => item.kind === "todo" && item.done);
+
+  const pendingItems = visibleItems.filter((item) => !item.done);
+  const completedItems = visibleItems.filter((item) => item.done);
 
   const addItem = () => {
-    const content = draft.trim();
-    if (!content) return;
-    store.addInboxItem({ kind: mode, content });
+    const title = draft.trim();
+    if (!title) return;
+    store.addInboxItem({
+      title,
+      description: draftDescription.trim(),
+      projectId: draftProjectId,
+    });
     setDraft("");
-    show(mode === "todo" ? "待办已收下" : "备忘已收下");
-  };
-
-  const switchMode = (nextMode: InboxItemKind) => {
-    setMode(nextMode);
-    setDraft("");
+    setDraftDescription("");
+    setDraftProjectId(null);
+    show("待办已收下");
   };
 
   const focusCapture = () => {
@@ -227,7 +455,8 @@ export function InboxView() {
   const { openDrawer, sendMessage } = useAiChat();
 
   const handleAiOrganize = () => {
-    if (pendingItems.length === 0) {
+    const pendingTotal = store.state.inboxItems.filter((i) => !i.done).length;
+    if (pendingTotal === 0) {
       show("当前收集箱没有待处理的条目");
       return;
     }
@@ -246,7 +475,7 @@ export function InboxView() {
     window.setTimeout(() => {
       store.deleteInboxItem(id);
       setLeavingId(null);
-      show("内容已删除");
+      show("待办已删除");
     }, ITEM_EXIT_MS);
   };
 
@@ -260,21 +489,21 @@ export function InboxView() {
           </div>
           <h1 className="headline-lg">收集箱</h1>
           <p className="body-md muted">
-            还没想好放在哪个项目？先放进这里。待办和灵感，都值得被好好接住。
+            还没想好放在哪个项目？先放进这里。待办与灵感，都值得被好好接住。
           </p>
         </div>
         <div className="inbox-hero__summary" aria-label="收集箱概览">
           <div>
-            <strong>{todoCount}</strong>
-            <span>待办</span>
-          </div>
-          <div>
-            <strong>{noteCount}</strong>
-            <span>备忘</span>
+            <strong>{activeCount}</strong>
+            <span>待处理</span>
           </div>
           <div>
             <strong>{completedCount}</strong>
             <span>已完成</span>
+          </div>
+          <div>
+            <strong>{totalCount}</strong>
+            <span>全部待办</span>
           </div>
         </div>
       </section>
@@ -287,59 +516,87 @@ export function InboxView() {
             </div>
             <div>
               <h2 className="title-md">快速收集</h2>
-              <p className="body-sm inbox-capture__sub">先记下来，不用现在分类。</p>
+              <p className="body-sm inbox-capture__sub">随时记下待办，支持选择关联项目。</p>
             </div>
           </div>
-          <OutlinedSegmentedButtonSet className="segmented-control inbox-capture__modes">
-            <OutlinedSegmentedButton
-              label="待办"
-              noCheckmark
-              selected={mode === "todo"}
-              onClick={() => switchMode("todo")}
-            />
-            <OutlinedSegmentedButton
-              label="备忘"
-              noCheckmark
-              selected={mode === "note"}
-              onClick={() => switchMode("note")}
-            />
-          </OutlinedSegmentedButtonSet>
           <form
             className="inbox-capture__form"
             onSubmit={(event) => {
               event.preventDefault();
               addItem();
             }}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                addItem();
+              }
+            }}
           >
             <OutlinedTextField
-              // Material Web caches the native control in its validator; remounting
-              // prevents it from trying to assign `type` to a textarea when the mode changes.
-              key={mode}
               ref={captureInputRef}
-              label={mode === "todo" ? "想做什么？" : "想记点什么？"}
-              type={mode === "note" ? "textarea" : "text"}
-              rows={mode === "note" ? 7 : undefined}
+              label="待办标题"
               value={draft}
               onInput={(event) => setDraft(eventValue(event))}
-              placeholder={
-                mode === "todo" ? "例如：给家里的植物换盆" : "例如：下次想试试番茄工作法……"
-              }
+              placeholder="想做什么？例如：给家里的植物换盆"
               autoFocus
             />
+            <OutlinedTextField
+              label="描述（可选）"
+              type="textarea"
+              rows={2}
+              value={draftDescription}
+              onInput={(event) => setDraftDescription(eventValue(event))}
+              placeholder="补充详细说明…"
+            />
+            <OutlinedSelect
+              label="关联项目"
+              value={draftProjectId ?? ""}
+              onChange={(event) => {
+                const val = eventValue(event);
+                setDraftProjectId(val ? val : null);
+              }}
+            >
+              {draftProjectId && (
+                <span slot="leading-icon" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+                  <span
+                    className="inbox-project-option__dot"
+                    style={{ backgroundColor: colorByKey(activeProjects.find((p) => p.id === draftProjectId)?.color) }}
+                  />
+                </span>
+              )}
+              <SelectOption value="" selected={!draftProjectId}>
+                <span slot="headline">不关联项目</span>
+              </SelectOption>
+              {activeProjects.map((p) => (
+                <SelectOption
+                  key={p.id}
+                  value={p.id}
+                  selected={draftProjectId === p.id}
+                >
+                  <span slot="headline" className="inbox-project-option">
+                    <span
+                      className="inbox-project-option__dot"
+                      style={{ backgroundColor: colorByKey(p.color) }}
+                    />
+                    {p.name}
+                  </span>
+                </SelectOption>
+              ))}
+            </OutlinedSelect>
             <FilledButton type="submit" className="inbox-capture__submit">
-              <Icon name={mode === "todo" ? "add_task" : "save"} size={18} slot="icon" />
-              {mode === "todo" ? "收下待办" : "保存备忘"}
+              <Icon name="add_task" size={18} slot="icon" />
+              收下待办
             </FilledButton>
           </form>
           <p className="inbox-capture__hint body-sm inbox-capture__sub">
-            {mode === "todo" ? "按 Enter 快速收下一个待办" : "可以写多行，适合记录一闪而过的想法"}
+            填写标题与可选描述，按 Ctrl+Enter 快速收下。
           </p>
         </FilledCard>
 
         <FilledCard className="material-card inbox-list-card">
           <div className="inbox-list-toolbar">
             <SectionHeader
-              title="我的收集"
+              title="我的待办"
               subtitle="把零散想法变成下一步行动。"
               actions={
                 <TonalButton onClick={handleAiOrganize} aria-label="AI 智能整理收集箱">
@@ -348,38 +605,81 @@ export function InboxView() {
                 </TonalButton>
               }
             />
-            <ChipSet className="inbox-filters" role="tablist" aria-label="收集箱筛选">
-              {(
-                [
-                  ["all", "全部", store.state.inboxItems.length],
-                  ["todo", "待办", todoCount + completedCount],
-                  ["note", "备忘", noteCount],
-                ] as [InboxFilter, string, number][]
-              ).map(([value, label, count]) => (
+            <div className="inbox-toolbar-filter-row">
+              <ChipSet className="inbox-filters" role="tablist" aria-label="按状态筛选">
                 <FilterChip
-                  key={value}
                   role="tab"
-                  aria-selected={filter === value}
-                  selected={filter === value}
-                  onClick={() => setFilter(value)}
+                  aria-selected={statusFilter === "all"}
+                  selected={statusFilter === "all"}
+                  onClick={() => setStatusFilter("all")}
                 >
-                  {label} · {count}
+                  全部 · {totalCount}
                 </FilterChip>
-              ))}
-            </ChipSet>
+                <FilterChip
+                  role="tab"
+                  aria-selected={statusFilter === "active"}
+                  selected={statusFilter === "active"}
+                  onClick={() => setStatusFilter("active")}
+                >
+                  待处理 · {activeCount}
+                </FilterChip>
+                <FilterChip
+                  role="tab"
+                  aria-selected={statusFilter === "completed"}
+                  selected={statusFilter === "completed"}
+                  onClick={() => setStatusFilter("completed")}
+                >
+                  已完成 · {completedCount}
+                </FilterChip>
+              </ChipSet>
+
+              <div className="inbox-filter-right">
+                <TonalButton
+                  className={`inbox-project-filter-trigger ${projectFilter !== "all" ? "is-filtered" : ""}`}
+                  onClick={() => setFilterDialogOpen(true)}
+                  aria-label="按项目筛选待办"
+                >
+                  {selectedFilterProject ? (
+                    <span className="inbox-btn-project">
+                      <span
+                        className="inbox-chip-project__dot"
+                        style={{ backgroundColor: colorByKey(selectedFilterProject.color) }}
+                      />
+                      {selectedFilterProject.name}
+                    </span>
+                  ) : projectFilter === "none" ? (
+                    "未关联"
+                  ) : (
+                    "项目筛选"
+                  )}
+                  <Icon name="arrow_drop_down" size={16} />
+                </TonalButton>
+
+                {projectFilter !== "all" && (
+                  <IconButton
+                    className="inbox-filter-reset-btn"
+                    aria-label="清除项目筛选"
+                    title="清除项目筛选"
+                    onClick={() => setProjectFilter("all")}
+                  >
+                    <Icon name="close" size={14} />
+                  </IconButton>
+                )}
+              </div>
+            </div>
           </div>
 
           {pendingItems.length > 0 && (
-            <InboxSection
-              title={filter === "note" ? "备忘" : "待处理"}
-              count={pendingItems.length}
-            >
+            <InboxSection title="待处理" count={pendingItems.length}>
               {pendingItems.map((item) => (
                 <InboxItemRow
                   key={item.id}
                   item={item}
+                  project={item.projectId ? projectMap.get(item.projectId) : null}
                   leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
+                  onConvertToTask={() => handleConvertToTask(item)}
+                  onConvertToPlan={() => handleConvertToPlan(item)}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
                 />
@@ -393,8 +693,11 @@ export function InboxView() {
                 <InboxItemRow
                   key={item.id}
                   item={item}
+                  project={item.projectId ? projectMap.get(item.projectId) : null}
                   leaving={leavingId === item.id}
                   onToggle={() => store.updateInboxItem(item.id, { done: !item.done })}
+                  onConvertToTask={() => handleConvertToTask(item)}
+                  onConvertToPlan={() => handleConvertToPlan(item)}
                   onEdit={() => setEditing(item)}
                   onDelete={() => setDeleteTarget(item)}
                 />
@@ -405,15 +708,17 @@ export function InboxView() {
           {visibleItems.length === 0 && (
             <div className="inbox-empty-container">
               <EmptyState
-                icon={filter === "note" ? "sticky_note_2" : "inbox"}
-                title={filter === "all" ? "这里还很安静" : filter === "todo" ? "没有待办" : "没有备忘"}
-                hint={filter === "all" ? "把脑海里的第一件事交给收集箱吧。" : "切换上方类型，或从左侧快速收集。"}
+                icon="inbox"
+                title="这里还很安静"
+                hint={
+                  totalCount === 0
+                    ? "把脑海里的第一件事交给收集箱吧。"
+                    : "当前筛选条件下没有待办事项。"
+                }
                 action={
-                  filter !== "note" ? (
-                    <TonalButton className="inbox-empty-cta" onClick={focusCapture}>
-                      <Icon name="add" size={18} slot="icon" /> 收下第一件事
-                    </TonalButton>
-                  ) : undefined
+                  <TonalButton className="inbox-empty-cta" onClick={focusCapture}>
+                    <Icon name="add" size={18} slot="icon" /> 收下第一件事
+                  </TonalButton>
                 }
               />
             </div>
@@ -421,24 +726,93 @@ export function InboxView() {
         </FilledCard>
       </div>
 
+      <ProjectFilterDialog
+        open={filterDialogOpen}
+        projects={activeProjects}
+        projectCounts={projectItemCounts}
+        unassignedCount={unassignedCount}
+        selectedProjectId={projectFilter}
+        onClose={() => setFilterDialogOpen(false)}
+        onSelect={(id) => setProjectFilter(id)}
+      />
+
       <InboxEditDialog
         key={editing?.id ?? "no-edit"}
         item={editing}
+        projects={activeProjects}
         onClose={() => setEditing(null)}
-        onSave={(content) => {
+        onSave={({ title, description, projectId }) => {
           if (!editing) return;
-          store.updateInboxItem(editing.id, { content });
+          store.updateInboxItem(editing.id, { title, description, projectId });
           setEditing(null);
-          show("内容已更新");
+          show("待办已更新");
         }}
       />
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={deleteTarget?.kind === "todo" ? "删除待办" : "删除备忘"}
-        message={`确定删除「${(deleteTarget ? (deleteTarget.kind === "note" ? getFirstLine(deleteTarget.content) : deleteTarget.content) : "") || "这条内容"}」吗？`}
+        title="删除待办"
+        message={`确定删除「${(deleteTarget ? getItemTitle(deleteTarget) : "") || "这条待办"}」吗？`}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
+
+      <Dialog
+        open={convertingTaskItem !== null}
+        onClose={() => setConvertingTaskItem(null)}
+        title="转为任务"
+      >
+        {convertingTaskItem && (
+          <TaskForm
+            key={convertingTaskItem.id}
+            allowChangeProject
+            projects={activeProjects}
+            projectId={convertingTaskItem.projectId ?? activeProjects[0]?.id ?? ""}
+            defaultName={getItemTitle(convertingTaskItem)}
+            defaultDescription={convertingTaskItem.description ?? ""}
+            onCancel={() => setConvertingTaskItem(null)}
+            onSubmit={(input) => {
+              const targetProjectId = input.projectId || convertingTaskItem.projectId || activeProjects[0]?.id;
+              if (!targetProjectId) {
+                show("请选择所属项目");
+                return;
+              }
+              store.addTask({
+                projectId: targetProjectId,
+                name: input.name,
+                description: input.description,
+                startDate: input.startDate,
+                endDate: input.endDate,
+                priority: input.priority,
+              });
+              store.deleteInboxItem(convertingTaskItem.id);
+              setConvertingTaskItem(null);
+              show(`已将待办转为任务「${input.name}」`);
+            }}
+          />
+        )}
+      </Dialog>
+
+      <Dialog
+        open={convertingPlanItem !== null}
+        onClose={() => setConvertingPlanItem(null)}
+        title="转为每日计划"
+      >
+        {convertingPlanItem && (
+          <DailyPlanForm
+            key={convertingPlanItem.id}
+            defaultProjectId={convertingPlanItem.projectId}
+            defaultName={getItemTitle(convertingPlanItem)}
+            defaultDescription={convertingPlanItem.description ?? ""}
+            onCancel={() => setConvertingPlanItem(null)}
+            onSubmit={(input) => {
+              store.addDailyPlan(input);
+              store.deleteInboxItem(convertingPlanItem.id);
+              setConvertingPlanItem(null);
+              show(`已将待办转为每日计划「${input.name}」`);
+            }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

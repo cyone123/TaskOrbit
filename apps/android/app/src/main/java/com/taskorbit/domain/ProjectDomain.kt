@@ -132,12 +132,18 @@ object ProjectDomain {
             }
         }
 
+        val nextInboxItems = state.inboxItems.map { item ->
+            if (item.projectId == id) item.copy(projectId = null, updatedAt = System.currentTimeMillis())
+            else item
+        }
+
         return state.copy(
             projects = state.projects.filterNot { it.id == id },
             tasks = state.tasks.filterNot { it.projectId == id },
             dailyPlans = state.dailyPlans.filterNot { it.id in planIds },
             activeTimer = if (timerRefsProject) null else state.activeTimer,
-            pomodoroSessions = nextSessions
+            pomodoroSessions = nextSessions,
+            inboxItems = nextInboxItems
         )
     }
 

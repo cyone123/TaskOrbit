@@ -107,7 +107,6 @@
     "south_east",
     "space_dashboard",
     "speed",
-    "sticky_note_2",
     "stop_circle",
     "subdirectory_arrow_right",
     "sync",
@@ -128,6 +127,6 @@
     "visibility_off",
     "warning"
   ],
-  "bytes": 31152,
-  "sha256": "2595da4ac2f517a4497416fa8fe0bed0b9dbcd87e81ad084667e5ce8746781d1"
+  "bytes": 30856,
+  "sha256": "c58b197e84a1cc85cbf9441278d507a7af1addcde600cfd789ca7d478826eb99"
 }

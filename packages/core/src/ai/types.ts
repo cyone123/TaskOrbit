@@ -13,8 +13,16 @@ export type AiProposalStatus = "pending" | "applied" | "cancelled";
 
 export interface InboxOrganizationProposalItem {
   inboxItemId: string;
+  sourceTitle?: string;
+  sourceDescription?: string;
   sourceContent?: string;
-  action: "convert_to_task" | "convert_to_daily_plan" | "mark_done" | "dismiss";
+  action:
+    | "convert_to_task"
+    | "convert_to_daily_plan"
+    | "assign_project"
+    | "mark_done"
+    | "dismiss";
+  targetProjectId?: string;
   targetProjectName?: string;
   taskData?: {
     projectId: string;

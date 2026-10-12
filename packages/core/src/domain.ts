@@ -44,11 +44,18 @@ export type TaskPatch = Partial<
 >;
 
 export interface InboxItemInput {
-  kind: InboxItemKind;
-  content: string;
+  title?: string;
+  description?: string;
+  /** @deprecated Transitional compatibility: if title is missing, splits content */
+  content?: string;
+  projectId?: string | null;
+  /** @deprecated Transitional compatibility */
+  kind?: InboxItemKind;
 }
 
-export type InboxItemPatch = Partial<Pick<InboxItem, "content" | "done">>;
+export type InboxItemPatch = Partial<
+  Pick<InboxItem, "title" | "description" | "content" | "done" | "projectId">
+>;
 
 export interface DailyPlanInput {
   projectId: string | null;
@@ -287,6 +294,9 @@ export function deleteProjectState(state: AppState, id: string): AppState {
           (session.dailyPlanId ? planNames.get(session.dailyPlanId) ?? null : null),
       };
     }),
+    inboxItems: state.inboxItems.map((item) =>
+      item.projectId === id ? { ...item, projectId: null, updatedAt: Date.now() } : item,
+    ),
   };
 }
 
@@ -426,11 +436,29 @@ export function deleteTaskState(state: AppState, id: string): AppState {
 }
 
 export function createInboxItem(input: InboxItemInput, createdAt = Date.now()): InboxItem {
+  let title = (input.title ?? "").trim();
+  let description = (input.description ?? "").trim();
+
+  if (!title && input.content !== undefined) {
+    const lines = input.content.split(/\r?\n/);
+    title = (lines[0] ?? "").trim();
+    description = lines.slice(1).join("\n").trim();
+  }
+
+  if (!title) {
+    title = "未命名待办";
+  }
+
+  const content = description ? `${title}\n${description}` : title;
+
   return {
     id: uid("i_"),
-    kind: input.kind,
-    content: input.content.trim(),
+    kind: input.kind ?? "todo",
+    title,
+    description,
+    content,
     done: false,
+    projectId: input.projectId ?? null,
     createdAt,
     updatedAt: createdAt,
   };
@@ -448,16 +476,40 @@ export function updateInboxItemState(
 ): AppState {
   return {
     ...state,
-    inboxItems: state.inboxItems.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            ...patch,
-            content: patch.content === undefined ? item.content : patch.content.trim(),
-            updatedAt,
-          }
-        : item,
-    ),
+    inboxItems: state.inboxItems.map((item) => {
+      if (item.id !== id) return item;
+
+      let nextTitle = patch.title !== undefined ? patch.title.trim() : item.title;
+      let nextDescription =
+        patch.description !== undefined ? patch.description.trim() : item.description;
+
+      if (
+        patch.content !== undefined &&
+        patch.title === undefined &&
+        patch.description === undefined
+      ) {
+        const lines = patch.content.split(/\r?\n/);
+        nextTitle = (lines[0] ?? "").trim() || nextTitle;
+        nextDescription = lines.slice(1).join("\n").trim();
+      }
+
+      if (!nextTitle) {
+        nextTitle = "未命名待办";
+      }
+
+      const nextContent =
+        nextDescription ? `${nextTitle}\n${nextDescription}` : nextTitle;
+
+      return {
+        ...item,
+        ...patch,
+        title: nextTitle,
+        description: nextDescription,
+        content: nextContent,
+        projectId: patch.projectId === undefined ? item.projectId : patch.projectId,
+        updatedAt,
+      };
+    }),
   };
 }
 

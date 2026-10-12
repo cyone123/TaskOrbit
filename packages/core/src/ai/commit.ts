@@ -18,9 +18,6 @@ import type {
 } from "./types";
 
 function finalizeInboxItem(state: AppState, item: InboxItem, now: number): AppState {
-  if (item.kind === "note") {
-    return deleteInboxItemState(state, item.id);
-  }
   return updateInboxItemState(state, item.id, { done: true }, now);
 }
 
@@ -73,7 +70,7 @@ export function commitInboxProposal(
           {
             projectId: targetProjectId,
             name: data.name.trim(),
-            description: data.description?.trim() || "",
+            description: data.description?.trim() || item.description || "",
             startDate: data.startDate || project.startDate,
             endDate: data.endDate || project.endDate,
             priority,
@@ -126,7 +123,7 @@ export function commitInboxProposal(
             projectId,
             taskId,
             name: data.name.trim(),
-            description: data.description?.trim() || "",
+            description: data.description?.trim() || item.description || "",
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,
@@ -141,6 +138,19 @@ export function commitInboxProposal(
 
         nextState = appendDailyPlan(nextState, plan);
         nextState = finalizeInboxItem(nextState, item, now);
+        break;
+      }
+
+      case "assign_project": {
+        const targetProjectId = proposal.targetProjectId || proposal.taskData?.projectId;
+        if (!targetProjectId) {
+          continue;
+        }
+        const project = nextState.projects.find((p) => p.id === targetProjectId && !p.archived);
+        if (!project) {
+          continue;
+        }
+        nextState = updateInboxItemState(nextState, item.id, { projectId: project.id }, now);
         break;
       }
 

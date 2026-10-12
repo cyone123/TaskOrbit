@@ -217,24 +217,50 @@ const dailyPlanSchema = z
   });
 
 const inboxItemSchema = z
-  .object({
-    id: z.string().min(1),
-    kind: z.enum(["todo", "note"]),
-    content: z.string().trim().min(1),
-    done: z.boolean(),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  })
-  .passthrough()
-  .superRefine((item, ctx) => {
-    if (item.kind === "note" && item.done) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["done"],
-        message: "备忘不能标记为完成",
-      });
-    }
-  });
+  .preprocess(
+    (val) => {
+      if (val && typeof val === "object") {
+        const raw = val as Record<string, unknown>;
+        let title = typeof raw.title === "string" ? raw.title.trim() : undefined;
+        let description = typeof raw.description === "string" ? raw.description.trim() : undefined;
+        if (!title && typeof raw.content === "string") {
+          const lines = raw.content.split(/\r?\n/);
+          title = (lines[0] ?? "").trim() || "未命名待办";
+          if (description === undefined) {
+            description = lines.slice(1).join("\n").trim();
+          }
+        }
+        const finalTitle = title || "未命名待办";
+        const finalDesc = description ?? "";
+        const content =
+          typeof raw.content === "string"
+            ? raw.content
+            : finalDesc
+              ? `${finalTitle}\n${finalDesc}`
+              : finalTitle;
+        return {
+          ...raw,
+          title: finalTitle,
+          description: finalDesc,
+          content,
+        };
+      }
+      return val;
+    },
+    z
+      .object({
+        id: z.string().min(1),
+        title: z.string().trim().min(1),
+        description: z.string().default(""),
+        kind: z.enum(["todo", "note"]).optional().default("todo"),
+        content: z.string().optional(),
+        done: z.boolean(),
+        projectId: z.string().min(1).nullable().default(null),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .passthrough(),
+  );
 
 const pomodoroSessionSchema = z
   .object({
@@ -490,6 +516,7 @@ export function parsePersistedState(raw: unknown): AppState {
     vaultSettings: envelope.data.vaultSettings ?? {},
     activeTimer: envelope.data.activeTimer ?? null,
     webDavSettings: envelope.data.webDavSettings ?? {},
+    aiSettings: envelope.data.aiSettings ?? {},
   });
   const parsed = appStateSchema.safeParse(migrated);
   if (!parsed.success) {
@@ -541,6 +568,12 @@ export function validateAppState(state: AppState): AppState {
       if (plan.projectId !== timer.projectId || plan.taskId !== timer.taskId) {
         throw new Error("计时器的项目、任务与计划不一致。");
       }
+    }
+  }
+
+  for (const item of parsed.inboxItems) {
+    if (item.projectId && !projectIds.has(item.projectId)) {
+      throw new Error(`待办「${item.title.slice(0, 10)}」引用了不存在的项目。`);
     }
   }
 

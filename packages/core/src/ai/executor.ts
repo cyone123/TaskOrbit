@@ -66,21 +66,28 @@ export function executeReadTool(
     }
 
     case "get_inbox_items": {
-      const kind = (args.kind as string) ?? "all";
+      const targetProjectId =
+        typeof args.projectId === "string" && args.projectId.trim()
+          ? args.projectId.trim()
+          : null;
       const done = typeof args.done === "boolean" ? args.done : false;
 
       let items = state.inboxItems.filter((item) => item.done === done);
-      if (kind === "todo" || kind === "note") {
-        items = items.filter((item) => item.kind === kind);
+      if (targetProjectId) {
+        items = items.filter((item) => item.projectId === targetProjectId);
       }
 
       return {
         total: items.length,
         items: items.map((item) => ({
           id: item.id,
-          kind: item.kind,
-          content: item.content,
+          title: item.title,
+          description: item.description,
+          content:
+            item.content ??
+            (item.description ? `${item.title}\n${item.description}` : item.title),
           done: item.done,
+          projectId: item.projectId,
           createdAt: item.createdAt,
         })),
       };

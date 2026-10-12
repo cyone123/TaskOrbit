@@ -138,9 +138,48 @@ class AppStateRepository private constructor(context: Context) {
 
     // --- Inbox Operations ---
 
-    fun addInbox(kind: InboxItemKind, content: String) {
-        val item = InboxDomain.createInboxItem(kind = kind, content = content)
+    fun addInbox(title: String, description: String = "", projectId: String? = null) {
+        val item = InboxDomain.createInboxItem(title = title, description = description, projectId = projectId)
         mutate { InboxDomain.appendInboxItem(it, item) }
+    }
+
+    fun addInbox(content: String, projectId: String? = null) {
+        val item = InboxDomain.createInboxItem(content = content, projectId = projectId)
+        mutate { InboxDomain.appendInboxItem(it, item) }
+    }
+
+    fun addInbox(kind: InboxItemKind, content: String) {
+        addInbox(content = content, projectId = null)
+    }
+
+    fun updateInbox(
+        id: String,
+        title: String? = null,
+        description: String? = null,
+        content: String? = null,
+        done: Boolean? = null,
+        projectId: String? = null,
+        clearProject: Boolean = false
+    ) {
+        mutate { InboxDomain.updateInboxItemState(it, id, title, description, content, done, projectId, clearProject) }
+    }
+
+    fun updateInbox(
+        id: String,
+        content: String?,
+        done: Boolean?,
+        projectId: String?,
+        clearProject: Boolean
+    ) {
+        updateInbox(
+            id = id,
+            title = null,
+            description = null,
+            content = content,
+            done = done,
+            projectId = projectId,
+            clearProject = clearProject
+        )
     }
 
     fun toggleInbox(id: String, done: Boolean) {

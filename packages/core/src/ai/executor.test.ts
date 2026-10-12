@@ -111,8 +111,11 @@ function createMockState(): AppState {
   const item1: InboxItem = {
     id: "inbox_1",
     kind: "todo",
+    title: "未完成待办",
+    description: "",
     content: "未完成待办",
     done: false,
+    projectId: "p_1",
     createdAt: 1000,
     updatedAt: 1000,
   };
@@ -120,8 +123,11 @@ function createMockState(): AppState {
   const item2: InboxItem = {
     id: "inbox_2",
     kind: "note",
+    title: "一条备忘",
+    description: "",
     content: "一条备忘",
     done: false,
+    projectId: null,
     createdAt: 1100,
     updatedAt: 1100,
   };
@@ -129,8 +135,11 @@ function createMockState(): AppState {
   const item3: InboxItem = {
     id: "inbox_3",
     kind: "todo",
+    title: "已完成待办",
+    description: "",
     content: "已完成待办",
     done: true,
+    projectId: null,
     createdAt: 800,
     updatedAt: 900,
   };
@@ -212,13 +221,19 @@ describe("executeReadTool", () => {
     expect(doneOnly.total).toBe(1);
     expect(doneOnly.items[0].content).toBe("已完成待办");
 
-    // note kind only
-    const notes = executeReadTool(state, "get_inbox_items", { kind: "note" }, testNow) as {
+    // projectId filter
+    const projectItems = executeReadTool(
+      state,
+      "get_inbox_items",
+      { projectId: "p_1" },
+      testNow,
+    ) as {
       total: number;
       items: InboxItem[];
     };
-    expect(notes.total).toBe(1);
-    expect(notes.items[0].kind).toBe("note");
+    expect(projectItems.total).toBe(1);
+    expect(projectItems.items[0].content).toBe("未完成待办");
+    expect(projectItems.items[0].projectId).toBe("p_1");
   });
 
   it("executes get_projects_and_tasks", () => {

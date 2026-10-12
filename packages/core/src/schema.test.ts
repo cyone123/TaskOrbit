@@ -260,19 +260,32 @@ describe("persisted state schema", () => {
     ).toThrow("周视图结束时间必须晚于起始时间");
   });
 
-  it("rejects completed notes", () => {
+  it("rejects inbox items with non-existent project references", () => {
     expect(() =>
       parsePersistedState({
         version: STATE_VERSION,
-        projects: [],
+        projects: [
+          {
+            id: "p_1",
+            name: "项目1",
+            description: "",
+            color: "blue",
+            startDate: "2026-09-01",
+            endDate: "2026-09-30",
+            archived: false,
+            archivedAt: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
         tasks: [],
         dailyPlans: [],
         inboxItems: [
           {
             id: "i_1",
-            kind: "note",
-            content: "一条备忘",
-            done: true,
+            content: "关联了不存在项目的待办",
+            done: false,
+            projectId: "non_existent_project",
             createdAt: 1,
             updatedAt: 1,
           },
@@ -281,6 +294,53 @@ describe("persisted state schema", () => {
         settings: {},
         vaultSettings: {},
       }),
-    ).toThrow("备忘不能标记为完成");
+    ).toThrow("引用了不存在的项目");
+  });
+
+  it("accepts inbox items with valid project reference or null project", () => {
+    const state = parsePersistedState({
+      version: STATE_VERSION,
+      projects: [
+        {
+          id: "p_1",
+          name: "项目1",
+          description: "",
+          color: "blue",
+          startDate: "2026-09-01",
+          endDate: "2026-09-30",
+          archived: false,
+          archivedAt: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      tasks: [],
+      dailyPlans: [],
+      inboxItems: [
+        {
+          id: "i_1",
+          content: "关联有效项目的待办",
+          done: true,
+          projectId: "p_1",
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: "i_2",
+          content: "无项目的待办",
+          done: false,
+          projectId: null,
+          createdAt: 2,
+          updatedAt: 2,
+        },
+      ],
+      pomodoroSessions: [],
+      settings: {},
+      vaultSettings: {},
+    });
+
+    expect(state.inboxItems).toHaveLength(2);
+    expect(state.inboxItems[0]?.projectId).toBe("p_1");
+    expect(state.inboxItems[1]?.projectId).toBeNull();
   });
 });
