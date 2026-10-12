@@ -204,13 +204,39 @@ md-filled-card.inbox-list-card {
   flex-shrink: 0;
 }
 
+md-filled-tonal-button.inbox-project-filter-trigger,
 .inbox-project-filter-trigger {
-  --md-tonal-button-container-shape: var(--shape-full);
+  --md-filled-tonal-button-container-height: 32px;
+  --md-filled-tonal-button-container-shape: var(--shape-full);
+  --md-filled-tonal-button-label-text-size: 12px;
+  --md-filled-tonal-button-label-text-line-height: 16px;
+  --md-filled-tonal-button-label-text-weight: 500;
+  --md-filled-tonal-button-leading-space: 10px;
+  --md-filled-tonal-button-trailing-space: 6px;
+  --md-filled-tonal-button-icon-size: 15px;
+  --md-filled-tonal-button-container-color: var(--md-surface-container-high);
+  --md-filled-tonal-button-label-text-color: var(--md-on-surface-variant);
+  height: 32px;
+  font-size: 12px;
 }
 
+md-filled-tonal-button.inbox-project-filter-trigger:hover,
+.inbox-project-filter-trigger:hover {
+  --md-filled-tonal-button-container-color: var(--md-surface-container-highest);
+  --md-filled-tonal-button-label-text-color: var(--md-on-surface);
+}
+
+md-filled-tonal-button.inbox-project-filter-trigger.is-filtered,
 .inbox-project-filter-trigger.is-filtered {
-  --md-tonal-button-container-color: var(--md-secondary-container);
-  --md-tonal-button-label-text-color: var(--md-on-secondary-container);
+  --md-filled-tonal-button-container-color: var(--md-secondary-container);
+  --md-filled-tonal-button-label-text-color: var(--md-on-secondary-container);
+  --md-filled-tonal-button-icon-color: var(--md-on-secondary-container);
+}
+
+.inbox-filter-reset-btn {
+  --md-icon-button-container-width: 28px;
+  --md-icon-button-container-height: 28px;
+  --md-icon-button-icon-size: 14px;
 }
 
 .inbox-btn-project {

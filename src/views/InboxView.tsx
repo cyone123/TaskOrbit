@@ -568,7 +568,6 @@ export function InboxView() {
                   onClick={() => setFilterDialogOpen(true)}
                   aria-label="按项目筛选待办"
                 >
-                  <Icon name="tune" size={18} slot="icon" />
                   {selectedFilterProject ? (
                     <span className="inbox-btn-project">
                       <span
@@ -580,18 +579,19 @@ export function InboxView() {
                   ) : projectFilter === "none" ? (
                     "未关联"
                   ) : (
-                    "按项目筛选"
+                    "项目筛选"
                   )}
-                  <Icon name="arrow_drop_down" size={18} slot="icon" />
+                  <Icon name="arrow_drop_down" size={16} />
                 </TonalButton>
 
                 {projectFilter !== "all" && (
                   <IconButton
+                    className="inbox-filter-reset-btn"
                     aria-label="清除项目筛选"
                     title="清除项目筛选"
                     onClick={() => setProjectFilter("all")}
                   >
-                    <Icon name="close" size={16} />
+                    <Icon name="close" size={14} />
                   </IconButton>
                 )}
               </div>
