@@ -44,11 +44,13 @@ export type TaskPatch = Partial<
 >;
 
 export interface InboxItemInput {
-  kind: InboxItemKind;
   content: string;
+  projectId?: string | null;
+  /** @deprecated Transitional compatibility */
+  kind?: InboxItemKind;
 }
 
-export type InboxItemPatch = Partial<Pick<InboxItem, "content" | "done">>;
+export type InboxItemPatch = Partial<Pick<InboxItem, "content" | "done" | "projectId">>;
 
 export interface DailyPlanInput {
   projectId: string | null;
@@ -287,6 +289,9 @@ export function deleteProjectState(state: AppState, id: string): AppState {
           (session.dailyPlanId ? planNames.get(session.dailyPlanId) ?? null : null),
       };
     }),
+    inboxItems: state.inboxItems.map((item) =>
+      item.projectId === id ? { ...item, projectId: null, updatedAt: Date.now() } : item,
+    ),
   };
 }
 
@@ -428,9 +433,10 @@ export function deleteTaskState(state: AppState, id: string): AppState {
 export function createInboxItem(input: InboxItemInput, createdAt = Date.now()): InboxItem {
   return {
     id: uid("i_"),
-    kind: input.kind,
+    kind: input.kind ?? "todo",
     content: input.content.trim(),
     done: false,
+    projectId: input.projectId ?? null,
     createdAt,
     updatedAt: createdAt,
   };
@@ -454,6 +460,7 @@ export function updateInboxItemState(
             ...item,
             ...patch,
             content: patch.content === undefined ? item.content : patch.content.trim(),
+            projectId: patch.projectId === undefined ? item.projectId : patch.projectId,
             updatedAt,
           }
         : item,

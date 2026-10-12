@@ -38,7 +38,7 @@ class MigrationManagerTest {
         val migratedJson = MigrationManager.migrate(rawV1)
         val root = Json.parseToJsonElement(migratedJson).jsonObject
 
-        assertEquals(11, root["version"]?.jsonPrimitive?.intOrNull)
+        assertEquals(com.taskorbit.domain.model.STATE_VERSION, root["version"]?.jsonPrimitive?.intOrNull)
         assertNotNull(root["webDavSettings"])
         assertNotNull(root["inboxItems"])
         assertNotNull(root["vaultSettings"])

@@ -61,15 +61,16 @@ export interface DailyPlan {
 
 export type InboxItemKind = "todo" | "note";
 
-/** A lightweight capture item that intentionally stays outside projects. */
+/** A capture item in the inbox, converging on actionable todos with optional project linkage. */
 export interface InboxItem {
   id: string;
-  kind: InboxItemKind;
   content: string;
-  /** Notes are always false; keeping one field makes migration and ordering simple. */
   done: boolean;
+  projectId: string | null;
   createdAt: number;
   updatedAt: number;
+  /** @deprecated Converged to single todo model; retained for transitional compatibility. */
+  kind?: InboxItemKind;
 }
 
 export type PomodoroKind = "focus" | "shortBreak" | "longBreak";

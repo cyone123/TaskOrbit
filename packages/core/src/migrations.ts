@@ -207,8 +207,33 @@ function migrateV10ToV11(input: JsonRecord): JsonRecord {
   });
   return {
     ...input,
-    version: STATE_VERSION,
+    version: 11,
     tasks,
+  };
+}
+
+/**
+ * v12 converges inbox items into actionable todos:
+ * - existing notes are converted to todos, with done initialized to false
+ * - adds optional projectId (defaulting to null)
+ */
+function migrateV11ToV12(input: JsonRecord): JsonRecord {
+  const rawItems = asArray(input.inboxItems);
+  const inboxItems = rawItems.map((raw) => {
+    const isNote = raw.kind === "note";
+    const done = isNote ? false : Boolean(raw.done);
+    const projectId = asString(raw.projectId) ?? null;
+    return {
+      ...raw,
+      kind: "todo",
+      done,
+      projectId,
+    };
+  });
+  return {
+    ...input,
+    version: 12,
+    inboxItems,
   };
 }
 
@@ -235,6 +260,7 @@ export function migratePersistedState(raw: unknown): unknown {
   if (version <= 8) migrated = migrateV8ToV9(migrated);
   if (version <= 9) migrated = migrateV9ToV10(migrated);
   if (version <= 10) migrated = migrateV10ToV11(migrated);
+  if (version <= 11) migrated = migrateV11ToV12(migrated);
 
   return migrated;
 }

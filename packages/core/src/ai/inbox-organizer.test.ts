@@ -38,6 +38,7 @@ function createMockState(): AppState {
     kind: "todo",
     content: "完成系统架构设计文档",
     done: false,
+    projectId: null,
     createdAt: 1000,
     updatedAt: 1000,
   };
@@ -47,6 +48,7 @@ function createMockState(): AppState {
     kind: "note",
     content: "明天下午两点去图书馆查资料",
     done: false,
+    projectId: null,
     createdAt: 1100,
     updatedAt: 1100,
   };
@@ -56,6 +58,7 @@ function createMockState(): AppState {
     kind: "todo",
     content: "给花浇水",
     done: false,
+    projectId: null,
     createdAt: 1200,
     updatedAt: 1200,
   };

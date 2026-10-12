@@ -44,6 +44,7 @@ object MigrationManager {
         if (version <= 8) migrated = migrateV8ToV9(migrated)
         if (version <= 9) migrated = migrateV9ToV10(migrated)
         if (version <= 10) migrated = migrateV10ToV11(migrated)
+        if (version <= 11) migrated = migrateV11ToV12(migrated)
 
         return migrated.toString()
     }
@@ -197,5 +198,21 @@ object MigrationManager {
             ))
         })
         return JsonObject(input + mapOf("version" to JsonPrimitive(11), "tasks" to tasks))
+    }
+
+    private fun migrateV11ToV12(input: JsonObject): JsonObject {
+        val inboxItems = JsonArray((input["inboxItems"] as? JsonArray ?: JsonArray(emptyList())).map { element ->
+            val item = element.jsonObject
+            val isNote = (item["kind"] as? JsonPrimitive)?.content == "note"
+            val done = if (isNote) false else ((item["done"] as? JsonPrimitive)?.content == "true")
+            val projectId = (item["projectId"] as? JsonPrimitive)
+                ?.takeUnless { it is JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
+            JsonObject(item + mapOf(
+                "kind" to JsonPrimitive("todo"),
+                "done" to JsonPrimitive(done),
+                "projectId" to (projectId?.let(::JsonPrimitive) ?: JsonNull)
+            ))
+        })
+        return JsonObject(input + mapOf("version" to JsonPrimitive(12), "inboxItems" to inboxItems))
     }
 }

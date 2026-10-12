@@ -25,7 +25,7 @@ class V11MigrationTest {
             }"""
             val migrated = MigrationManager.migrate(raw)
             val state = json.decodeFromString<AppState>(migrated)
-            assertEquals(11, state.version)
+            assertEquals(com.taskorbit.domain.model.STATE_VERSION, state.version)
             assertEquals(42, state.settings.focusMinutes)
             assertEquals(8, state.settings.dayStartHour)
             assertEquals(24, state.settings.dayEndHour)
@@ -61,7 +61,7 @@ class V11MigrationTest {
     @Test
     fun `new state uses desktop defaults`() {
         val state = AppState()
-        assertEquals(11, state.version)
+        assertEquals(com.taskorbit.domain.model.STATE_VERSION, state.version)
         assertEquals(6, state.settings.weekDetailStartHour)
         assertEquals(3, state.settings.monthMaxTaskTracks)
         assertEquals("deepseek", state.aiSettings.provider)

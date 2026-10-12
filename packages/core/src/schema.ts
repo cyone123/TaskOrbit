@@ -219,22 +219,14 @@ const dailyPlanSchema = z
 const inboxItemSchema = z
   .object({
     id: z.string().min(1),
-    kind: z.enum(["todo", "note"]),
+    kind: z.enum(["todo", "note"]).optional().default("todo"),
     content: z.string().trim().min(1),
     done: z.boolean(),
+    projectId: z.string().min(1).nullable().default(null),
     createdAt: timestamp,
     updatedAt: timestamp,
   })
-  .passthrough()
-  .superRefine((item, ctx) => {
-    if (item.kind === "note" && item.done) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["done"],
-        message: "备忘不能标记为完成",
-      });
-    }
-  });
+  .passthrough();
 
 const pomodoroSessionSchema = z
   .object({
@@ -490,6 +482,7 @@ export function parsePersistedState(raw: unknown): AppState {
     vaultSettings: envelope.data.vaultSettings ?? {},
     activeTimer: envelope.data.activeTimer ?? null,
     webDavSettings: envelope.data.webDavSettings ?? {},
+    aiSettings: envelope.data.aiSettings ?? {},
   });
   const parsed = appStateSchema.safeParse(migrated);
   if (!parsed.success) {
@@ -541,6 +534,12 @@ export function validateAppState(state: AppState): AppState {
       if (plan.projectId !== timer.projectId || plan.taskId !== timer.taskId) {
         throw new Error("计时器的项目、任务与计划不一致。");
       }
+    }
+  }
+
+  for (const item of parsed.inboxItems) {
+    if (item.projectId && !projectIds.has(item.projectId)) {
+      throw new Error(`待办「${item.content.slice(0, 10)}」引用了不存在的项目。`);
     }
   }
 

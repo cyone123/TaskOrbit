@@ -81,6 +81,22 @@ describe("domain commands", () => {
     });
   });
 
+  it("unlinks associated inbox items when project is deleted", () => {
+    const { state, project } = fixtureState();
+    const itemWithProject = createInboxItem({ content: "关联该项目的待办", projectId: project.id });
+    const itemWithoutProject = createInboxItem({ content: "无关联待办", projectId: null });
+    const stateWithInbox = {
+      ...state,
+      inboxItems: [itemWithProject, itemWithoutProject],
+    };
+    const archived = archiveProjectState(stateWithInbox, project.id, 4);
+    const deleted = deleteProjectState(archived, project.id);
+
+    expect(deleted.inboxItems).toHaveLength(2);
+    expect(deleted.inboxItems[0]?.projectId).toBeNull();
+    expect(deleted.inboxItems[1]?.projectId).toBeNull();
+  });
+
   it("rejects a plan whose task belongs to another project", () => {
     const first = fixtureState();
     const secondProject = createProject({
@@ -139,21 +155,30 @@ describe("domain commands", () => {
 
   it("captures, edits, completes and deletes lightweight inbox items", () => {
     const state = createEmptyState();
-    const todo = createInboxItem({ kind: "todo", content: "  整理收件箱  " }, 10);
-    const note = createInboxItem({ kind: "note", content: "记录一个想法" }, 11);
+    const todo = createInboxItem({ content: "  整理收件箱  ", projectId: "p1" }, 10);
+    const note = createInboxItem({ content: "记录一个多行\n想法" }, 11);
     const withItems = {
       ...state,
       inboxItems: [todo, note],
     };
 
     expect(todo.content).toBe("整理收件箱");
+    expect(todo.projectId).toBe("p1");
+    expect(note.projectId).toBeNull();
     expect(updateInboxItemState(withItems, todo.id, { done: true }, 12).inboxItems[0]).toMatchObject({
       id: todo.id,
       done: true,
       updatedAt: 12,
     });
-    const edited = updateInboxItemState(withItems, note.id, { content: "  更新后的想法  " }, 13);
-    expect(edited.inboxItems.find((item) => item.id === note.id)?.content).toBe("更新后的想法");
+    const edited = updateInboxItemState(
+      withItems,
+      note.id,
+      { content: "  更新后的想法  ", projectId: "p2" },
+      13,
+    );
+    const updatedNote = edited.inboxItems.find((item) => item.id === note.id);
+    expect(updatedNote?.content).toBe("更新后的想法");
+    expect(updatedNote?.projectId).toBe("p2");
     expect(deleteInboxItemState(edited, todo.id).inboxItems).toHaveLength(1);
   });
 

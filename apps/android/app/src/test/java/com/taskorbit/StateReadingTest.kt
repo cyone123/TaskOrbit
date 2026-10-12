@@ -22,7 +22,7 @@ class StateReadingTest {
         }""").state
         assertEquals(local, imported)
         assertEquals(local, synced)
-        assertEquals(11, synced.version)
+        assertEquals(com.taskorbit.domain.model.STATE_VERSION, synced.version)
     }
 
     @Test
@@ -31,7 +31,7 @@ class StateReadingTest {
         try {
             val main = dir.resolve("data.json")
             val backup = dir.resolve("data.json.bak")
-            val future = """{"version":12,"tasks":[]}"""
+            val future = """{"version":13,"tasks":[]}"""
             main.writeText(future)
             backup.writeText("""{"version":7}""")
             val persistence = AtomicFilePersistence(dir, this)
@@ -52,13 +52,13 @@ class StateReadingTest {
     @Test(expected = UnsupportedDataVersionException::class)
     fun `future sync state is rejected before merge`() {
         SyncCoordinator.decodeEnvelope("""{"format":"task-orbit-webdav-sync","formatVersion":1,
-          "deviceId":"desktop","updatedAt":1,"state":{"version":12}}""")
+          "deviceId":"desktop","updatedAt":1,"state":{"version":13}}""")
     }
 
     @Test(expected = UnsupportedDataVersionException::class)
     fun `future sync envelope is rejected`() {
         SyncCoordinator.decodeEnvelope("""{"format":"task-orbit-webdav-sync","formatVersion":2,
-          "deviceId":"desktop","updatedAt":1,"state":{"version":11}}""")
+          "deviceId":"desktop","updatedAt":1,"state":{"version":12}}""")
     }
 
     @Test
@@ -70,7 +70,7 @@ class StateReadingTest {
             val result = AtomicFilePersistence(dir, this).loadState()
             assertTrue(result.recoveredFromBackup)
             assertEquals(31, result.state.settings.focusMinutes)
-            assertEquals(11, result.state.version)
+            assertEquals(com.taskorbit.domain.model.STATE_VERSION, result.state.version)
         } finally { dir.deleteRecursively() }
     }
 }

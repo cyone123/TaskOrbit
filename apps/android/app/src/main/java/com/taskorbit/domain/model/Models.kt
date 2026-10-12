@@ -5,7 +5,7 @@ package com.taskorbit.domain.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val STATE_VERSION = 11
+const val STATE_VERSION = 12
 
 @Serializable
 enum class Priority {
@@ -122,6 +122,7 @@ data class InboxItem(
     val kind: InboxItemKind = InboxItemKind.TODO,
     val content: String,
     val done: Boolean = false,
+    val projectId: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

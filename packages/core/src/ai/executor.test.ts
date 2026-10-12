@@ -113,6 +113,7 @@ function createMockState(): AppState {
     kind: "todo",
     content: "未完成待办",
     done: false,
+    projectId: null,
     createdAt: 1000,
     updatedAt: 1000,
   };
@@ -122,6 +123,7 @@ function createMockState(): AppState {
     kind: "note",
     content: "一条备忘",
     done: false,
+    projectId: null,
     createdAt: 1100,
     updatedAt: 1100,
   };
@@ -131,6 +133,7 @@ function createMockState(): AppState {
     kind: "todo",
     content: "已完成待办",
     done: true,
+    projectId: null,
     createdAt: 800,
     updatedAt: 900,
   };

@@ -8,21 +8,28 @@ import com.taskorbit.domain.model.InboxItemKind
 object InboxDomain {
 
     fun createInboxItem(
-        kind: InboxItemKind = InboxItemKind.TODO,
         content: String,
+        projectId: String? = null,
         createdAt: Long = System.currentTimeMillis()
     ): InboxItem {
         val trimmed = content.trim()
         require(trimmed.isNotEmpty()) { "内容不能为空。" }
         return InboxItem(
             id = IdGenerator.uid("inbox_"),
-            kind = kind,
+            kind = InboxItemKind.TODO,
             content = trimmed,
             done = false,
+            projectId = projectId,
             createdAt = createdAt,
             updatedAt = createdAt
         )
     }
+
+    fun createInboxItem(
+        kind: InboxItemKind,
+        content: String,
+        createdAt: Long = System.currentTimeMillis()
+    ): InboxItem = createInboxItem(content = content, projectId = null, createdAt = createdAt)
 
     fun appendInboxItem(state: AppState, item: InboxItem): AppState {
         return state.copy(
@@ -36,7 +43,7 @@ object InboxDomain {
             if (item.id == id) {
                 found = true
                 item.copy(
-                    done = if (item.kind == InboxItemKind.NOTE) false else done,
+                    done = done,
                     updatedAt = System.currentTimeMillis()
                 )
             } else {
@@ -51,7 +58,9 @@ object InboxDomain {
         state: AppState,
         id: String,
         content: String? = null,
-        done: Boolean? = null
+        done: Boolean? = null,
+        projectId: String? = null,
+        clearProject: Boolean = false
     ): AppState {
         var found = false
         val nextItems = state.inboxItems.map { item ->
@@ -59,9 +68,11 @@ object InboxDomain {
                 found = true
                 val nextContent = content?.trim() ?: item.content
                 require(nextContent.isNotEmpty()) { "内容不能为空。" }
+                val nextProjectId = if (clearProject) null else (projectId ?: item.projectId)
                 item.copy(
                     content = nextContent,
-                    done = if (item.kind == InboxItemKind.NOTE) false else (done ?: item.done),
+                    done = done ?: item.done,
+                    projectId = nextProjectId,
                     updatedAt = System.currentTimeMillis()
                 )
             } else {
