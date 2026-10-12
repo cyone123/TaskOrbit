@@ -574,11 +574,17 @@ md-filled-tonal-button.inbox-project-filter-trigger.is-filtered,
 .inbox-edit-dialog__form {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding-top: 8px;
+}
+
+.inbox-edit-dialog__field {
   width: 100%;
 }
 
 .inbox-edit-dialog__project {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .inbox-edit-dialog md-outlined-select {

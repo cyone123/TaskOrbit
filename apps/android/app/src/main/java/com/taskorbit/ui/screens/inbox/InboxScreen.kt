@@ -1,6 +1,7 @@
 package com.taskorbit.ui.screens.inbox
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -67,8 +68,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -130,6 +134,7 @@ fun InboxScreen(
     val isFocused by viewModel.isFocused.collectAsState()
     val editingItem by viewModel.editingItem.collectAsState()
 
+    val titleFocusRequester = remember { FocusRequester() }
     var isFabMenuExpanded by remember { mutableStateOf(false) }
     var showProjectFilterSheet by remember { mutableStateOf(false) }
 
@@ -197,6 +202,7 @@ fun InboxScreen(
                     onClick = {
                         isFabMenuExpanded = false
                         viewModel.onFocusChange(true)
+                        runCatching { titleFocusRequester.requestFocus() }
                     },
                     text = { Text("新建待办") },
                     icon = { Icon(Icons.Filled.CheckBox, contentDescription = null) }
@@ -237,6 +243,7 @@ fun InboxScreen(
                 onDraftProjectChange = viewModel::onDraftProjectChange,
                 onFocusChange = viewModel::onFocusChange,
                 onSubmit = viewModel::submit,
+                titleFocusRequester = titleFocusRequester,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -555,15 +562,35 @@ private fun InboxComposerCard(
     onDraftProjectChange: (String?) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    titleFocusRequester: FocusRequester? = null
 ) {
-    val isExpanded = isFocused || title.isNotEmpty() || description.isNotEmpty() || draftProjectId != null
+    var isTitleFocused by remember { mutableStateOf(false) }
+    var isDescriptionFocused by remember { mutableStateOf(false) }
+    val descriptionFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    val isExpanded = isFocused || isTitleFocused || isDescriptionFocused || title.isNotEmpty() || description.isNotEmpty() || draftProjectId != null
+
+    val handleDone = {
+        if (title.isNotBlank()) {
+            onSubmit()
+            focusManager.clearFocus()
+        }
+    }
 
     Column(modifier = modifier) {
         TaskOrbitCard(
             variant = CardVariant.FILLED,
             shape = ShapeTokens.Large,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
         ) {
             Column(
                 modifier = Modifier
@@ -575,6 +602,18 @@ private fun InboxComposerCard(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val titleModifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (titleFocusRequester != null) Modifier.focusRequester(titleFocusRequester) else Modifier
+                        )
+                        .onFocusChanged { state ->
+                            if (isTitleFocused != state.isFocused) {
+                                isTitleFocused = state.isFocused
+                                onFocusChange(state.isFocused || isDescriptionFocused)
+                            }
+                        }
+
                     OutlinedTextField(
                         value = title,
                         onValueChange = onTitleChange,
@@ -585,15 +624,15 @@ private fun InboxComposerCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
-                        modifier = Modifier
-                            .weight(1f)
-                            .onFocusChanged { onFocusChange(it.isFocused) },
+                        modifier = titleModifier,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
-                            imeAction = if (isExpanded) ImeAction.Next else ImeAction.Done
+                            imeAction = ImeAction.Next
                         ),
                         keyboardActions = KeyboardActions(
-                            onDone = { onSubmit() }
+                            onNext = {
+                                runCatching { descriptionFocusRequester.requestFocus() }
+                            }
                         ),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color.Transparent,
@@ -608,61 +647,76 @@ private fun InboxComposerCard(
                     TaskOrbitIconButton(
                         icon = Icons.Filled.ArrowUpward,
                         contentDescription = "添加待办",
-                        onClick = onSubmit,
+                        onClick = handleDone,
                         variant = IconButtonVariant.FILLED,
                         enabled = title.isNotBlank()
                     )
                 }
 
-                if (isExpanded) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = onDescriptionChange,
-                        placeholder = {
-                            Text(
-                                text = "添加详细描述（可选）…",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = onDescriptionChange,
+                            placeholder = {
+                                Text(
+                                    text = "添加详细描述（可选）…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(descriptionFocusRequester)
+                                .onFocusChanged { state ->
+                                    if (isDescriptionFocused != state.isFocused) {
+                                        isDescriptionFocused = state.isFocused
+                                        onFocusChange(isTitleFocused || state.isFocused)
+                                    }
+                                },
+                            minLines = 2,
+                            maxLines = 4,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Default
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
                             )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { onFocusChange(it.isFocused) },
-                        minLines = 2,
-                        maxLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
                         )
-                    )
-                }
 
-                if (isExpanded && projects.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        item {
-                            TaskOrbitFilterChip(
-                                selected = draftProjectId == null,
-                                onClick = { onDraftProjectChange(null) },
-                                label = "无关联项目"
-                            )
-                        }
-                        items(
-                            items = projects,
-                            key = { it.id }
-                        ) { project ->
-                            TaskOrbitFilterChip(
-                                selected = draftProjectId == project.id,
-                                onClick = { onDraftProjectChange(project.id) },
-                                label = project.name
-                            )
+                        if (projects.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                item {
+                                    TaskOrbitFilterChip(
+                                        selected = draftProjectId == null,
+                                        onClick = { onDraftProjectChange(null) },
+                                        label = "无关联项目"
+                                    )
+                                }
+                                items(
+                                    items = projects,
+                                    key = { it.id }
+                                ) { project ->
+                                    TaskOrbitFilterChip(
+                                        selected = draftProjectId == project.id,
+                                        onClick = { onDraftProjectChange(project.id) },
+                                        label = project.name
+                                    )
+                                }
+                            }
                         }
                     }
                 }
