@@ -107,4 +107,12 @@ class InboxDomainTest {
         assertEquals(1, state.inboxItems.size)
         assertEquals("保留", state.inboxItems[0].content)
     }
+
+    @Test
+    fun `multi-line content is preserved faithfully in InboxItem`() {
+        val multiLineText = "第一行待办\n第二行详情\n第三行备注"
+        val item = InboxDomain.createInboxItem(content = multiLineText, projectId = "p_1")
+        assertEquals(multiLineText, item.content)
+        assertEquals(3, item.content.lines().size)
+    }
 }
