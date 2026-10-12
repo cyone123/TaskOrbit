@@ -207,8 +207,24 @@ object MigrationManager {
             val done = if (isNote) false else ((item["done"] as? JsonPrimitive)?.content == "true")
             val projectId = (item["projectId"] as? JsonPrimitive)
                 ?.takeUnless { it is JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
+
+            val rawContent = (item["content"] as? JsonPrimitive)?.content?.trim().orEmpty()
+            var title = (item["title"] as? JsonPrimitive)?.content?.trim().orEmpty()
+            var description = (item["description"] as? JsonPrimitive)?.content?.trim().orEmpty()
+
+            if (title.isEmpty()) {
+                val lines = rawContent.split("\n", limit = 2)
+                title = lines.getOrNull(0)?.trim().orEmpty().ifEmpty { "未命名待办" }
+                description = lines.getOrNull(1)?.trim().orEmpty()
+            }
+
+            val content = if (description.isNotEmpty()) "$title\n$description" else title
+
             JsonObject(item + mapOf(
                 "kind" to JsonPrimitive("todo"),
+                "title" to JsonPrimitive(title),
+                "description" to JsonPrimitive(description),
+                "content" to JsonPrimitive(content),
                 "done" to JsonPrimitive(done),
                 "projectId" to (projectId?.let(::JsonPrimitive) ?: JsonNull)
             ))

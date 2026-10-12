@@ -119,12 +119,15 @@ enum class InboxItemKind {
 @Serializable
 data class InboxItem(
     val id: String,
-    val kind: InboxItemKind = InboxItemKind.TODO,
-    val content: String,
+    val title: String = "",
+    val description: String = "",
     val done: Boolean = false,
     val projectId: String? = null,
-    val createdAt: Long,
-    val updatedAt: Long
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val content: String = if (description.isNotBlank()) "$title\n$description" else title,
+    @Deprecated("Converged to single todo model; retained for transitional compatibility.")
+    val kind: InboxItemKind = InboxItemKind.TODO
 )
 
 @Serializable

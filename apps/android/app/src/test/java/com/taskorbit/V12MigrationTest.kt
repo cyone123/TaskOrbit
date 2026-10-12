@@ -67,20 +67,26 @@ class V12MigrationTest {
         assertEquals(12, state.version)
         assertEquals(3, state.inboxItems.size)
 
-        // note -> todo, done=false, projectId=null
+        // note -> todo, done=false, projectId=null, split title & description
         val item1 = state.inboxItems[0]
+        assertEquals("多行备忘", item1.title)
+        assertEquals("灵感内容", item1.description)
         assertEquals("多行备忘\n灵感内容", item1.content)
         assertFalse(item1.done)
         assertNull(item1.projectId)
 
         // todo, done=true, projectId=null
         val item2 = state.inboxItems[1]
+        assertEquals("普通待办", item2.title)
+        assertEquals("", item2.description)
         assertEquals("普通待办", item2.content)
         assertTrue(item2.done)
         assertNull(item2.projectId)
 
         // todo, projectId="p_1"
         val item3 = state.inboxItems[2]
+        assertEquals("项目待办", item3.title)
+        assertEquals("", item3.description)
         assertEquals("项目待办", item3.content)
         assertEquals("p_1", item3.projectId)
 

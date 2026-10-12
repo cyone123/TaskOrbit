@@ -162,8 +162,12 @@ describe("domain commands", () => {
       inboxItems: [todo, note],
     };
 
+    expect(todo.title).toBe("整理收件箱");
+    expect(todo.description).toBe("");
     expect(todo.content).toBe("整理收件箱");
     expect(todo.projectId).toBe("p1");
+    expect(note.title).toBe("记录一个多行");
+    expect(note.description).toBe("想法");
     expect(note.projectId).toBeNull();
     expect(updateInboxItemState(withItems, todo.id, { done: true }, 12).inboxItems[0]).toMatchObject({
       id: todo.id,
@@ -173,11 +177,13 @@ describe("domain commands", () => {
     const edited = updateInboxItemState(
       withItems,
       note.id,
-      { content: "  更新后的想法  ", projectId: "p2" },
+      { title: "新标题", description: "新描述", projectId: "p2" },
       13,
     );
     const updatedNote = edited.inboxItems.find((item) => item.id === note.id);
-    expect(updatedNote?.content).toBe("更新后的想法");
+    expect(updatedNote?.title).toBe("新标题");
+    expect(updatedNote?.description).toBe("新描述");
+    expect(updatedNote?.content).toBe("新标题\n新描述");
     expect(updatedNote?.projectId).toBe("p2");
     expect(deleteInboxItemState(edited, todo.id).inboxItems).toHaveLength(1);
   });

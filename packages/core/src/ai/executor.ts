@@ -81,7 +81,11 @@ export function executeReadTool(
         total: items.length,
         items: items.map((item) => ({
           id: item.id,
-          content: item.content,
+          title: item.title,
+          description: item.description,
+          content:
+            item.content ??
+            (item.description ? `${item.title}\n${item.description}` : item.title),
           done: item.done,
           projectId: item.projectId,
           createdAt: item.createdAt,

@@ -457,9 +457,37 @@ md-filled-tonal-button.inbox-project-filter-trigger.is-filtered,
   font-size: 14px;
 }
 
+.inbox-item__title {
+  width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-on-surface);
+}
+
+.inbox-item.is-done .inbox-item__title,
 .inbox-item.is-done .inbox-item__content {
   color: var(--md-on-surface-variant);
   text-decoration: line-through;
+}
+
+.inbox-item__description {
+  width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--md-on-surface-variant);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.inbox-item.is-done .inbox-item__description {
+  opacity: 0.65;
 }
 
 .inbox-item__meta {

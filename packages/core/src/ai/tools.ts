@@ -126,11 +126,19 @@ export const INBOX_ORGANIZATION_TOOL: AiToolDefinition = {
             properties: {
               inboxItemId: {
                 type: "string",
-                description: "对应的收集箱条目 ID",
+                description: "对应的收集箱待办 ID",
+              },
+              sourceTitle: {
+                type: "string",
+                description: "原待办标题（可选，用于卡片回显）",
+              },
+              sourceDescription: {
+                type: "string",
+                description: "原待办描述（可选，用于卡片回显）",
               },
               sourceContent: {
                 type: "string",
-                description: "原收集箱条目内容（可选，用于卡片回显）",
+                description: "原待办文本内容（可选，兼容历史格式）",
               },
               action: {
                 type: "string",

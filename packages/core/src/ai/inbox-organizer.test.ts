@@ -36,6 +36,8 @@ function createMockState(): AppState {
   const item1: InboxItem = {
     id: "i_1",
     kind: "todo",
+    title: "完成系统架构设计文档",
+    description: "",
     content: "完成系统架构设计文档",
     done: false,
     projectId: null,
@@ -46,6 +48,8 @@ function createMockState(): AppState {
   const item2: InboxItem = {
     id: "i_2",
     kind: "note",
+    title: "明天下午两点去图书馆查资料",
+    description: "",
     content: "明天下午两点去图书馆查资料",
     done: false,
     projectId: null,
@@ -56,6 +60,8 @@ function createMockState(): AppState {
   const item3: InboxItem = {
     id: "i_3",
     kind: "todo",
+    title: "给花浇水",
+    description: "",
     content: "给花浇水",
     done: false,
     projectId: null,

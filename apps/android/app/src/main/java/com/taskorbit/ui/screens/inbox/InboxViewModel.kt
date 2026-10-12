@@ -35,6 +35,12 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         .map { it.inboxItems.count { item -> !item.done } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    private val _title = MutableStateFlow("")
+    val title: StateFlow<String> = _title.asStateFlow()
+
+    private val _description = MutableStateFlow("")
+    val description: StateFlow<String> = _description.asStateFlow()
+
     private val _content = MutableStateFlow("")
     val content: StateFlow<String> = _content.asStateFlow()
 
@@ -53,8 +59,19 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
     private val _editingItem = MutableStateFlow<InboxItem?>(null)
     val editingItem: StateFlow<InboxItem?> = _editingItem.asStateFlow()
 
+    fun onTitleChange(text: String) {
+        _title.value = text
+    }
+
+    fun onDescriptionChange(text: String) {
+        _description.value = text
+    }
+
     fun onContentChange(text: String) {
         _content.value = text
+        val lines = text.split("\n", limit = 2)
+        _title.value = lines.getOrNull(0).orEmpty()
+        _description.value = lines.getOrNull(1).orEmpty()
     }
 
     fun onDraftProjectChange(projectId: String?) {
@@ -74,9 +91,12 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun submit() {
-        val trimmed = _content.value.trim()
-        if (trimmed.isEmpty()) return
-        repository.addInbox(content = trimmed, projectId = _draftProjectId.value)
+        val trimmedTitle = _title.value.trim().ifEmpty { _content.value.trim() }
+        if (trimmedTitle.isEmpty()) return
+        val trimmedDesc = _description.value.trim()
+        repository.addInbox(title = trimmedTitle, description = trimmedDesc, projectId = _draftProjectId.value)
+        _title.value = ""
+        _description.value = ""
         _content.value = ""
         _draftProjectId.value = null
     }
@@ -97,15 +117,27 @@ class InboxViewModel(application: Application) : AndroidViewModel(application) {
         _editingItem.value = null
     }
 
-    fun saveEditing(id: String, content: String, projectId: String?) {
-        val trimmed = content.trim()
-        if (trimmed.isEmpty()) return
+    fun saveEditing(id: String, title: String, description: String, projectId: String?) {
+        val trimmedTitle = title.trim()
+        if (trimmedTitle.isEmpty()) return
+        val trimmedDesc = description.trim()
         repository.updateInbox(
             id = id,
-            content = trimmed,
+            title = trimmedTitle,
+            description = trimmedDesc,
             projectId = projectId,
             clearProject = projectId == null
         )
         _editingItem.value = null
+    }
+
+    fun saveEditing(id: String, content: String, projectId: String?) {
+        val lines = content.trim().split("\n", limit = 2)
+        saveEditing(
+            id = id,
+            title = lines.getOrNull(0)?.trim().orEmpty(),
+            description = lines.getOrNull(1)?.trim().orEmpty(),
+            projectId = projectId
+        )
     }
 }

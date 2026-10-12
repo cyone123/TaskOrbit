@@ -122,7 +122,8 @@ fun InboxScreen(
     val items by viewModel.inboxItems.collectAsState()
     val projects by viewModel.projects.collectAsState()
     val pendingCount by viewModel.pendingCount.collectAsState()
-    val content by viewModel.content.collectAsState()
+    val title by viewModel.title.collectAsState()
+    val description by viewModel.description.collectAsState()
     val draftProjectId by viewModel.draftProjectId.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
     val projectFilter by viewModel.projectFilter.collectAsState()
@@ -226,11 +227,13 @@ fun InboxScreen(
         ) {
             // 快速记录输入卡片
             InboxComposerCard(
-                content = content,
+                title = title,
+                description = description,
                 draftProjectId = draftProjectId,
                 projects = projects,
                 isFocused = isFocused,
-                onContentChange = viewModel::onContentChange,
+                onTitleChange = viewModel::onTitleChange,
+                onDescriptionChange = viewModel::onDescriptionChange,
                 onDraftProjectChange = viewModel::onDraftProjectChange,
                 onFocusChange = viewModel::onFocusChange,
                 onSubmit = viewModel::submit,
@@ -389,8 +392,8 @@ fun InboxScreen(
             item = item,
             projects = projects,
             onDismiss = { viewModel.dismissEditing() },
-            onSave = { newContent, newProjectId ->
-                viewModel.saveEditing(item.id, newContent, newProjectId)
+            onSave = { newTitle, newDescription, newProjectId ->
+                viewModel.saveEditing(item.id, newTitle, newDescription, newProjectId)
             }
         )
     }
@@ -542,17 +545,19 @@ private fun ProjectFilterOptionItem(
 
 @Composable
 private fun InboxComposerCard(
-    content: String,
+    title: String,
+    description: String,
     draftProjectId: String?,
     projects: List<Project>,
     isFocused: Boolean,
-    onContentChange: (String) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
     onDraftProjectChange: (String?) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isExpanded = isFocused || content.isNotEmpty() || draftProjectId != null
+    val isExpanded = isFocused || title.isNotEmpty() || description.isNotEmpty() || draftProjectId != null
 
     Column(modifier = modifier) {
         TaskOrbitCard(
@@ -568,14 +573,14 @@ private fun InboxComposerCard(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = if (isExpanded) Alignment.Top else Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
-                        value = content,
-                        onValueChange = onContentChange,
+                        value = title,
+                        onValueChange = onTitleChange,
                         placeholder = {
                             Text(
-                                text = "随手记下待办…（支持多行）",
+                                text = "想做什么？",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -583,11 +588,9 @@ private fun InboxComposerCard(
                         modifier = Modifier
                             .weight(1f)
                             .onFocusChanged { onFocusChange(it.isFocused) },
-                        singleLine = !isExpanded,
-                        minLines = if (isExpanded) 2 else 1,
-                        maxLines = if (isExpanded) 5 else 1,
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
-                            imeAction = if (isExpanded) ImeAction.Default else ImeAction.Done
+                            imeAction = if (isExpanded) ImeAction.Next else ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
                             onDone = { onSubmit() }
@@ -607,7 +610,33 @@ private fun InboxComposerCard(
                         contentDescription = "添加待办",
                         onClick = onSubmit,
                         variant = IconButtonVariant.FILLED,
-                        enabled = content.isNotBlank()
+                        enabled = title.isNotBlank()
+                    )
+                }
+
+                if (isExpanded) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = onDescriptionChange,
+                        placeholder = {
+                            Text(
+                                text = "添加详细描述（可选）…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { onFocusChange(it.isFocused) },
+                        minLines = 2,
+                        maxLines = 4,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
                     )
                 }
 
@@ -646,7 +675,7 @@ private fun InboxComposerCard(
             exit = fadeOut() + shrinkVertically()
         ) {
             Text(
-                text = "支持记录多行文本，可选择关联项目",
+                text = "输入标题与可选描述，可选择关联项目",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp)
@@ -692,8 +721,9 @@ private fun InboxItemRow(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
+                val itemTitle = item.title.ifEmpty { item.content }
                 Text(
-                    text = item.content,
+                    text = itemTitle,
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (item.done) {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
@@ -701,9 +731,24 @@ private fun InboxItemRow(
                         MaterialTheme.colorScheme.onSurface
                     },
                     textDecoration = if (item.done) TextDecoration.LineThrough else TextDecoration.None,
-                    maxLines = 6,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                if (item.description.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = item.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (item.done) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -766,9 +811,10 @@ private fun InboxEditBottomSheet(
     item: InboxItem,
     projects: List<Project>,
     onDismiss: () -> Unit,
-    onSave: (content: String, projectId: String?) -> Unit
+    onSave: (title: String, description: String, projectId: String?) -> Unit
 ) {
-    var editContent by remember(item) { mutableStateOf(item.content) }
+    var editTitle by remember(item) { mutableStateOf(item.title.ifEmpty { item.content }) }
+    var editDescription by remember(item) { mutableStateOf(item.description) }
     var selectedProjectId by remember(item) { mutableStateOf(item.projectId) }
 
     TaskOrbitBottomSheet(
@@ -788,13 +834,25 @@ private fun InboxEditBottomSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = editContent,
-                onValueChange = { editContent = it },
-                label = { Text("待办内容") },
-                placeholder = { Text("写下待办事项…") },
+                value = editTitle,
+                onValueChange = { editTitle = it },
+                label = { Text("待办标题") },
+                placeholder = { Text("写下待办标题…") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = ShapeTokens.Medium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = editDescription,
+                onValueChange = { editDescription = it },
+                label = { Text("待办描述（可选）") },
+                placeholder = { Text("添加详细描述…") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                maxLines = 8,
+                maxLines = 6,
                 shape = ShapeTokens.Medium
             )
 
@@ -847,9 +905,9 @@ private fun InboxEditBottomSheet(
                 Spacer(modifier = Modifier.width(8.dp))
                 TaskOrbitButton(
                     text = "保存",
-                    onClick = { onSave(editContent, selectedProjectId) },
+                    onClick = { onSave(editTitle, editDescription, selectedProjectId) },
                     variant = ButtonVariant.FILLED,
-                    enabled = editContent.isNotBlank()
+                    enabled = editTitle.isNotBlank()
                 )
             }
 

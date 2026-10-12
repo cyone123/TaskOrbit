@@ -54,7 +54,8 @@ object StateValidator {
         // 校验收集箱待办引用的项目
         for (item in state.inboxItems) {
             if (item.projectId != null && item.projectId !in projectIds) {
-                throw ValidationException("待办「${item.content.take(10)}」引用了不存在的项目: ${item.projectId}")
+                val displayName = item.title.ifEmpty { item.content }
+                throw ValidationException("待办「${displayName.take(10)}」引用了不存在的项目: ${item.projectId}")
             }
         }
     }

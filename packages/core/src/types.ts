@@ -64,11 +64,14 @@ export type InboxItemKind = "todo" | "note";
 /** A capture item in the inbox, converging on actionable todos with optional project linkage. */
 export interface InboxItem {
   id: string;
-  content: string;
+  title: string;
+  description: string;
   done: boolean;
   projectId: string | null;
   createdAt: number;
   updatedAt: number;
+  /** @deprecated Transitional backward compatibility; computed or read from title/description if needed. */
+  content?: string;
   /** @deprecated Converged to single todo model; retained for transitional compatibility. */
   kind?: InboxItemKind;
 }

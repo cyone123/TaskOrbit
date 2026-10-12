@@ -50,6 +50,7 @@ export interface InboxViewState {
   statusFilter: InboxStatusFilterKey;
   projectFilter: string; // "all" | "none" | projectId
   draft: string;
+  draftDescription?: string;
   draftProjectId: string | null;
   /** @deprecated Transitional compatibility */
   mode: "todo" | "note";
@@ -101,6 +102,7 @@ export interface PersistedViewState {
     statusFilter?: InboxStatusFilterKey;
     projectFilter?: string;
     draft?: string;
+    draftDescription?: string;
     draftProjectId?: string | null;
     mode?: "todo" | "note";
     filter?: InboxFilterKey;
@@ -140,6 +142,7 @@ export const DEFAULT_VIEW_STATE: DesktopViewState = {
     statusFilter: "all",
     projectFilter: "all",
     draft: "",
+    draftDescription: "",
     draftProjectId: null,
     mode: "todo",
     filter: "all",
@@ -754,6 +757,19 @@ export function useInboxViewState() {
     [update],
   );
 
+  const setDraftDescription = useCallback(
+    (val: string | ((prev: string) => string)) => {
+      update((prev) => ({
+        ...prev,
+        draftDescription:
+          typeof val === "function"
+            ? val(prev.draftDescription ?? "")
+            : val,
+      }));
+    },
+    [update],
+  );
+
   return {
     statusFilter: state.statusFilter ?? "all",
     setStatusFilter,
@@ -761,6 +777,8 @@ export function useInboxViewState() {
     setProjectFilter,
     draft: state.draft,
     setDraft,
+    draftDescription: state.draftDescription ?? "",
+    setDraftDescription,
     draftProjectId: state.draftProjectId ?? null,
     setDraftProjectId,
     mode: state.mode ?? "todo",

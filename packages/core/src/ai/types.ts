@@ -13,6 +13,8 @@ export type AiProposalStatus = "pending" | "applied" | "cancelled";
 
 export interface InboxOrganizationProposalItem {
   inboxItemId: string;
+  sourceTitle?: string;
+  sourceDescription?: string;
   sourceContent?: string;
   action:
     | "convert_to_task"

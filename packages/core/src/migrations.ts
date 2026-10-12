@@ -216,6 +216,7 @@ function migrateV10ToV11(input: JsonRecord): JsonRecord {
  * v12 converges inbox items into actionable todos:
  * - existing notes are converted to todos, with done initialized to false
  * - adds optional projectId (defaulting to null)
+ * - splits multi-line content into title and description
  */
 function migrateV11ToV12(input: JsonRecord): JsonRecord {
   const rawItems = asArray(input.inboxItems);
@@ -223,9 +224,25 @@ function migrateV11ToV12(input: JsonRecord): JsonRecord {
     const isNote = raw.kind === "note";
     const done = isNote ? false : Boolean(raw.done);
     const projectId = asString(raw.projectId) ?? null;
+
+    let title = asString(raw.title)?.trim();
+    let description = asString(raw.description)?.trim() ?? "";
+    const rawContent = asString(raw.content) ?? "";
+
+    if (!title) {
+      const lines = rawContent.split(/\r?\n/);
+      title = (lines[0] ?? "").trim() || "未命名待办";
+      description = lines.slice(1).join("\n").trim();
+    }
+
+    const content = description ? `${title}\n${description}` : title;
+
     return {
       ...raw,
       kind: "todo",
+      title,
+      description,
+      content,
       done,
       projectId,
     };

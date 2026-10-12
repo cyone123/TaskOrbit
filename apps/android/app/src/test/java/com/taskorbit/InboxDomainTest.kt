@@ -21,6 +21,8 @@ class InboxDomainTest {
             createdAt = 1000L
         )
 
+        assertEquals("买牛奶", item.title)
+        assertEquals("", item.description)
         assertEquals("买牛奶", item.content)
         assertFalse(item.done)
         assertEquals("p_1", item.projectId)
@@ -112,7 +114,21 @@ class InboxDomainTest {
     fun `multi-line content is preserved faithfully in InboxItem`() {
         val multiLineText = "第一行待办\n第二行详情\n第三行备注"
         val item = InboxDomain.createInboxItem(content = multiLineText, projectId = "p_1")
+        assertEquals("第一行待办", item.title)
+        assertEquals("第二行详情\n第三行备注", item.description)
         assertEquals(multiLineText, item.content)
         assertEquals(3, item.content.lines().size)
+    }
+
+    @Test
+    fun `createInboxItem with explicit title and description`() {
+        val item = InboxDomain.createInboxItem(
+            title = "自定义标题",
+            description = "自定义描述",
+            projectId = "p_1"
+        )
+        assertEquals("自定义标题", item.title)
+        assertEquals("自定义描述", item.description)
+        assertEquals("自定义标题\n自定义描述", item.content)
     }
 }

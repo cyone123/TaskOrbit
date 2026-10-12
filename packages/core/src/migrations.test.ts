@@ -216,9 +216,11 @@ describe("migrations v11 -> v12", () => {
     expect(migrated.version).toBe(STATE_VERSION);
     expect(migrated.inboxItems).toHaveLength(3);
 
-    // Note converted to todo
+    // Note converted to todo and split into title & description
     expect(migrated.inboxItems[0]?.kind).toBe("todo");
     expect(migrated.inboxItems[0]?.done).toBe(false);
+    expect(migrated.inboxItems[0]?.title).toBe("灵感备忘");
+    expect(migrated.inboxItems[0]?.description).toBe("多行文字内容");
     expect(migrated.inboxItems[0]?.content).toBe("灵感备忘\n多行文字内容");
     expect(migrated.inboxItems[0]?.projectId).toBeNull();
 

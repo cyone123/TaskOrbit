@@ -29,8 +29,11 @@ function InboxProposalItemRow({ item }: { item: InboxOrganizationProposalItem })
       {/* Source item header */}
       <div className="ai-proposal-item__source row items-center gap-6">
         <span className="ai-proposal-item__tag">待办</span>
-        <span className="ai-proposal-item__content truncate" title={item.sourceContent}>
-          {item.sourceContent || `ID: ${item.inboxItemId}`}
+        <span
+          className="ai-proposal-item__content truncate"
+          title={item.sourceTitle || item.sourceContent}
+        >
+          {item.sourceTitle || item.sourceContent || `ID: ${item.inboxItemId}`}
         </span>
       </div>
 

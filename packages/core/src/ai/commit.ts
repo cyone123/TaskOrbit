@@ -70,7 +70,7 @@ export function commitInboxProposal(
           {
             projectId: targetProjectId,
             name: data.name.trim(),
-            description: data.description?.trim() || "",
+            description: data.description?.trim() || item.description || "",
             startDate: data.startDate || project.startDate,
             endDate: data.endDate || project.endDate,
             priority,
@@ -123,7 +123,7 @@ export function commitInboxProposal(
             projectId,
             taskId,
             name: data.name.trim(),
-            description: data.description?.trim() || "",
+            description: data.description?.trim() || item.description || "",
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,

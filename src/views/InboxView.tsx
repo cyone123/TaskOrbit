@@ -42,6 +42,14 @@ export function getFirstLine(content: string): string {
   return (line ?? content.split(/\r?\n/)[0] ?? "").trim();
 }
 
+export function getItemTitle(item: InboxItem): string {
+  if (item.title) return item.title;
+  if (item.content) {
+    return getFirstLine(item.content);
+  }
+  return "未命名待办";
+}
+
 function InboxItemRow({
   item,
   project,
@@ -58,6 +66,7 @@ function InboxItemRow({
   onDelete: () => void;
 }) {
   const projectColor = project ? colorByKey(project.color) : undefined;
+  const title = getItemTitle(item);
 
   return (
     <div
@@ -66,18 +75,19 @@ function InboxItemRow({
       <Checkbox
         className="inbox-item__checkbox"
         checked={item.done}
-        aria-label={`标记「${getFirstLine(item.content)}」${item.done ? "未完成" : "已完成"}`}
+        aria-label={`标记「${title}」${item.done ? "未完成" : "已完成"}`}
         onChange={onToggle}
       />
       <button
         type="button"
         className="inbox-item__body"
         onClick={onEdit}
-        aria-label={`编辑待办：${getFirstLine(item.content)}`}
+        aria-label={`编辑待办：${title}`}
       >
-        <span className="inbox-item__content">
-          {item.content}
-        </span>
+        <span className="inbox-item__title">{title}</span>
+        {item.description ? (
+          <span className="inbox-item__description">{item.description}</span>
+        ) : null}
         <span className="inbox-item__meta">
           {project && (
             <span
@@ -119,21 +129,22 @@ function InboxEditDialog({
   item: InboxItem | null;
   projects: Project[];
   onClose: () => void;
-  onSave: (patch: { content: string; projectId: string | null }) => void;
+  onSave: (patch: { title: string; description: string; projectId: string | null }) => void;
 }) {
-  const [content, setContent] = useState(item?.content ?? "");
+  const [title, setTitle] = useState(item?.title ?? (item ? getItemTitle(item) : ""));
+  const [description, setDescription] = useState(item?.description ?? "");
   const [projectId, setProjectId] = useState<string | null>(item?.projectId ?? null);
   const [error, setError] = useState("");
 
   if (!item) return null;
 
   const save = () => {
-    const nextContent = content.trim();
-    if (!nextContent) {
-      setError("请写下待办内容");
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      setError("请写下待办标题");
       return;
     }
-    onSave({ content: nextContent, projectId });
+    onSave({ title: nextTitle, description: description.trim(), projectId });
   };
 
   return (
@@ -164,15 +175,24 @@ function InboxEditDialog({
       >
         <OutlinedTextField
           className="inbox-edit-dialog__field"
-          label="待办内容"
-          type="textarea"
-          rows={6}
-          value={content}
+          label="待办标题"
+          value={title}
           onInput={(event) => {
-            setContent(eventValue(event));
+            setTitle(eventValue(event));
             setError("");
           }}
           autoFocus
+        />
+        <OutlinedTextField
+          className="inbox-edit-dialog__field"
+          label="待办描述（可选）"
+          type="textarea"
+          rows={4}
+          value={description}
+          onInput={(event) => {
+            setDescription(eventValue(event));
+          }}
+          placeholder="补充详细说明…"
         />
         <div className="inbox-edit-dialog__project">
           <OutlinedSelect
@@ -313,6 +333,8 @@ export function InboxView() {
     setProjectFilter,
     draft,
     setDraft,
+    draftDescription,
+    setDraftDescription,
     draftProjectId,
     setDraftProjectId,
   } = useInboxViewState();
@@ -380,13 +402,15 @@ export function InboxView() {
   const completedItems = visibleItems.filter((item) => item.done);
 
   const addItem = () => {
-    const content = draft.trim();
-    if (!content) return;
+    const title = draft.trim();
+    if (!title) return;
     store.addInboxItem({
-      content,
+      title,
+      description: draftDescription.trim(),
       projectId: draftProjectId,
     });
     setDraft("");
+    setDraftDescription("");
     setDraftProjectId(null);
     show("待办已收下");
   };
@@ -477,13 +501,19 @@ export function InboxView() {
           >
             <OutlinedTextField
               ref={captureInputRef}
-              label="想做什么？"
-              type="textarea"
-              rows={3}
+              label="待办标题"
               value={draft}
               onInput={(event) => setDraft(eventValue(event))}
-              placeholder="例如：给家里的植物换盆&#10;支持多行文本，按 Ctrl+Enter 快速收下"
+              placeholder="想做什么？例如：给家里的植物换盆"
               autoFocus
+            />
+            <OutlinedTextField
+              label="描述（可选）"
+              type="textarea"
+              rows={2}
+              value={draftDescription}
+              onInput={(event) => setDraftDescription(eventValue(event))}
+              placeholder="补充详细说明…"
             />
             <OutlinedSelect
               label="关联项目"
@@ -518,7 +548,7 @@ export function InboxView() {
             </FilledButton>
           </form>
           <p className="inbox-capture__hint body-sm inbox-capture__sub">
-            支持记录多行文本，按 Ctrl+Enter 快速收下。
+            填写标题与可选描述，按 Ctrl+Enter 快速收下。
           </p>
         </FilledCard>
 
@@ -666,9 +696,9 @@ export function InboxView() {
         item={editing}
         projects={activeProjects}
         onClose={() => setEditing(null)}
-        onSave={({ content, projectId }) => {
+        onSave={({ title, description, projectId }) => {
           if (!editing) return;
-          store.updateInboxItem(editing.id, { content, projectId });
+          store.updateInboxItem(editing.id, { title, description, projectId });
           setEditing(null);
           show("待办已更新");
         }}
@@ -676,7 +706,7 @@ export function InboxView() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="删除待办"
-        message={`确定删除「${(deleteTarget ? getFirstLine(deleteTarget.content) : "") || "这条待办"}」吗？`}
+        message={`确定删除「${(deleteTarget ? getItemTitle(deleteTarget) : "") || "这条待办"}」吗？`}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />

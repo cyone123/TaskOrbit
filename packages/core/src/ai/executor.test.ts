@@ -111,6 +111,8 @@ function createMockState(): AppState {
   const item1: InboxItem = {
     id: "inbox_1",
     kind: "todo",
+    title: "未完成待办",
+    description: "",
     content: "未完成待办",
     done: false,
     projectId: "p_1",
@@ -121,6 +123,8 @@ function createMockState(): AppState {
   const item2: InboxItem = {
     id: "inbox_2",
     kind: "note",
+    title: "一条备忘",
+    description: "",
     content: "一条备忘",
     done: false,
     projectId: null,
@@ -131,6 +135,8 @@ function createMockState(): AppState {
   const item3: InboxItem = {
     id: "inbox_3",
     kind: "todo",
+    title: "已完成待办",
+    description: "",
     content: "已完成待办",
     done: true,
     projectId: null,
